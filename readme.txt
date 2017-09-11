@@ -22,7 +22,7 @@ I/ install (linux)
 
 2) add srfpython/bin to your python path
 
-3) in python, import function srfdis17 from module srfid17
+3) in python, import function srfdis17 from module srfdis17
 >> from srfdis17 import srfdis17
 >> help(srfdis17)
 
