@@ -1,7 +1,10 @@
 #!/usr/bin/python2.7
+from __future__ import print_function
 from subprocess import Popen, PIPE
+from numpy import log, log10
 import numpy as np
 import sys, glob, os, time, signal
+
 
 _pathfile = os.path.realpath(__file__) #.../srfpyhon/src/srfdis17.py
 _file     = _pathfile.split('/')[-1]
@@ -23,6 +26,15 @@ class Timeout():
     def raise_timeout(self, *args):
         raise Timeout.Timeout()
 #_____________________________________
+class Timer(object):
+    def __init__(self, title):
+        self.title = title
+    def __enter__(self):
+        self.start = time.time()
+        return self
+    def __exit__(self, *args, **kwargs):
+        print ("elapsed time %s : %fs" % (self.title, time.time() - self.start))
+#_____________________________________
 def firstfalse(I):
     if not I[0] : return 0
     II = I[1:] != I[:-1]
@@ -41,7 +53,7 @@ def freqspace(freqmin, freqmax, nfreq, scale="flin"):
     if "lin" in scale.lower():
         return np.linspace(freqmin, freqmax, nfreq)
     elif "log" in scale.lower():
-        return np.logspace(np.log10(freqmin), np.logspace(freqmax), nfreq)
+        return np.logspace(log10(freqmin), np.logspace(freqmax), nfreq)
     else: raise ValueError('%s not understood' % scale)
 ###################################### MODIFIED HERRMANN'S CODES
 def prep_srfpre96_1(h = 0.005, dcl = 0.005, dcr = 0.005):
@@ -170,7 +182,7 @@ def igroupbywtm(Waves, Types, Modes, Freqs):
     array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
     array([0.1, 0.37606031, 1.41421356, 5.3182959, 20., 0.1, 0.37606031, 1.41421356, 5.3182959, 20., 0.1, 0.37606031, 1.41421356, 5.3182959, 20., 0.1, 0.37606031, 1.41421356, 5.3182959, 20])
     """
-    Waves, Types, Modes = [np.array(w, object) for w in Waves, Types, Modes]
+    Waves, Types, Modes = [np.array(w, object) for w in [Waves, Types, Modes]]
     waves = Waves.repeat([len(ff) for ff in Freqs])
     types = Types.repeat([len(ff) for ff in Freqs])
     modes = Modes.repeat([len(ff) for ff in Freqs])
@@ -190,48 +202,66 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
     #except:  raise CPiSError('could not understand stdout \n%s' % stdout)
     A = np.asarray( (" ".join(stdout.strip().rstrip('\n').split('\n'))).split(), float)
     A = A.reshape((len(A) / 6, 6))
+    #A[:, 0] (itst) wave type 1 = Love, 2 = Rayleigh
+    #A[:, 1] (iq-1) mode number, 0 = fundamental
+    #A[:, 2] (t1a)  t1 if phase only else lower period = t1/(1+h), in s
+    #A[:, 3] (t1b)  0. if phase only else upper period = t1/(1-h), in s; 
+    #A[:, 4] (cc0)  phase velocity at t1 if phase only else at t1a, in km/s; 
+    #A[:, 5] (cc1)  phase velocity at t1 if phase only else at t1b, in km/s; 
+    #for i in xrange(A.shape[0]):print (A[i, :])
 
-    W = A[:, 0]
-    M = A[:, 1]
-    I = A[:, 3] == 0.
+    W = A[:, 0]       
+    M = A[:, 1]       
+    I = A[:, 3] == 0. #True means phase only
     nI = ~I
     n = A.shape[0]
     T, C, U = np.zeros(n, float), np.zeros(n, float), np.zeros(n, float) * np.nan
-    T[I]=A[I,2]
-    T[nI]=A[nI,2:4].mean(axis = 1)
-    C[I]=A[I,4]
-    C[nI]=A[nI,4:6].mean(axis = 1)
-
-    U[nI] = C[nI] / (1. - (np.log(A[nI,5]) - np.log(A[nI,4])) / (np.log(A[nI,2]) - np.log(A[nI,3])))
+    if I.any():
+        T[I]  = A[I,2]
+        C[I]  = A[I,4]
+    if nI.any():
+        T[nI] = A[nI,2] * A[nI,3] / (A[nI,2:4].mean(axis = 1))#np.sqrt(A[nI,2] * A[nI,3]) #Jeffreys average #A[nI,2:4].mean(axis = 1)
+        C[nI] = np.sqrt(A[nI,4] * A[nI,5]) #Jeffreys average #A[nI,4:6].mean(axis = 1)
+        LnI = (log(A[nI,5]) - log(A[nI,4])) / (log(A[nI,2]) - log(A[nI,3]))
+        U[nI] = C[nI] / (1. - LnI)
     
     L, R = (W == 1), (W == 2)
-    Ms = {}
-    for m in np.unique(modes): Ms['%d' % m] = (M == m)
-
+    umodes = np.arange(max(modes) + 1)
+    RMs = [R & (M == m) for m in umodes]
+    LMs = [L & (M == m) for m in umodes]
+    RMs = [rms if rms.any() else None for rms in RMs]
+    LMs = [lms if lms.any() else None for lms in LMs]
 
     values = np.zeros(len(waves), float) * np.nan
+#    T0, T1, T2 = 0., 0., 0.
     for n, (w, t, m, f) in enumerate(zip(waves, types, modes, freqs)):
-        #S = eval(w) & (M == m)
-        if   w == "R":S = R & Ms['%d' % m]
-        elif w == "L":S = L & Ms['%d' % m]
 
-        if not S.any(): continue#yield w, t, int(m), f, np.nan
+#        start = time.time()
+        if   w == "R":S = RMs[m]
+        else         :S = LMs[m]#elif w == "L"
+        if S is None: continue
+#        T0 += time.time() - start
+        
+#        start = time.time()
+        p  = 1. / f
         TS = T[S]
-        iS = np.abs(TS - 1./f).argmin()
+        iS = np.abs(TS - p).argmin()
         per = TS[iS]        
-        if abs(per - 1./f) * f > 0.01: continue#yield w, t, int(m), f, np.nan
+        if abs(per - p) / p > 0.01: continue
+#        T1 += time.time() - start
 
+#        start = time.time()        
         if   t == 'C': val = C[S][iS] 
-        elif t == "U": val = U[S][iS]
-        else: raise ValueError('')
+        else         : val = U[S][iS] #elif t == "U"
+        #else: raise ValueError('')
         #if val <= 0: #NON, je met une penalite dans la fonction cout
         #    raise CPiSError('encountered negative dispersion velocity')
 
         values[n] = val
+#        T2 += time.time() - start
 
+#    print (T0, T1, T2)
     return values
-
-
 
 #_____________________________________
 def srfdis17(ztop, vp, vs, rh, \
@@ -281,24 +311,27 @@ def srfdis17(ztop, vp, vs, rh, \
             p = Popen(srfpre96_exe, stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=False, preexec_fn=os.setsid)#, stderr = stderrfid)
             p.stdin.write(pstdin)
             pstdout, _ = p.communicate()
-            if p.returncode : raise CPiSError('srfpre96_exe failed')
+            if p.returncode : raise CPiSError('error : %s failed' % srfpre96_exe)
 
             q = Popen(srfdis96_exe, stdout=PIPE, stdin=PIPE, stderr = PIPE, shell = False,  preexec_fn=os.setsid)#, stderr = stderrfid)
             q.stdin.write(pstdout)
             qstdout, _ = q.communicate()
-            if q.returncode : raise CPiSError('srfdis96_exe failed')    
+            if q.returncode : raise CPiSError('error : %s failed' % srfdis96_exe)
     except Timeout.Timeout:
-        print "*123*", ztop, vp, vs, rh
+        print ("error *123*", ztop, vp, vs, rh)
         #raise Exception('srfdis96 timed out ')
         os.killpg(os.getpgid(p.pid), signal.SIGKILL)
         os.killpq(os.getpgid(q.pid), signal.SIGKILL)
         raise CPiSError('timeout')
     except: raise 
     finally:
-        p.stdin.close()
-        q.stdin.close()
+        try:p.stdin.close()
+        except:pass
+        try:q.stdin.close()
+        except:pass
 
     #-------------- 
+#    with Timer('readsrfdis96'):
     values = readsrfdis96(qstdout, waves, types, modes, freqs)
     return values
 
@@ -320,11 +353,14 @@ def srfdis17_1(ztop, vp, vs, rh, \
         'R', 'U', 0, fRU0, RU0(fRU0)
 
     """
+#    with Timer('igroupbywtm'):
     waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
+#    with Timer('srfdis17'):
     values = srfdis17(ztop, vp, vs, rh, \
-                        waves, types, modes, freqs,
-                        h = h, dcl = dcl, dcr = dcr)
+                    waves, types, modes, freqs,
+                    h = h, dcl = dcl, dcr = dcr)
 
+#    with Timer('groupbywtm'):
     for w, t, m, F, V in groupbywtm(waves, types, modes, freqs, values, keepnans = keepnans):
         yield w, t, m, F, V
 #_____________________________________
@@ -339,15 +375,19 @@ if __name__ == "__main__":
     rh   = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63] #g/cm3
 
     ###dipsersion parameters
-    f = np.logspace(np.log10(0.2), np.log10(10.), 20)
-    Waves = ['R', 'R', 'R', 'R']
-    Types = ['U', 'U', 'U', 'U']
-    Modes = [ 0 ,  1,   2 ,  3 ]
-    Freqs = [ f ,  f,   f,   f ]
+    def f(): return np.logspace(np.log10(0.2), np.log10(1.5), 15)
+    Waves = ['R']#, 'R', 'R', 'R']#, 'R', 'R', 'R', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L']
+    Types = ['U']#, 'U', 'U', 'U']#, 'C', 'C', 'C', 'C', 'U', 'U', 'U', 'U', 'C', 'C', 'C', 'C']
+    Modes = [ 0 ]#,  1,   2 ,  3 ]#,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ]
+    Freqs = [ f()]#, f(), f(), f()]#, f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f()]
 
     start = time.time()
-    out = list(srfdis17_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
-    print "elapsed time %fs" % (time.time() - start)
+    n = 0
+    while time.time() - start < 1.0:
+        n += 1
+        out = list(srfdis17_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
+    print ("%.2f models/s" % (n / (time.time() - start)))
+
     for w, t, m, fs, vs in out:
         plt.gca().loglog(1. / fs, vs, '+-')
     plt.gcf().show()
