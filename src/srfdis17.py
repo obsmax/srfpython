@@ -194,8 +194,8 @@ def igroupbywtm(Waves, Types, Modes, Freqs):
 #_____________________________________
 class CPiSError(Exception): pass
 class CPiSDomainError(CPiSError): pass
-#_____________________________________
-def readsrfdis96(stdout, waves, types, modes, freqs):
+
+def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
     "converts output from max_srfdis96, to be optimized (takes about 0.5 * the times used by max_srfpre96+max_srfdis96)"
 
     #try:     A = np.genfromtxt(StringIO(unicode(stdout)), dtype = float)
@@ -262,6 +262,75 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
 
 #    print (T0, T1, T2)
     return values
+  
+
+#_____________________________________
+def argcrossfind(X, Y):
+    #X and Y are unique and sorted
+    nx, ny = len(X), len(Y)
+    ix, iy = 0, 0
+    IX, IY = [], []
+    while ix < nx and iy < ny:
+#        if X[ix] == Y[iy]:
+        if abs((X[ix] - Y[iy]) / X[ix]) < 0.01:
+            IX.append(ix)
+            IY.append(iy)
+            ix += 1
+            iy += 1
+        elif X[ix] < Y[iy]: ix += 1
+        elif X[ix] > Y[iy]: iy += 1
+    return np.asarray(IX, int), np.asarray(IY, int)
+
+#_____________________________________
+def readsrfdis96(stdout, waves, types, modes, freqs):
+    periods = 1./freqs
+    A = (" ".join(stdout.strip().rstrip('\n').split('\n'))).split()
+    W   = np.asarray(A[::6],  int)-1  #wave type 0 = Love, 1 = Rayleigh
+    M   = np.asarray(A[1::6], int)    #(iq-1) mode number, 0 = fundamental
+    T1A = np.asarray(A[2::6], float)  #t1 if phase only else lower period = t1/(1+h), in s
+    T1B = np.asarray(A[3::6], float)  #0. if phase only else upper period = t1/(1-h), in s; 
+    CC0 = np.asarray(A[4::6], float)  #phase velocity at t1 if phase only else at t1a, in km/s; 
+    CC1 = np.asarray(A[5::6], float)  #phase velocity at t1 if phase only else at t1b, in km/s; 
+    n = len(W)    
+    I = T1B == 0. #True means phase only
+    L = W == 0    #True means Love
+    R = ~L        #assume only R or L
+
+    #---------------------------------
+    nI = ~I
+    T, C, U = np.zeros(n, float), np.zeros(n, float), np.zeros(n, float) * np.nan
+    if I.any():
+        T[I]  = T1A[I]
+        C[I]  = CC0[I]
+    if nI.any():
+        T[nI] = 2. * T1A[nI] * T1B[nI] / (T1A[nI] + T1B[nI]) #see srfpre96 T1A = T1/(1+h), T1B = T1/(1-h) => T1=2 T1A T1B / (T1A + T1B)
+        C[nI] = np.sqrt(CC0[nI] * CC1[nI]) #Jeffreys average #A[nI,4:6].mean(axis = 1)
+        LnI = (log(CC1[nI]) - log(CC0[nI])) / (log(T1A[nI]) - log(T1B[nI]))
+        U[nI] = C[nI] / (1. - LnI)
+    #---------------------------------
+    #arange available data
+    umodes = np.arange(max(modes) + 1)
+    D = {"L" : [], "R" : []}
+    for m in umodes:
+        I = (M == m)
+        IR = R & I
+        IL = L & I
+        D["L"].append({"T" : T[IL], "C" : C[IL], "U" : U[IL]})
+        D["R"].append({"T" : T[IR], "C" : C[IR], "U" : U[IR]})
+
+
+    #---------------------------------
+    values = np.zeros(len(waves), float) * np.nan
+    indexs  = np.arange(len(waves))  
+    for w, t, m, P, I in groupbywtm(waves, types, modes, periods, indexs, dvalues = None, keepnans = True):
+        #available data : period D[w][m]["T"]; value  D[w][m][t]
+        #requested data : P
+        IP, ITT = argcrossfind(P, D[w][m]["T"])
+        values[I[IP]] = D[w][m][t][ITT]
+
+    return values
+
+    
 
 #_____________________________________
 def srfdis17(ztop, vp, vs, rh, \
@@ -331,8 +400,7 @@ def srfdis17(ztop, vp, vs, rh, \
         except:pass
 
     #-------------- 
-#    with Timer('readsrfdis96'):
-    values = readsrfdis96(qstdout, waves, types, modes, freqs)
+    values = readsrfdis96(qstdout, waves, types, modes, freqs)      
     return values
 
 #_____________________________________
@@ -353,14 +421,11 @@ def srfdis17_1(ztop, vp, vs, rh, \
         'R', 'U', 0, fRU0, RU0(fRU0)
 
     """
-#    with Timer('igroupbywtm'):
     waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
-#    with Timer('srfdis17'):
     values = srfdis17(ztop, vp, vs, rh, \
-                    waves, types, modes, freqs,
-                    h = h, dcl = dcl, dcr = dcr)
+                waves, types, modes, freqs,
+                h = h, dcl = dcl, dcr = dcr)
 
-#    with Timer('groupbywtm'):
     for w, t, m, F, V in groupbywtm(waves, types, modes, freqs, values, keepnans = keepnans):
         yield w, t, m, F, V
 #_____________________________________
@@ -375,18 +440,15 @@ if __name__ == "__main__":
     rh   = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63] #g/cm3
 
     ###dipsersion parameters
-    def f(): return np.logspace(np.log10(0.2), np.log10(1.5), 15)
-    Waves = ['R']#, 'R', 'R', 'R']#, 'R', 'R', 'R', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L']
-    Types = ['U']#, 'U', 'U', 'U']#, 'C', 'C', 'C', 'C', 'U', 'U', 'U', 'U', 'C', 'C', 'C', 'C']
-    Modes = [ 0 ]#,  1,   2 ,  3 ]#,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ]
-    Freqs = [ f()]#, f(), f(), f()]#, f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f()]
+    def f(): return np.logspace(np.log10(0.2), np.log10(3.5), 35)
+    Waves = ['R', 'R']#, 'R', 'R', 'R', 'R', 'R', 'R', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L']
+    Types = ['U', 'U']#, 'U', 'U', 'C', 'C', 'C', 'C', 'U', 'U', 'U', 'U', 'C', 'C', 'C', 'C']
+    Modes = [ 0 ,  1]#,   2 ,  3 ,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ]
+    Freqs = [ f(), f()]#, f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f()]
 
-    start = time.time()
-    n = 0
-    while time.time() - start < 1.0:
-        n += 1
-        out = list(srfdis17_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
-    print ("%.2f models/s" % (n / (time.time() - start)))
+
+    out = list(srfdis17_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
+
 
     for w, t, m, fs, vs in out:
         plt.gca().loglog(1. / fs, vs, '+-')
