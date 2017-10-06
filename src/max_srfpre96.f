@@ -120,7 +120,6 @@ c     model96 earth model format
 c     Modified  January  2002 to internally use the model96 files
 c- - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 c
-
         parameter(LER=0,LIN=5,LOT=6)
         parameter(NL=200,NL2=NL+NL)
 c-----
@@ -131,36 +130,18 @@ c     NL    - number of layers in model
 c     NL2   - number of columns in model (first NL2/2 are
 c           - velocity parameters, second NL2/2 are Q values)
 c-----
-        integer nf10(NL)
-        data nf10/NL*1/
+!        integer nf10(NL)
+!        data nf10/NL*1/
         integer nf(13)
-        real dd(NL2)
-        logical wc(NL2)
-        dimension a(NL),b(NL),d(NL),r(NL),rat(NL),qbinv(NL)
-        character*80 nmmodl, nmdisp
-        logical ext
-        common/param/qaqb,itype,dlam,invdep
-        data qbinv/NL *0.0/
-       
+!        real dd(NL2)
+!        logical wc(NL2)
+!        dimension a(NL),b(NL),d(NL),r(NL),rat(NL),qbinv(NL)
+!        character*80 nmmodl, nmdisp
+        character*80 nmdisp
+!        logical ext
+!        common/param/qaqb,itype,dlam,invdep
+!        data qbinv/NL *0.0/
         real*4 h,dcl,dcr
-c-----
-c     machine dependent initialization
-c-----
-        call mchdep()
-c-----
-c     test for the existence of sobs.d
-c     if it does not exist interactively set it up
-c-----
-!        inquire(file='sobs.d',exist=ext)
-!        if(.not.(ext))    call setobs(a,b,d,r,rat,qbinv)
-c-----
-!        open(1,file='sobs.d',status='old',access='sequential')
-!        rewind 1
-!          read(1,*) h,dcl,onel,dcr,oner
-           read(LIN,*) h,dcl,dcr
-           oner = 0.0
-           onel = 0.0
-C         write(LOT,*) h,dcl,onel,dcr,oner
 c-----
 c     h     = percentage period change for group velocity partial
 c     dcl   = Love Wave Phase Velocity Search Increment
@@ -168,16 +149,9 @@ c     onel  = Love Wave Increment for Backtracking on Step
 c     dcr   = Rayleigh Wave Phase Velocity Search Increment
 c     oner  = Rayleigh Wave Increment for Backtracking on Step
 c-----
-!        read(1,*) (nf(i),i=1,8),nf(11),nf(12)
-C       write(LOT,*) (nf(i),i=1,8),nf(11),nf(12)
-c        read(LIN,*) (nf(i),i=1,8),nf(11),nf(12)
-         nf(1) = 0 
-         nf(2) = 0
-         nf(5) = 0
-         nf(8) = 0
-         nf(11) = 0
-         nf(12) = 0
-c         read(LIN,*) nf(3),nf(4),nf(6),nf(7) 
+        read(LIN,*) h,dcl,dcr
+        oner = 0.0
+        onel = 0.0
 c-----
 c     nf() is the control array
 c     nf(1) = 1 estimated stdev computed from residuals
@@ -212,8 +186,12 @@ c             (from disp file)
 c             0 period
 c             1 frequency
 c-----
-!        read(1,'(a)')nmmodl
-!        write(LOT,*)nmmodl
+         nf(1) = 0 
+         nf(2) = 0
+         nf(5) = 0
+         nf(8) = 0
+         nf(11) = 0
+         nf(12) = 0
 c-----
 c     nmmodl= name of file containing model information
 c-----
@@ -222,239 +200,16 @@ c-----
         nf(12) = iflsph
         m=nf(9)
         m2 = m + m
-         read(LIN,*) nf(3),nf(4),nf(6),nf(7) 
+        read(LIN,*) nf(3),nf(4),nf(6),nf(7)
 c-----
 c     nmdisp= name of file containing dispersion data
 c-----
-!        read(1,'(a)')nmdisp
-C       write(LOT,*)nmdisp
-!        close (1)
-c-----
-c     initialize model weights
-c-----
-!        do 2 i=1,m
-!            dd(i) = 1.0
-!            dd(i+m) = dd(i)
-!            wc(i) = .true.
-!            wc(i+m) = .true.
-!            if(i.eq.m)then
-!                wc(i) = .false.
-!                wc(i+m) = .false.
-!            else
-!                wc(i) = .true.
-!                wc(i+m) = .true.
-!            endif
-!    2   continue
-!        open(8,file='tmpsrfi.12',form='unformatted',access='sequential')
-!        rewind 8
-!        write(8) nf(8),m
-!        write(8)(dd(i),i=1,m2)
-!        write(8)(wc(i),i=1,m2)
-!        close(8,status='keep')
-!        open(8,file='tmpsrfi.04',form='unformatted',access='sequential')
-!        rewind 8
-!        write(8) nf(8),m
-!        write(8)(dd(i),i=1,m2)
-!        write(8)(wc(i),i=1,m2)
 c
 c     main loop...check input data and write to unformatted files
 c
         call getdsp(nmdisp,nf,dcl,dcr,onel,oner,h,iunitd)
-              nf34=max(nf(3),nf(4))
-              nf67=max(nf(6),nf(7))
-c-----
-c     close the file with the internal dispersion values
-c-----
-!       close(8,status='keep')
-c-----
-c     nfilt   0   no weighting no smoothing
-c         1      weighting no smoothing
-c         2       no weighting    smoothing
-c         3          weighting    smoothing
-c----
-
-        if(nf(8).eq.0.and.nf(11).eq.0) nfilt=0
-        if(nf(8).eq.1.and.nf(11).eq.0) nfilt=1
-        if(nf(8).eq.0.and.nf(11).eq.1) nfilt=2
-        if(nf(8).eq.1.and.nf(11).eq.1) nfilt=3
-              nf34 = max(nf(3),nf(4))
-              nf67 = max(nf(6),nf(7))
-c-----
-c     this value of nup forces a run of dispersion first
-c-----
-              nup=2
-              nzer=0
-              qaqb = 2.25
-              invcsl = 0
-              wref = 1.0
-              lstinv = -1
-        invdep = 1
-        itype = 0
-        dlam = 1.0
-        twnmin = -5.0
-        twnmax = 20.0
-        iter = 0
-        nurftn = -1
-        pval = 0.5
-        sigv = 0.05
-        sigr = 0.05
-        sigg = 0.00005
-        idtwo = 0
-        idum2 = 0
-        idum3 = 0
-        idum4 = 0
-        idum5 = 0
-        rdum1 = 0.0
-        rdum2 = 0.0
-        rdum3 = 0.0
-        rdum4 = 0.0
-        rdum5 = 0.0
-c-----
-c     iprog is a binary OR: 2= rftn, 1=surf
-c-----
-!        iprog = 0 + 1
-!        call pttmp0(iprog,nzer,nf(1),nf(2),nf34,nf(5),nf67,nf10,nfilt,
-!     1            nup,dlam,qaqb,wref,invcsl,lstinv,
-!     2      twnmin,twnmax,iter,nurftn,invdep,pval,sigv,sigr,sigg,
-!     3      idtwo,idum2,idum3,idum4,idum5,
-!     4      rdum1,rdum2,rdum3,rdum4,rdum5)
         end
-
-        subroutine pttmp0(iprog,itot,nf1,nf2,nf34,nf5,nf67,nf10,
-     1      nfilt,nup,dlam,qaqb,wref,invcsl,lstinv,
-     2      twnmin,twnmax,iter,nurftn,invdep,pval,sigv,sigr,sigg,
-     3      idtwo,idum2,idum3,idum4,idum5,
-     4      rdum1,rdum2,rdum3,rdum4,rdum5)
-        integer NL
-        parameter (NL=200)
-        integer nf10(NL)
-c-----
-c     update control file
-c-----
-!        open(1,file='tmpsrfi.00',form='unformatted'
-!     1            ,access='sequential')
-!        rewind 1
-!        write(1) iprog,itot,nf1,nf2,nf34,nf5,nf67,nf10,nfilt,
-!     1      nup,dlam,qaqb,wref,invcsl,lstinv,
-!     2      twnmin,twnmax,iter,nurftn,invdep,pval,sigv,sigr,sigg,
-!     3      idtwo,idum2,idum3,idum4,idum5,
-!     4      rdum1,rdum2,rdum3,rdum4,rdum5
-!        close(1,status='keep')
-        return
-        end
-
-        subroutine psrho(a,b,r,ratio,nswtch,iunit)
-c-----
-c relations between p and s velocities, poissons ratio and density
-c if(nswtch.eq.0)  given a and b find ratio
-c              1   given a and ratio find b
-c              2   given b and ratio find a
-c              3   given a find r
-c              4   given b and ratio find a and r
-c              5   given a and ratio find b and r
-c              6   given r find a
-c iunit   0 km,km/sec,gm/cc
-c         1 ft,ft/sec,gm/cc
-c         2  m, m/sec,gm/cc
-c-----
-c-----
-c     convert units to km/sec if necessary
-c-----
-        if(iunit.eq.1)then
-              a = a * 0.3048006 / 1000.0
-              b = b * 0.3048006 / 1000.0
-        elseif(iunit.eq.2)then
-              a = a / 1000.0
-              b = b / 1000.0
-        endif
-        if(nswtch.eq.0) then
-c-----
-c determine poissons ratio
-c-----
-              a2 = a**2
-              b2 = b**2
-              ratio = (2.*b2-a2)/(2.*b2-2.*a2)
-        elseif(nswtch.eq.1 .or. nswtch.eq.5)then
-c-----
-c determine s-wave velocity
-c-----
-              b = a*sqrt((1.-2.*ratio)/(2.-2.*ratio))
-        elseif(nswtch.eq.2 .or. nswtch.eq.4)then
-c-----
-c determine p-wave velocity
-c-----
-              if(ratio.eq..5.or.b.eq.0.0) then
-                    a = 1.52
-              else
-                    a = b/sqrt((1.-2.*ratio)/(2.-2.*ratio))
-              endif
-        endif
-c-----
-c     determine densities from P-velocity
-c-----
-        if(nswtch.eq.3 .or. nswtch.eq.4 .or. nswtch.eq.5)then
-              call gtrofa(r,a)
-        endif
-c-----
-c     determin P-velocity from density
-c-----
-        if(nswtch.eq.6)then
-              call gtaofr(r,a)
-        endif
-c-----
-c     convert km/sec units back to original units
-c-----
-        if(iunit.eq.1)then
-              a = a * 1000.0 / 0.3048006
-              b = b * 1000.0 / 0.3048006
-        elseif(iunit.eq.2)then
-              a = a * 1000.0
-              b = b * 1000.0
-        endif
-        return
-        end
-
-        subroutine gtrofa(r,a)
-c-----
-c     obtain density (r,gm/cc) as a function of P-vel (a,km/sec)
-c-----
-        dimension rp(18)
-        data rp/1.65,1.85,2.05,2.15,2.23,2.32,2.39,2.50,2.60,2.70,2.85,
-     # 2.98,3.14,3.31,3.49,3.66,3.86,4.05/
-c-----
-c determine density
-c-----
-        if(a.gt.1.5 .and. a.lt.10.0)then
-              xa = (a-1.5)*2.
-              na = xa+1
-              dr = rp(na+1)-rp(na)
-              da=a-na*.5-1.0
-              r = rp(na)+dr*da*2.
-        elseif(a.le.1.5)then
-              r = 1.0
-        elseif(a.ge.10.0)then
-              r = 4.10
-        endif
-        return
-c-----
-c     determine P-vel (a,km/sec) as a function of density (r,gm/cc)
-c-----
-        entry gtaofr(r,a)
-        if(r.lt.1.65)then
-              a = 1.5
-        elseif(r.gt.4.05)then
-              a = 10.0
-        elseif(r.ge.1.65 .and. r.le.4.05)then
-              do 10 i=2,18
-                    if(rp(i).gt.r) go to 20
-10          continue
-20          xa = i*.5+.5
-              dr = rp(i)-rp(i-1)
-              a=((r-rp(i-1))/dr)*.5+xa
-        endif
-        return
-        end
-
+c#################################################################
         subroutine getmdl(nmmodl,mmax,nfmod,iunit,iflsph)
 c-----
 c     igetmod common
@@ -485,15 +240,15 @@ c-----
         nfmod = 1
         iunit = 0
         LT = LGSTR(TITLE)
-!        call putmod(2,'tmpsrfi.17',mmax,title(1:lt),iunit,iiso,iflsph,
-!     1      idimen,icnvel,.false.)
         call putmod(2,'stdout',mmax,title(1:lt),iunit,iiso,iflsph,
      1      idimen,icnvel,.false.)
-!        call putmod(2,'tmpmod96.000',mmax,title(1:lt),iunit,iiso,iflsph,
-!     1      idimen,icnvel,.false.)
+!        write(LOT,*) mmax,title(1:lt),iunit,iiso,iflsph,
+!     1      idimen,icnvel,.false.
         return
         end
 
+
+c#################################################################
         subroutine getdsp(nmdisp,nf,dcl,dcr,onel,oner,h,iunitd)
 c-----
 c     nmdisp - file containing dispersion data
@@ -567,8 +322,8 @@ C        WRITE(0,*)idat,' ',instr
 c-----
 c         do the parsing
 c-----
-            if(instr(1:6).eq.'surf96' .or.
-     1          instr(1:6).eq.'SURF96')then
+            if(instr(1:6).eq.'SURF96' .or.
+     1          instr(1:6).eq.'surf96')then
 c-----
 c             now get wave type
 c-----      
@@ -782,6 +537,7 @@ c-----
         return
         end
 
+c#################################################################
         subroutine getlim(modemx,idat,lorr,mode,imap,ilvry)
         integer*4 modemx(2,2), idat,lorr(*),imap(*),mode(*)
 c-----
@@ -833,6 +589,7 @@ c-----
         return
         end
 
+c#################################################################
         subroutine uniq(y,x,key,nx,ny,imap)
         
 c-----
@@ -863,6 +620,7 @@ c-----
         return
         end
 
+c#################################################################
        subroutine sort(x,key,n)
 c-----
 c     Starting with x(1) ,,, x(n)
@@ -878,7 +636,6 @@ c-----
        integer n
        real x(n)
        integer key(n)
-
        do i=1,n
            key(i) = i
        enddo
@@ -894,186 +651,11 @@ c-----
                 endif
            enddo
        enddo
+
+
        return
        end
-
-        subroutine setobs(a,b,d,r,rat,qbinv)
-c-----
-c     set up the control file sobs.d interactively
-c-----
-        parameter (LIN=5, LOT=6, LER=0)
-        parameter (NL=200,NL2=NL+NL)
-        character*80 nmmodl, nmdisp
-        real a(NL),b(NL),d(NL),r(NL),rat(NL),qbinv(NL)
-        integer nf(12)
-        logical ext
-c-----
-c     open the file sobs.d
-c-----
-        open(1,file='sobs.d',status='unknown',form='formatted',
-     1            access='sequential')
-        rewind 1
-c-----
-c     get control for dispersion search
-c-----
-        write(LOT,*)
-     1 ' Enter h,dcl,dcr'
-        write(LOT,*)
-     1 '      h = fraction change in period to get group vel'
-        write(LOT,*)
-     1 '            (0.005 is reasonable)'
-        write(LOT,*)
-     1 '      dcl, dcr are phase velocity increment in root'
-        write(LOT,*)
-     1 '            search for Love and Rayl respectively'
-        read(LIN,*)h,dcl,dcr
-        onel = 0.0
-        oner = 0.0
-        write(1,*)h,dcl,onel,dcr,oner
-c-----
-c     get second line of sobs.d
-c-----
-        write(LOT,*)
-     1 ' Enter 1 if SW variance based on residuals or'
-        write(LOT,*)
-     1 '       0 if SW variance based on obs std err'
-        read(LIN,*)nf(1)
-        write(LOT,*)
-     1 ' Enter maximum number of Love gamma modes to process'
-        write(LOT,*)
-     1 '      0 means DO NO PROCESS LOVE gamma data'
-        read(LIN,*)nf(2)
-        write(LOT,*)
-     1 ' Enter maximum number of Love Phvel modes to process'
-        write(LOT,*)
-     1 '      0 means DO NO PROCESS LOVE phase vel data'
-        read(LIN,*)nf(3)
-        write(LOT,*)
-     1 ' Enter maximum number of Love Gpvel modes to process'
-        write(LOT,*)
-     1 '      0 means DO NO PROCESS LOVE group vel data'
-        read(LIN,*)nf(4)
-        write(LOT,*)
-     1 ' Enter maximum number of Rayl gamma modes to process'
-        write(LOT,*)
-     1 '      0 means DO NO PROCESS RAYL gamma data'
-        read(LIN,*)nf(5)
-        write(LOT,*)
-     1 ' Enter maximum number of Rayl Phvel modes to process'
-        write(LOT,*)
-     1 '      0 means DO NO PROCESS RAYL phase vel data'
-        read(LIN,*)nf(6)
-        write(LOT,*)
-     1 ' Enter maximum number of Rayl Gpvel modes to process'
-        write(LOT,*)
-     1 '      0 means DO NO PROCESS RAYL group vel data'
-        read(LIN,*)nf(7)
-C       write(LOT,*)
-C     1 ' Model Layer Weighting'
-C       write(LOT,*)
-C     1 '      0 No weighting'
-C       write(LOT,*)
-C     1 '      1 Read in weights for layers'
-C       read(LIN,*)nf(8)
-        nf(8) = 0
-C       write(LOT,*)' Enter inversion technique'
-C       write(LOT,*)'    0   invert for Vs :Va,rho fixed'
-C       write(LOT,*)'    1 : invert for Vs :Poisson fixed, rho from Vp'
-C       read(LIN,*)nf(10)
-C       write(LOT,*)
-C     1 ' Enter Type of Smoothing'
-C       write(LOT,*)
-C     1 '      0 None'
-C       write(LOT,*)
-C     1 '      1 Differential'
-C       read(LIN,*)nf(11)
-        nf(11) = 1
-c-----
-c     nf(12) on flat/spherical model is now build into the 
-c            earth model file
-c-----
-        nf(12) = 0
-        write(1,'(10i5)')(nf(i),i=1,8),nf(11),nf(12)
-c-----
-c     get model file information
-c-----
-        write(LOT,*)
-     1 ' Enter name of model file'
-        read(LIN,'(a)')nmmodl
-        write(1,'(a)')nmmodl
-c-----
-c     see whether the model file exists
-c-----
-        inquire(file=nmmodl,exist=ext)
-c-----
-c     if it does not, interactively create it
-c-----
-        if(.not.(ext))call setmod(nmmodl,mmax)
-c-----
-c     get dispersion file
-c-----
-        write(LOT,*)
-     1 ' Enter name of dispersion file'
-        read(LIN,'(a)')nmdisp
-        write(1,'(a)')nmdisp
-c-----
-c     if the file does not exist, then interactively build it
-c-----
-        inquire(file=nmdisp,exist=ext)
-        if(.not.(ext))call setdsp(nmdisp)
-        return
-        end
-
-        subroutine perr(str)
-        character str*(*)
-        parameter(LER=0,LIN=5,LOT=6)
-        dimension nf(10)
-        common/param/qaqb,itype,dlam,invdep
-        integer NL
-        parameter (NL=200)
-        integer nf10(NL)
-        data nf10/NL*1/
-        data nf/10*0/
-            nzer=-1
-            nf34 = 0
-            nfilt = 0
-            nup=0
-            wref = 1.0
-            invcsl = 0
-            lstinv = -1
-            twnmin = -5.0
-            twnmax =  20.0
-            iter = 0 
-            nurftn = 0 
-            invdep = 1
-            pval = 0.5
-        sigv = 0.05
-        sigr = 0.05
-        sigg = 0.00005
-        idtwo = 0
-        idum2 = 0
-        idum3 = 0
-        idum4 = 0
-        idum5 = 0
-        rdum1 = 0.0
-        rdum2 = 0.0
-        rdum3 = 0.0
-        rdum4 = 0.0
-        rdum5 = 0.0
-        write(LER,*)str
-c-----
-c     iprog is a binary OR: 2= rftn, 1=surf
-c-----
-        iprog = 0 + 1
-        call pttmp0(iprog,nzer,nf(1),nf(2),nf34,nf(5),
-     1      nf67,nf10,nfilt,nup,
-     2      dlam,qaqb,wref,invcsl,lstinv,
-     3      twnmin,twnmax,iter,nurftn,invdep,pval,sigv,sigr,sigg,
-     4      idtwo, idum2, idum3, idum4, idum5,
-     5      rdum1, rdum2, rdum3, rdum4, rdum5)
-        stop
-        end
-
+c#################################################################
         subroutine getblnk(instr,lsep,ls,lnobl)
 c-----
 c     determine first non-blank character

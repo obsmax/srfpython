@@ -94,24 +94,13 @@ c-----
         common/modtit/title
         character title*80
 c-----
-c     machine dependent initialization
-c-----
-        call mchdep()
-c-----
         call getmod(2,'STDIN',mmax,title,iunit,iiso,iflsph,
      1      idimen,icnvel,ierr,.false.)
 c-----
         iverb(1) = 0
         iverb(2) = 0
-!        open(3,file='tmpsrfi.03',form='unformatted',access='sequential')
-!        rewind 3
-!        read(3) idispl,idispr,nsph
         read(LIN,*) idispl,idispr,nsph
 c-----
-c     get velocity model
-c-----
-!        call getmod(2,'tmpsrfi.17',mmax,title,iunit,iiso,iflsph,
-!     1      idimen,icnvel,ierr,.false.)
         mlyr = MMAX
         iunit = 0
         nsph = iflsph
@@ -160,37 +149,14 @@ c-----
         endif
         if(b(i).gt.betmx) betmx=b(i)
    20 continue
-!      WRITE(6,*)'betmn, betmx:',betmn, betmx
-!        if(idispl.gt.0)then
-!            open(1,file='tmpsrfi.06',form='unformatted',
-!     1          access='sequential')
-!            rewind 1
-!        endif
-!        if(idispr.gt.0)then
-!            open(2,file='tmpsrfi.07',form='unformatted',
-!     1          access='sequential')
-!            rewind 2
-!        endif
+
         do 2000 ifunc=1,2
             if(ifunc.eq.1.and.idispl.le.0) go to 2000
             if(ifunc.eq.2.and.idispr.le.0) go to 2000
             if(nsph.eq.1) call sphere(ifunc,1)
-!            read(3) kmax,mode,ddc,sone,igr,h
-!            read(3) (t(i),i=1,kmax)
             read(LIN,*) kmax,mode,ddc,sone,igr,h
             read(LIN,*) (t(i),i=1,kmax)
-!            write(ifunc) mmax,nsph
-!            write(ifunc) (btp(i),i=1,mmax)
-!            write(ifunc) (dtp(i),i=1,mmax)
-!c            write(LOT,*) mmax,nsph
-!c            write(LOT,*) (btp(i),i=1,mmax)
-!c            write(LOT,*) (dtp(i),i=1,mmax)
-!            do 420 i=1,mmax
-!            write(ifunc) d(i),a(i),b(i),rho(i)
-!c           write(LOT,*) d(i),a(i),b(i),rho(i)
-!  420   continue
-!            write(ifunc) kmax,igr,h
-!c            write(LOT,*) kmax,igr,h
+
             if(sone.lt. 0.01) sone=2.0
             onea=dble(sone)
 c-----
@@ -225,7 +191,6 @@ c-----
   450     continue
             ift=999
             do 1800 iq=1,mode
-!                read(3) is,ie
                 read(LIN,*) is,ie
                 itst=ifunc
                 do 1600 k=is,ie
@@ -298,44 +263,11 @@ c-----
             endif
             cc0 = sngl(c(k))
             cc1 = sngl(c1)
-!           write(ifunc) itst,iq,t1a,t1b,cc0,cc1
             write(LOT,*) itst,iq-1,t1a,t1b,cc0,cc1
  1600     continue
             go to 1800
  1700     if(iq.gt.1) go to 1750
-!        if(iverb(ifunc).eq.0)then
-!            iverb(ifunc) = 1
-!          write(LOT,*)'improper initial value in disper - no zero found'
-!        write(LOT,*)'in fundamental mode '
-!        write(LOT,*)'This may be due to low velocity zone '
-!        write(LOT,*)'causing reverse phase velocity dispersion, '
-!        write(LOT,*)'and mode jumping.'
-!        write(LOT,*)'due to looking for Love waves in a halfspace'
-!        write(LOT,*)'which is OK if there are Rayleigh data.'
-!        write(LOT,*)'If reverse dispersion is the problem,'
-!        write(LOT,*)'Get present model using OPTION 28, edit sobs.d,'
-!        write(LOT,*)'Rerun with onel large than 2'
-!        write(LOT,*)'which is the default '
-!c-----
-!c   if we have higher mode data and the model does not find that
-!c   mode, just indicate (itst=0) that it has not been found, but
-!c   fill out file with dummy results to maintain format - note
-!c   eigenfunctions will not be found for these values. The subroutine
-!c   'amat' in 'surf' will worry about this in building up the
-!c   input file for 'surfinv'
-!c-----
-!        write(LOT,*)'ifunc = ',ifunc ,' (1=L, 2=R)'
-!        write(LOT,*)'mode  = ',iq-1
-!        write(LOT,*)'period= ',t(k), ' for k,is,ie=',k,is,ie
-!        write(LOT,*)'cc,cm = ',cc,cm
-!        write(LOT,*)'c1    = ',c1
-!        write(LOT,*)'d,a,b,rho (d(mmax)=control ignore)'
-!        write(LOT,'(4f15.5)')(d(i),a(i),b(i),rho(i),i=1,mmax)
-!        write(LOT,*)' c(i),i=1,k (NOTE may be part)'
-!        write(LOT,*)(c(i),i=1,k)
-!        endif
-c     if(k.gt.0)goto 1750
-c       go to 2000
+
  1750     ift=k
             itst=0
 !            do 1770 i=k,ie

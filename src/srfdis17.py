@@ -446,8 +446,8 @@ if __name__ == "__main__":
     Modes = [ 0 ,  1]#,   2 ,  3 ,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ]
     Freqs = [ f(), f()]#, f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f()]
 
-
-    out = list(srfdis17_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
+    with Timer(''):
+        out = list(srfdis17_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
 
 
     for w, t, m, fs, vs in out:
