@@ -429,6 +429,15 @@ def srfdis17_1(ztop, vp, vs, rh, \
     for w, t, m, F, V in groupbywtm(waves, types, modes, freqs, values, keepnans = keepnans):
         yield w, t, m, F, V
 #_____________________________________
+def skernels(ztop, vp, vs, rh, \
+    waves, types, modes, freqs,
+    delta = 0.05,
+    h = 0.005, dcl = 0.005, dcr = 0.005):
+
+    raise NotImplementedError('')
+    
+
+#_____________________________________
 if __name__ == "__main__":
     """ DEMO """
     import matplotlib.pyplot as plt
