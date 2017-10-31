@@ -538,6 +538,10 @@ if __name__ == "__main__":
 
     for w, t, m, fs, us in out:
         plt.gca().loglog(1. / fs, us, '+-', label = "%s%s%d" % (w, t, m))
+    plt.gca().set_xlabel('period (s)')
+    plt.gca().set_ylabel('velocity (km/s)')    
+    plt.gca().grid(True, which = "major")
+    plt.gca().grid(True, which = "minor")    
     plt.legend()
     plt.gcf().show()
 
