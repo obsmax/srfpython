@@ -55,6 +55,12 @@ def freqspace(freqmin, freqmax, nfreq, scale="flin"):
     elif "log" in scale.lower():
         return np.logspace(log10(freqmin), np.logspace(freqmax), nfreq)
     else: raise ValueError('%s not understood' % scale)
+#_____________________________________
+def minmax(X):
+    if hasattr(X, "min"): #numpy arrays
+        return X.min(), X.max()
+    else:
+        return min(X), max(X)    
 ###################################### MODIFIED HERRMANN'S CODES
 def prep_srfpre96_1(h = 0.005, dcl = 0.005, dcr = 0.005):
     """prepare input for modified srfpre96 (max_srfpre96)
@@ -208,7 +214,6 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
     #A[:, 3] (t1b)  0. if phase only else upper period = t1/(1-h), in s; 
     #A[:, 4] (cc0)  phase velocity at t1 if phase only else at t1a, in km/s; 
     #A[:, 5] (cc1)  phase velocity at t1 if phase only else at t1b, in km/s; 
-    #for i in xrange(A.shape[0]):print (A[i, :])
 
     W = A[:, 0]       
     M = A[:, 1]       
@@ -233,24 +238,18 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
     LMs = [lms if lms.any() else None for lms in LMs]
 
     values = np.zeros(len(waves), float) * np.nan
-#    T0, T1, T2 = 0., 0., 0.
     for n, (w, t, m, f) in enumerate(zip(waves, types, modes, freqs)):
 
-#        start = time.time()
         if   w == "R":S = RMs[m]
         else         :S = LMs[m]#elif w == "L"
         if S is None: continue
-#        T0 += time.time() - start
-        
-#        start = time.time()
+
         p  = 1. / f
         TS = T[S]
         iS = np.abs(TS - p).argmin()
         per = TS[iS]        
         if abs(per - p) / p > 0.01: continue
-#        T1 += time.time() - start
 
-#        start = time.time()        
         if   t == 'C': val = C[S][iS] 
         else         : val = U[S][iS] #elif t == "U"
         #else: raise ValueError('')
@@ -258,9 +257,6 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
         #    raise CPiSError('encountered negative dispersion velocity')
 
         values[n] = val
-#        T2 += time.time() - start
-
-#    print (T0, T1, T2)
     return values
   
 
@@ -342,21 +338,21 @@ def srfdis17(ztop, vp, vs, rh, \
 
     input: 
         -> depth model
-        ztop  : list or array, top layer depth in km, ztop[0] must be 0 !!!
-        vp    : list or array, km/s
-        vs    : list or array, km/s
+        ztop  : list or array, sorted, positive, top layer depth in km, ztop[0] must be 0 !!!
+        vp    : list or array, P wave velocity in km/s
+        vs    : list or array, S wave velocity in km/s
         rh    : list or array, density in g.cm^-3
-                note that len(ztop) must be len(vp) = len(vs) = len(rh)
+                note that these four parameters must have the same length
 
         -> required dispersion points
         waves : list or array, like ['L', 'L', 'L', 'R', 'R', 'R', 'R', 'R'] (L = Love, R = Rayleigh)
         types : list or array, like ['U', 'U', 'U', 'C', 'C', 'C', 'C', 'C'] (U = groupe, C = phase)
         modes : list or array, like [ 0,   0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ] (mode number, 0 = fundamental)
         freqs : list or array, like [ 1.,  2.,  3.,  1.,  2.,  3.,  4.,  5.] (frequency in Hz)
-                note that len(waves) must be len(types) = len(modes) = len(freqs)
+                note that these four parameters must have the same length
 
         -> Herrmann's parameters, see CPS documentation
-        h = period increment for phase to group conversion (0.005 is reasonale)
+        h = period increment for phase to group conversion (0.005 is reasonable)
         dcl, dcr = phase velocity increment for love and rayleigh root searches respectively, see Herrmann doc
 
     output:
@@ -431,12 +427,94 @@ def srfdis17_1(ztop, vp, vs, rh, \
 #_____________________________________
 def skernels(ztop, vp, vs, rh, \
     waves, types, modes, freqs,
-    delta = 0.05,
+    delta = 0.05, norm = True, 
     h = 0.005, dcl = 0.005, dcr = 0.005):
+    """skernels : compute finite difference sensitivity kernels for surface waves dispersion curves 
+    input: 
+        -> depth model
+        ztop, vp, vs, rh  : lists or arrays, see srfdis17
 
-    raise NotImplementedError('')
+        -> required dispersion points
+        waves, types, modes, freqs : lists or arrays, see srfdis17
+
+        -> sensitivity kernel computation
+        delta = float, > 0, relative perturbation to apply to each parameter and each layer
+        norm  = bool, If false, I compute the simple derivative of the dispersion velocity
+                                relative to a given parameter (e.g. dU(T)/dVs(z) where T is a given period and z is a given depth)
+                      If true, I compute the ratio between the relative input perturbation (e.g. dVs(z)/Vs(z))
+                               and the output perturbation (e.g. dU(T)/U(T))
+
+        -> Herrmann's parameters, see CPS documentation
+        h, dcl, dcr = passed to srfdis17
+
+    output:
+        -> yields a tuple (w, t, m, F, DVADZ, DVADA, DVADB, DVADR) for each wave, type and mode
+        w      = string, wave letter (L = Love or R = Rayleigh)
+        t      = string, type letter (C = phase or U = group)
+        m      = int, mode number (0= fundamental)
+        F      = array, 1D, frequency array in Hz
+        DVADZ  = array, 2D, [normed] sensitivity kernel relative to top depth of each layer (lines) and frequency (columns)
+        DVADA  = array, 2D, [normed] sensitivity kernel relative to Pwave velocity of each layer (lines) and frequency (columns)
+        DVADB  = array, 2D, [normed] sensitivity kernel relative to Swave velocity of each layer (lines) and frequency (columns)
+        DVADR  = array, 2D, [normed] sensitivity kernel relative to density of each layer (lines) and frequency (columns)                
+                 note that these arrays might contain nans
+    see also :
+        skernels_1
+        srfdis17
+    """
     
 
+    waves, types, modes, freqs = [np.asarray(_) for _ in waves, types, modes, freqs]
+    nlayer = len(ztop)
+    model0 = np.concatenate((ztop, vp, vs, rh))
+    values0 = srfdis17(ztop, vp, vs, rh, \
+                       waves, types, modes, freqs, \
+                       h = h, dcl = dcl, dcr = dcr)
+
+    IZ  = np.arange(nlayer)
+    IVP = np.arange(nlayer, 2*nlayer)    
+    IVS = np.arange(2*nlayer, 3*nlayer)        
+    IRH = np.arange(3*nlayer, 4*nlayer)        
+    DVADP = np.zeros((4 * nlayer, len(waves)), float) * np.nan
+
+    for i in xrange(1, 4 * len(ztop)):
+        modeli = model0.copy()
+        modeli[i] *= (1. + delta)
+        ztopi, vpi, vsi, rhi = modeli[IZ], modeli[IVP], modeli[IVS], modeli[IRH]
+        valuesi = srfdis17(ztopi, vpi, vsi, rhi, \
+                       waves, types, modes, freqs, \
+                       h = h, dcl = dcl, dcr = dcr)        
+        if norm:
+            DVADP[i, :] = ((valuesi - values0) / values0) / \
+                          ((modeli[i] - model0[i]) / model0[i])
+        else:
+            DVADP[i, :] = (valuesi - values0) / (modeli[i] - model0[i])
+
+    for w, t, m, F, Iwtm in groupbywtm(waves, types, modes, freqs, np.arange(len(waves))):
+        DVADZ = DVADP[IZ, :][:, Iwtm]
+        DVADA = DVADP[IVP, :][:, Iwtm]
+        DVADB = DVADP[IVS, :][:, Iwtm]
+        DVADR = DVADP[IRH, :][:, Iwtm]
+        DVADZ, DVADA, DVADB, DVADR = [np.ma.masked_where(np.isnan(_), _) for _ in [DVADZ, DVADA, DVADB, DVADR]]
+        
+        yield w, t, m, F, DVADZ, DVADA, DVADB, DVADR
+
+#_____________________________________
+def skernels_1(ztop, vp, vs, rh, \
+    Waves, Types, Modes, Freqs, **kwargs):
+    """skernels_1 : same as skernels with slightely more convenient input (no need to repeat wave, type and mode)
+
+    Waves is like ['L', 'L', 'R']
+    Types is like ['C', 'C', 'U']
+    Modes is like [ 0,   1,   0 ]
+    Freqs is like [fLC0, fLC1, fRU0] where f??? are frequency numpy arrays or lists
+    
+    see skernels for detailed input and output arguments
+    """
+    waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
+    for tup in skernels(ztop, vp, vs, rh, \
+            waves, types, modes, freqs, **kwargs):
+        yield tup
 #_____________________________________
 if __name__ == "__main__":
     """ DEMO """
@@ -450,18 +528,68 @@ if __name__ == "__main__":
 
     ###dipsersion parameters
     def f(): return np.logspace(np.log10(0.2), np.log10(3.5), 35)
-    Waves = ['R', 'R']#, 'R', 'R', 'R', 'R', 'R', 'R', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L']
-    Types = ['U', 'U']#, 'U', 'U', 'C', 'C', 'C', 'C', 'U', 'U', 'U', 'U', 'C', 'C', 'C', 'C']
-    Modes = [ 0 ,  1]#,   2 ,  3 ,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ,  0 ,  1,   2 ,  3 ]
-    Freqs = [ f(), f()]#, f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f(), f()]
+    Waves = ['R', 'R', 'R', 'R', 'L', 'L', 'L', 'L']
+    Types = ['U', 'U', 'C', 'C', 'U', 'U', 'C', 'C']
+    Modes = [ 0 ,  1,   0,   1,   0,   1,   0,   1 ]
+    Freqs = [ f(), f(), f(), f(), f(), f(), f(), f()]
 
-    with Timer(''):
+    with Timer('srfdis17'):
         out = list(srfdis17_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
 
-
-    for w, t, m, fs, vs in out:
-        plt.gca().loglog(1. / fs, vs, '+-')
+    for w, t, m, fs, us in out:
+        plt.gca().loglog(1. / fs, us, '+-', label = "%s%s%d" % (w, t, m))
+    plt.legend()
     plt.gcf().show()
-    raw_input('pause')
+
+
+    ###sensitivity kernels
+    norm = True
+    fig = plt.figure()  
+    fig.subplots_adjust(wspace = 0.3, hspace = 0.3)
+    fig.show()
+    for w, t, m, F, DVADZ, DVADA, DVADB, DVADR in skernels_1(ztop, vp, vs, rh, \
+        Waves, Types, Modes, Freqs, 
+        norm = norm,   delta = 0.05, 
+        h = 0.005, dcl = 0.005, dcr = 0.005):
+        
+        fig.clf()
+        #------        
+        ilayer = np.arange(DVADZ.shape[0]+1)-0.5
+        iF = np.concatenate(([F[0] * 0.95], F * 1.05))   
+        fig.suptitle('%s%s%d' % (w, t, m))
+        
+        #------
+        vmin, vmax, cmap = -1., 1., plt.cm.RdBu
+        ax1 = fig.add_subplot(221)        
+        plt.pcolormesh(1./ iF, ilayer, DVADZ, vmin = vmin, vmax = vmax, cmap = cmap)
+        plt.colorbar()
+        ax2 = fig.add_subplot(222, sharex = ax1, sharey = ax1)        
+        plt.pcolormesh(1./ iF, ilayer, DVADA, vmin = vmin, vmax = vmax, cmap = cmap)
+        plt.colorbar()        
+        ax3 = fig.add_subplot(223, sharex = ax1, sharey = ax1)        
+        plt.pcolormesh(1./ iF, ilayer, DVADB, vmin = vmin, vmax = vmax, cmap = cmap)
+        plt.colorbar()            
+        ax4 = fig.add_subplot(224, sharex = ax1, sharey = ax1)
+        plt.pcolormesh(1./ iF, ilayer, DVADR, vmin = vmin, vmax = vmax, cmap = cmap)
+        plt.colorbar()            
+        #------
+        for ax, p in zip([ax1, ax2, ax3, ax4], ["Z", "Vp", "Vs", "rho"]):
+            ax.set_xlim(minmax(1./ iF))
+            ax.set_ylim(minmax(ilayer))        
+            ax.set_xscale('log')
+            ax.set_ylabel('layer number')
+            ax.set_xlabel('period (s)')
+            if norm:
+                ax.set_title(r'$ \frac{d%s/%s}{d%s/%s} $' % (t, t, p, p))        
+            else:
+                ax.set_title('d%s/d%s' % (t, p))        
+                
+            if not ax.yaxis_inverted(): ax.invert_yaxis()            
+        #------        
+        fig.canvas.draw()
+        raw_input('pause : press enter to plot the next wave type and mode')
+    #--------------------    
+    raw_input('bye')
+    
 
 

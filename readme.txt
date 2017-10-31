@@ -2,9 +2,11 @@ srfpython
 Maximilien Lehujeur, 18/04/2017
 maximilien.lehujeur@gmail.com
 
-Compute surface wave dispersion curves for Love and Rayleigh waves in python2.7
+Compute surface wave dispersion curves or depth sensitivity kernels for Love and Rayleigh waves in python2.7
 the heart of the code is in fortran77 modified after Computer Program in Seismology, Herrmann and Ammon, 2002
 the original codes (srfpre96, srfdis96) were slightly modified to prevent disk ios and communicate through stdin and stdout
+
+
 
 dependencies 
     numpy 
