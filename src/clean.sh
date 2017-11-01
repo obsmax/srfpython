@@ -11,5 +11,7 @@ rm -f ../bin/max_srfpre96
 rm -f ../bin/max_srfdis96 
 rm -f ../bin/srfdis17.py
 rm -f ../bin/srfdis17.pyc
+rm -f ../bin/sker17.py
+rm -f ../bin/sker17.pyc
 rm -f ../bin/__init__.py
 rm -f ../bin/__init__.pyc

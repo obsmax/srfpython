@@ -22,13 +22,18 @@ I/ install (linux)
 
 1.1) optional : test the fortran codes with srfpyhon/src/test/test.sh
 
-2) add srfpython/bin to your python path
+2) add srfpython/bin to your python path : in ~/.bashrc or ~/.bash_path, add the following line
+export PYTHONPATH=$PYTHONPATH:/path/to/srfpython/bin
 
 3) in python, import function srfdis17 from module srfdis17
 >> from srfdis17 import srfdis17
 >> help(srfdis17)
 
-II/ run demo (see __main__ section in srfpython/bin/srfdis17)
+>> from sker17 import sker17
+>> help(sker17)
+
+II/ run demo (see __main__ section in srfpython/bin/srfdis17.py)
 
 cd srfpython/bin
 python srfdis17.py
+python sker17.py

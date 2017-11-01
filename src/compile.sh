@@ -25,6 +25,7 @@ mkdir ../bin
 mv max_srfdis96 max_srfpre96 ../bin
 cd ../bin
 ln -s ../src/srfdis17.py
+ln -s ../src/sker17.py
 touch __init__.py
 
 ls -l --color ../bin
