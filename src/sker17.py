@@ -49,6 +49,9 @@ def sker17(ztop, vp, vs, rh, \
 
     waves, types, modes, freqs = [np.asarray(_) for _ in waves, types, modes, freqs]
     nlayer = len(ztop)
+    H = np.asarray(ztop)
+    H[:-1], H[-1] = H[1:] - H[:-1], np.inf #layer thickness in km
+
     model0 = np.concatenate((ztop, vp, vs, rh))
     values0 = srfdis17(ztop, vp, vs, rh, \
                        waves, types, modes, freqs, \
@@ -64,14 +67,19 @@ def sker17(ztop, vp, vs, rh, \
         modeli = model0.copy()
         modeli[i] *= (1. + delta)
         ztopi, vpi, vsi, rhi = modeli[IZ], modeli[IVP], modeli[IVS], modeli[IRH]
-        valuesi = srfdis17(ztopi, vpi, vsi, rhi, \
-                       waves, types, modes, freqs, \
-                       h = h, dcl = dcl, dcr = dcr)        
+        try:
+            valuesi = srfdis17(ztopi, vpi, vsi, rhi, \
+                           waves, types, modes, freqs, \
+                           h = h, dcl = dcl, dcr = dcr)        
+        except CPiSDomainError as err: 
+            print ("error during gradient computation %s" % str(err))
+            continue
+        except: raise
         if norm:
             DVADP[i, :] = ((valuesi - values0) / values0) / \
                           ((modeli[i] - model0[i]) / model0[i])
         else:
-            DVADP[i, :] = (valuesi - values0) / (modeli[i] - model0[i])
+            DVADP[i, :] = (valuesi - values0) / (modeli[i] - model0[i]) 
 
     for w, t, m, F, Iwtm in groupbywtm(waves, types, modes, freqs, np.arange(len(waves))):
         DVADZ = DVADP[IZ, :][:, Iwtm]
@@ -110,9 +118,8 @@ if __name__ == "__main__":
     vs   = [0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31] #km/s
     rh   = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63] #g/cm3
 
-
     ###dipsersion parameters
-    def f(): return np.logspace(np.log10(0.2), np.log10(3.5), 35)
+    def f(): return np.logspace(np.log10(0.1), np.log10(5.5), 35)
     Waves = ['R', 'R', 'R', 'R', 'L', 'L', 'L', 'L']
     Types = ['U', 'U', 'C', 'C', 'U', 'U', 'C', 'C']
     Modes = [ 0 ,  1,   0,   1,   0,   1,   0,   1 ]
@@ -139,7 +146,7 @@ if __name__ == "__main__":
     fig.show()
     for w, t, m, F, DVADZ, DVADA, DVADB, DVADR in sker17_1(ztop, vp, vs, rh, \
         Waves, Types, Modes, Freqs, 
-        norm = norm,   delta = 0.05, 
+        norm = norm,   delta = 0.01, 
         h = 0.005, dcl = 0.005, dcr = 0.005):
         
         fig.clf()
