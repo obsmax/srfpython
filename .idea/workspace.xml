@@ -1,38 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="e8d4ac70-bf80-4a3a-8e64-86d48a6b2145" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Herrmann/max_srfdis96" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Herrmann/max_srfpre96" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/modules.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/srfpython.iml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/vcs.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/HerrLin/__init__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/HerrMet/__init__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Herrmann/__init__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/Herrmann/src/clean.sh" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/__init__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/depthmodels/__init__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/displaws/__init__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/inversion/__init__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sensitivity_kernels/__init__.py" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/readme.txt" afterPath="" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/src/._srfdis17.py" afterPath="" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/src/clean.sh" afterPath="" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/compile.sh" afterPath="$PROJECT_DIR$/Herrmann/src/compile.sh" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/max_igetmod.f" afterPath="$PROJECT_DIR$/Herrmann/src/max_igetmod.f" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/max_iputmod.f" afterPath="$PROJECT_DIR$/Herrmann/src/max_iputmod.f" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/max_lgstr.f" afterPath="$PROJECT_DIR$/Herrmann/src/max_lgstr.f" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/max_setdsp.f" afterPath="$PROJECT_DIR$/Herrmann/src/max_setdsp.f" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/max_setmod.f" afterPath="$PROJECT_DIR$/Herrmann/src/max_setmod.f" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/max_srfdis96.f" afterPath="$PROJECT_DIR$/Herrmann/src/max_srfdis96.f" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/max_srfpre96.f" afterPath="$PROJECT_DIR$/Herrmann/src/max_srfpre96.f" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/sker17.py" afterPath="$PROJECT_DIR$/sensitivity_kernels/sker17.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/srfdis17.py" afterPath="$PROJECT_DIR$/Herrmann/dispersion.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/test.sh" afterPath="$PROJECT_DIR$/Herrmann/src/test.sh" />
-    </list>
+    <list default="true" id="e8d4ac70-bf80-4a3a-8e64-86d48a6b2145" name="Default" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -78,8 +47,8 @@
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="1920" />
-    <option name="y" value="-4" />
+    <option name="x" value="-1920" />
+    <option name="y" value="-1084" />
     <option name="width" value="1920" />
     <option name="height" value="1084" />
   </component>
@@ -182,7 +151,7 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="1920" y="-4" width="1920" height="1084" extended-state="6" />
+    <frame x="-1920" y="-1084" width="1920" height="1084" extended-state="6" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.18783352" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32984293" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
