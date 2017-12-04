@@ -1,5 +1,17 @@
 from pickle import load, dump
 import numpy as np
+import time
+
+
+
+class Timer(object):
+    def __init__(self, title):
+        self.title = title
+    def __enter__(self):
+        self.start = time.time()
+        return self
+    def __exit__(self, *args, **kwargs):
+        print ("elapsed time %s : %fs" % (self.title, time.time() - self.start))
 
 # -------------------------
 def pkl(obj, filename, protocol = None):
@@ -64,3 +76,12 @@ def freqspace(freqmin, freqmax, nfreq, scale="flin"):
     elif "log" in scale.lower():
         return np.logspace(log10(freqmin), log10(freqmax), nfreq)
     else: raise ValueError('%s not understood' % scale)
+
+# -------------------------
+def histogram2d(xflat, yflat, xbins, ybins):
+    H, X, Y = np.histogram2d(x = xflat, y = yflat, bins=(xbins, ybins), normed=True)
+    #H is in bin^-1 * xunit ^ -1 * yunit ^ -1
+    #H is a true pdf, indeed (H * dX * dY).sum() = 1.0
+    #however H can exceed 1. locally if the bin area is lower than 1.0 !!!!!
+    H[np.isnan(H)] = 0.
+    return X, Y, H.T
