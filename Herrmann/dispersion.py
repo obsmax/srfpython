@@ -7,16 +7,16 @@ import sys, glob, os, time, signal
 
 
 """
-srfdis17, Maximilien Lehujeur, 01/11/2017
+dispersion, Maximilien Lehujeur, 01/11/2017
 module to compute surface wave dispersion curves
-see documentation in function srfdis17
+see documentation in function 
 use __main__ for demo
 """
 
-_pathfile = os.path.realpath(__file__) #.../srfpyhon/src/srfdis17.py
+_pathfile = os.path.realpath(__file__) #.../srfpyhon/HerrMann/dispersion.py
 _file     = _pathfile.split('/')[-1]
-srfpre96_exe = _pathfile.replace('/src/', '/bin/').replace(_file, 'max_srfpre96') #.../srfpyhon/bin/max_srfpre96
-srfdis96_exe = _pathfile.replace('/src/', '/bin/').replace(_file, 'max_srfdis96') #.../srfpyhon/bin/max_srfdis96
+srfpre96_exe = _pathfile.replace('/src/', '/bin/').replace(_file, 'max_srfpre96') #.../srfpyhon/HerrMann/max_srfpre96
+srfdis96_exe = _pathfile.replace('/src/', '/bin/').replace(_file, 'max_srfdis96') #.../srfpyhon/HerrMann/max_srfdis96
 if not os.path.exists(srfpre96_exe) or not os.path.exists(srfdis96_exe):
     raise Exception('could not find %s and/or %s' % (srfpre96_exe, srfdis96_exe))
 
@@ -60,7 +60,7 @@ def freqspace(freqmin, freqmax, nfreq, scale="flin"):
     if "lin" in scale.lower():
         return np.linspace(freqmin, freqmax, nfreq)
     elif "log" in scale.lower():
-        return np.logspace(log10(freqmin), np.logspace(freqmax), nfreq)
+        return np.logspace(log10(freqmin), log10(freqmax), nfreq)
     else: raise ValueError('%s not understood' % scale)
 #_____________________________________
 def minmax(X):
@@ -91,10 +91,9 @@ def prep_srfpre96_2(z, vp, vs, rh):
         raise CPiSDomainError('Z VP, VS, RH must be the same length')#    assert n == len(vp) == len(vs) == len(rh)
     z = np.asarray(z, float)
     if (np.isinf(z) | np.isnan(z)).any():
-        raise CPiSDomainError('Z must be growing, layers must be at least 0.001km thick, got %s' % str(z))
+        raise CPiSDomainError('got inapropriate values for Z (%s)' % str(z))
     if (z[1:] - z[:-1] < 0.001).any():#    assert np.all(z[1:] - z[:-1] >= 0.001)
         raise CPiSDomainError('Z must be growing, layers must be at least 0.001km thick, got %s' % str(z))
-
 
     vs = np.asarray(vs, float)
     if (np.isinf(vs) | np.isnan(vs)).any(): raise CPiSDomainError('vs value error %s' % str(vs))
@@ -145,7 +144,7 @@ def prep_srfpre96_3(waves,types,modes,freqs):
     return out
 #_____________________________________
 def groupbywtm(waves, types, modes, freqs, values, dvalues = None, keepnans = True):
-    """group outputs from srfdis17 by wave, type, modes
+    """group outputs from dispersion by wave, type, modes
 
     waves types modes freqs are the same length
     groupbywtm demultiplexes these arrays to produce, for each mode
@@ -181,7 +180,7 @@ def groupbywtm(waves, types, modes, freqs, values, dvalues = None, keepnans = Tr
 #_____________________________________
 def igroupbywtm(Waves, Types, Modes, Freqs):
     """
-    make the opposite of groupbywtm, prepare input for srfdis17
+    make the opposite of groupbywtm, prepare input for dispersion
     e.g. 
     f = freqspace(0.1, 20, 5, 'plog')
     Waves                = ['R', 'R', 'R', 'R']
@@ -337,11 +336,11 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
     
 
 #_____________________________________
-def srfdis17(ztop, vp, vs, rh, \
+def dispersion(ztop, vp, vs, rh, \
     waves, types, modes, freqs,
     h = 0.005, dcl = 0.005, dcr = 0.005):
 
-    """srfdis17 : compute dispersion curves from a depth model for desired wave (R or L) types (C or U for phase or group) and frequencies (Hz)
+    """dispersion : compute dispersion curves from a depth model for desired wave (R or L) types (C or U for phase or group) and frequencies (Hz)
                   based on a modified version of the codes from Herrmann and Ammon 2002
 
     input: 
@@ -367,7 +366,7 @@ def srfdis17(ztop, vp, vs, rh, \
         values : list or array, dispersion values for each wave, type, mode, possibly nan (cut-off period)
                  note : use groupbywtm to group outputs by wave, type, and mode
     see also :
-        srfdis17_1
+        dispersion_1
         groupbywtm
         igroupbywtm
     """
@@ -408,11 +407,11 @@ def srfdis17(ztop, vp, vs, rh, \
     return values
 
 #_____________________________________
-def srfdis17_1(ztop, vp, vs, rh, \
+def dispersion_1(ztop, vp, vs, rh, \
     Waves, Types, Modes, Freqs,
     h = 0.005, dcl = 0.005, dcr = 0.005, keepnans = False):
 
-    """same as srfdis17 with slightely more convenient input and output (no need to repeat wave, type and mode)
+    """same as dispersion with slightely more convenient input and output (no need to repeat wave, type and mode)
 
     Waves is like ['L', 'L', 'R']
     Types is like ['C', 'C', 'U']
@@ -426,7 +425,7 @@ def srfdis17_1(ztop, vp, vs, rh, \
 
     """
     waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
-    values = srfdis17(ztop, vp, vs, rh, \
+    values = dispersion(ztop, vp, vs, rh, \
                 waves, types, modes, freqs,
                 h = h, dcl = dcl, dcr = dcr)
 
@@ -452,8 +451,8 @@ if __name__ == "__main__":
     Freqs = [ f(), f(), f(), f(), f(), f(), f(), f()]
 
     ###compute dispersion curves
-    with Timer('srfdis17'):
-        out = list(srfdis17_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
+    with Timer('dispersion'):
+        out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
 
     ###display results
     for w, t, m, fs, us in out:

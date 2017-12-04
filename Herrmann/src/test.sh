@@ -2,9 +2,7 @@
 
 #test the modified version of fortran programs max_srfpre96 and max_srfdis96
 
-
-
-time ../bin/max_srfpre96 << END   | ../bin/max_srfdis96 
+time ../max_srfpre96 << END   | ../max_srfdis96
 0.005000 0.005000 0.005000
 MODEL.01
 title

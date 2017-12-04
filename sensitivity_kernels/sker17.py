@@ -1,11 +1,14 @@
-from srfdis17 import *
+# from Herrmann.dispersion import *
+import numpy as np
+from srfpython.Herrmann.dispersion import dispersion, dispersion_1, Timer, groupbywtm, igroupbywtm, minmax
+
 """
 srfker17, Maximilien Lehujeur, 01/11/2017
 module to compute finite difference surface wave sensitivity kernels 
 see documentation in function sker17
 use __main__ for demo
 
-see also srfdis17
+see also Herrmann.dispersion.dispersion
 """
 #_____________________________________
 def sker17(ztop, vp, vs, rh, \
@@ -15,10 +18,10 @@ def sker17(ztop, vp, vs, rh, \
     """sker17 : compute finite difference sensitivity kernels for surface waves dispersion curves 
     input: 
         -> depth model
-        ztop, vp, vs, rh  : lists or arrays, see srfdis17
+        ztop, vp, vs, rh  : lists or arrays, see dispersion
 
         -> required dispersion points
-        waves, types, modes, freqs : lists or arrays, see srfdis17
+        waves, types, modes, freqs : lists or arrays, see dispersion
 
         -> sensitivity kernel computation
         delta = float, > 0, relative perturbation to apply to each parameter and each layer
@@ -28,7 +31,7 @@ def sker17(ztop, vp, vs, rh, \
                                and the output perturbation (e.g. dU(T)/U(T))
 
         -> Herrmann's parameters, see CPS documentation
-        h, dcl, dcr = passed to srfdis17
+        h, dcl, dcr = passed to dispersion
 
     output:
         -> yields a tuple (w, t, m, F, DVADZ, DVADA, DVADB, DVADR) for each wave, type and mode
@@ -43,7 +46,7 @@ def sker17(ztop, vp, vs, rh, \
                  note that these arrays might contain nans
     see also :
         sker17_1
-        srfdis17
+        dispersion
     """
     
 
@@ -53,7 +56,7 @@ def sker17(ztop, vp, vs, rh, \
     H[:-1], H[-1] = H[1:] - H[:-1], np.inf #layer thickness in km
 
     model0 = np.concatenate((ztop, vp, vs, rh))
-    values0 = srfdis17(ztop, vp, vs, rh, \
+    values0 = dispersion(ztop, vp, vs, rh, \
                        waves, types, modes, freqs, \
                        h = h, dcl = dcl, dcr = dcr)
 
@@ -68,7 +71,7 @@ def sker17(ztop, vp, vs, rh, \
         modeli[i] *= (1. + delta)
         ztopi, vpi, vsi, rhi = modeli[IZ], modeli[IVP], modeli[IVS], modeli[IRH]
         try:
-            valuesi = srfdis17(ztopi, vpi, vsi, rhi, \
+            valuesi = dispersion(ztopi, vpi, vsi, rhi, \
                            waves, types, modes, freqs, \
                            h = h, dcl = dcl, dcr = dcr)        
         except CPiSDomainError as err: 
@@ -126,8 +129,8 @@ if __name__ == "__main__":
     Freqs = [ f(), f(), f(), f(), f(), f(), f(), f()]
 
     ###compute dispersion curves
-    with Timer('srfdis17'):
-        out = list(srfdis17_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
+    with Timer('dispersion'):
+        out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
 
     for w, t, m, fs, us in out:
         plt.gca().loglog(1. / fs, us, '+-', label = "%s%s%d" % (w, t, m))
