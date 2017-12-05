@@ -28,7 +28,7 @@ def unpackmod96(string):
 
     H, VP, VS, RHO, QP, QS, ETAP, ETAS, FREFP, FREFS = [DAT[:, j] for j in xrange(10)]
 
-    assert not H[0]
+    assert not H[-1]
     assert H[:-1].all()
     Z = np.concatenate(([0.], H[:-1].cumsum()))
     return title, isotropic, kgs, flatearth, nlayer, Z, H, VP, VS, RHO, QP, QS, ETAP, ETAS, FREFP, FREFS
@@ -69,8 +69,6 @@ def readsurf96(filename):
 if __name__ == "__main__":
     title, isotropic, kgs, flatearth, nlayer, Z, H, VP, VS, RHO, QP, QS, ETAP, ETAS, FREFP, FREFS = readmod96("bidon0.mod96")
     WAVE, TYPE, FLAG, MODE, PERIOD, VALUE, DVALUE, NLC, NLU, NRC, NRU = readsurf96("bidon0.surf96")
-
-
 
 
 

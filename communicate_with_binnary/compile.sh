@@ -1,1 +1,0 @@
-gfortran -o prog prog.f

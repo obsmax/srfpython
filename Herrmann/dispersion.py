@@ -107,24 +107,30 @@ def prep_srfpre96_2(z, vp, vs, rh):
     if (np.isinf(rh) | np.isnan(rh)).any():      raise CPiSDomainError('rh value error %s' % str(rh))
     if not  np.all((rh > 1.)):                   raise CPiSDomainError('density domain error : %s' % str(rh))
 
-    out="""MODEL.01
-model-title
-ISOTROPIC
-KGS
-FLAT EARTH
-1-D
-CONSTANT VELOCITY
-LINE08
-LINE09
-LINE10
-LINE11
-      H(KM)   VP(KM/S)   VS(KM/S) RHO(GM/CC)     QP         QS       ETAP       ETAS      FREFP      FREFS    """
-    fmt = "\n %f %f %f %f 0.00 0.00 0.00 0.00 1.00 1.00"
-
-    for i in xrange(n - 1):
-        out += fmt % (z[i+1] - z[i], vp[i], vs[i], rh[i])
-    out += fmt % (0., vp[n-1], vs[n-1], rh[n-1])
+    out = "%d\n" % n + \
+          ("%f " * (n - 1)) % tuple(z[1:] - z[:-1]) + "\n" + \
+          ("%f " * n) % tuple(vp) + "\n" + \
+          ("%f " * n) % tuple(vs) + "\n" + \
+          ("%f " * n) % tuple(rh)
     return out
+        #    out="""MODEL.01
+#model-title
+#ISOTROPIC
+#KGS
+#FLAT EARTH
+#1-D
+#CONSTANT VELOCITY
+#LINE08
+#LINE09
+#LINE10
+#LINE11
+#      H(KM)   VP(KM/S)   VS(KM/S) RHO(GM/CC)     QP         QS       ETAP       ETAS      FREFP      FREFS    """
+#    fmt = "\n %f %f %f %f 0.00 0.00 0.00 0.00 1.00 1.00"
+
+#    for i in xrange(n - 1):
+#        out += fmt % (z[i+1] - z[i], vp[i], vs[i], rh[i])
+#    out += fmt % (0., vp[n-1], vs[n-1], rh[n-1])
+#    return out
 #_____________________________________
 def prep_srfpre96_3(waves,types,modes,freqs):
     """prepare input for modified srfpre96 (max_srfpre96)"""
@@ -370,10 +376,10 @@ def dispersion(ztop, vp, vs, rh, \
     """
 
     #--------------
-    instr1 = prep_srfpre96_1(h = h, dcl = dcl, dcr = dcr)
     instr2 = prep_srfpre96_2(ztop, vp, vs, rh)
+    instr1 = prep_srfpre96_1(h = h, dcl = dcl, dcr = dcr)
     instr3 = prep_srfpre96_3(waves, types, modes, freqs)
-    pstdin = "\n".join([instr1, instr2, instr3])
+    pstdin = "\n".join([instr2, instr1, instr3])
 
     # --------------
     try:
