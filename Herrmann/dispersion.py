@@ -21,8 +21,8 @@ if not os.path.exists(srfpre96_exe) or not os.path.exists(srfdis96_exe):
     raise Exception('could not find %s and/or %s' % (srfpre96_exe, srfdis96_exe))
 
 ###################################### TOOLS
+class TimeOutError(Exception): pass
 class Timeout():
-    class Timeout(Exception): pass
     def __init__(self, sec):
         self.sec = sec
     def __enter__(self):
@@ -31,7 +31,7 @@ class Timeout():
     def __exit__(self, *args):
         signal.alarm(0)
     def raise_timeout(self, *args):
-        raise Timeout.Timeout()
+        raise TimeOutError()
 #_____________________________________
 class Timer(object):
     def __init__(self, title):
@@ -129,7 +129,7 @@ LINE11
 def prep_srfpre96_3(waves,types,modes,freqs):
     """prepare input for modified srfpre96 (max_srfpre96)"""
     nlc = nlu = nrc = nru = 0
-    fmt="\nSURF96 %1s %1s X   %d  %f 1. 1."
+    fmt="\nSURF96 %1s %1s X %d %f 1. 1."
     out = ""
     for w,t,m,f in zip(waves,types,modes,freqs):
         out += fmt % (w,t,m,1./f)
@@ -333,12 +333,10 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
 
     return values
 
-    
-
 #_____________________________________
 def dispersion(ztop, vp, vs, rh, \
     waves, types, modes, freqs,
-    h = 0.005, dcl = 0.005, dcr = 0.005):
+    h=0.005, dcl=0.005, dcr=0.005):
 
     """dispersion : compute dispersion curves from a depth model for desired wave (R or L) types (C or U for phase or group) and frequencies (Hz)
                   based on a modified version of the codes from Herrmann and Ammon 2002
@@ -371,13 +369,13 @@ def dispersion(ztop, vp, vs, rh, \
         igroupbywtm
     """
 
-    #-------------- 
+    #--------------
     instr1 = prep_srfpre96_1(h = h, dcl = dcl, dcr = dcr)
     instr2 = prep_srfpre96_2(ztop, vp, vs, rh)
     instr3 = prep_srfpre96_3(waves, types, modes, freqs)
     pstdin = "\n".join([instr1, instr2, instr3])
 
-    #-------------- 
+    # --------------
     try:
         with Timeout(5):
             p = Popen(srfpre96_exe, stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=False, preexec_fn=os.setsid)#, stderr = stderrfid)
@@ -385,25 +383,28 @@ def dispersion(ztop, vp, vs, rh, \
             pstdout, _ = p.communicate()
             if p.returncode : raise CPiSError('error : %s failed' % srfpre96_exe)
 
-            q = Popen(srfdis96_exe, stdout=PIPE, stdin=PIPE, stderr = PIPE, shell = False,  preexec_fn=os.setsid)#, stderr = stderrfid)
+            q = Popen(srfdis96_exe, stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=False, preexec_fn=os.setsid)#, stderr = stderrfid)
             q.stdin.write(pstdout)
             qstdout, _ = q.communicate()
             if q.returncode : raise CPiSError('error : %s failed' % srfdis96_exe)
-    except Timeout.Timeout:
+    except TimeOutError:
         print ("error *123*", ztop, vp, vs, rh)
-        #raise Exception('srfdis96 timed out ')
         os.killpg(os.getpgid(p.pid), signal.SIGKILL)
         os.killpq(os.getpgid(q.pid), signal.SIGKILL)
         raise CPiSError('timeout')
-    except: raise 
+    except: raise
     finally:
-        try:p.stdin.close()
-        except:pass
-        try:q.stdin.close()
-        except:pass
+        try: p.stdin.close()
+        except: pass
+        try: q.stdin.close()
+        except: pass
 
-    #-------------- 
-    values = readsrfdis96(qstdout, waves, types, modes, freqs)      
+
+
+
+
+    #--------------
+    values = readsrfdis96(qstdout, waves, types, modes, freqs)
     return values
 
 #_____________________________________
