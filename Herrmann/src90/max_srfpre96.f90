@@ -81,6 +81,8 @@
 !      nouvelles sorties:
 !      le fichier modele qui doit etre relu par srfdis96 (fait chier..)
 !      les parametres de dispersion et pre-calculs indispensables a srfdis96
+!      a savoir
+!      nper, nper, iflsph (nombre de periodes distinctes, nombre de periodes distinctes, 0 pour terre plate)
       PROGRAM SRFPRE96
       IMPLICIT NONE
 !*--SRFPRE9686
@@ -492,20 +494,20 @@
 !-----
       DO ilvry = 1 , 2
          IF ( ilvry.EQ.1 ) THEN
-            nmph = modemx(1,1)
-            nmgr = modemx(1,2)
+            nmph = modemx(1,1) ! NLC
+            nmgr = modemx(1,2) ! NLU
             one = Onel
             dc = Dcl
          ELSE
-            nmph = modemx(2,1)
-            nmgr = modemx(2,2)
+            nmph = modemx(2,1) ! NRC
+            nmgr = modemx(2,2) ! NRU
             one = Oner
             dc = Dcr
          ENDIF
 !-----
 !                 ENFORCE USER MODE LIMITS
 !-----
-         kmax = nper
+         kmax = nper ! < you son of a bitch
          IF ( nmgr.EQ.0 ) igr = 0
          IF ( nmph.EQ.0 ) igr = 1
 !           if(nmgr.gt.0 .and. nmph.gt.0 .and. nmgm.gt.0)igr=2
