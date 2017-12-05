@@ -384,11 +384,14 @@ def dispersion(ztop, vp, vs, rh, \
     # --------------
     try:
         with Timeout(5):
+            #if True: #with Timer('2.1'):
             p = Popen(srfpre96_exe, stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=False, preexec_fn=os.setsid)#, stderr = stderrfid)
             p.stdin.write(pstdin)
             pstdout, _ = p.communicate()
             if p.returncode : raise CPiSError('error : %s failed' % srfpre96_exe)
 
+            #if True: #with Timer('2.2'):
+            #almost all time spent here
             q = Popen(srfdis96_exe, stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=False, preexec_fn=os.setsid)#, stderr = stderrfid)
             q.stdin.write(pstdout)
             qstdout, _ = q.communicate()
