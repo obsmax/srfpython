@@ -325,6 +325,10 @@
       IMPLICIT NONE
       REAL Betmx
       INTEGER idir , Ifirst , Ifunc , Iret
+      REAL*8 wvno , omega , twopi
+      REAL*8 C1 , c2 , cn , Cm , Dc , T1 , Clow
+      REAL*8 DLTAR , del1 , del2 , del1st , plmn
+      SAVE del1st
 !-----
 !     subroutine to bracket dispersion curve
 !     and then refine it
@@ -352,10 +356,7 @@
 !-----
 !     bracket solution
 !-----
-      REAL*8 wvno , omega , twopi
-      REAL*8 C1 , c2 , cn , Cm , Dc , T1 , Clow
-      REAL*8 DLTAR , del1 , del2 , del1st , plmn
-      SAVE del1st
+
 
       twopi = 2.D0*3.141592653589793D0
       omega = twopi/T1

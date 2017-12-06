@@ -407,39 +407,50 @@
 !-----
 !     increment n for internal use
 !-----
-      IF ( ilorr.NE.1 .OR. iobs.NE.1 .OR. n.LE.NLC ) THEN
-         IF ( ilorr.NE.1 .OR. iobs.NE.2 .OR. n.LE.NLU ) THEN
-            IF ( ilorr.NE.1 .OR. iobs.NE.3 .OR. n.LE.NLG ) THEN
-               IF ( ilorr.NE.2 .OR. iobs.NE.1 .OR. n.LE.NRC ) THEN
-                  IF ( ilorr.NE.2 .OR. iobs.NE.2 .OR. n.LE.NRU ) THEN
-                     IF ( ilorr.NE.2 .OR. iobs.NE.3 .OR. n.LE.NRG ) THEN
-                        idat = idat + 1
-                        lorr(idat) = ilorr
-                        porg(idat) = iobs
-                        mode(idat) = n
-!-----
-!     SURF96 input is always period!!!
-!     SURF96 DISPERSION UNITS ARE ALWAYS km/sec and 1/km
-!-----
-                        tper(idat) = f
-                        vel(idat) = c
-                        IF ( dc.EQ.0.0 ) dc = 1.0
-                        dvel(idat) = dc
-                        key(idat) = idat
-                        tmp(idat) = tper(idat)
-!!-----
-!!     make gamma seem to be phase data
-!!-----
-!                        mm = iobs
-!                        IF ( mm.EQ.3 ) mm = 1
-!                        IF ( n.GT.modemx(ilorr,mm) ) modemx(ilorr,mm) = n
-                        IF ( n.GT.modemx(ilorr,iobs) ) modemx(ilorr,iobs) = n
-                     ENDIF
-                  ENDIF
-               ENDIF
-            ENDIF
-         ENDIF
+!      IF ( ilorr.NE.1 .OR. iobs.NE.1 .OR. n.LE.NLC ) THEN
+!         IF ( ilorr.NE.1 .OR. iobs.NE.2 .OR. n.LE.NLU ) THEN
+!            IF ( ilorr.NE.1 .OR. iobs.NE.3 .OR. n.LE.NLG ) THEN
+!               IF ( ilorr.NE.2 .OR. iobs.NE.1 .OR. n.LE.NRC ) THEN
+!                  IF ( ilorr.NE.2 .OR. iobs.NE.2 .OR. n.LE.NRU ) THEN
+!                     IF ( ilorr.NE.2 .OR. iobs.NE.3 .OR. n.LE.NRG ) THEN
+!                     ENDIF
+!                  ENDIF
+!               ENDIF
+!            ENDIF
+!         ENDIF
+!      ENDIF
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! ilorr.NE.1 <=> ilorr.EQ.2  and inversly
+      IF (( ilorr.EQ.2 .OR. iobs.NE.1 .OR. n.LE.NLC ) .AND. &
+         &( ilorr.EQ.2 .OR. iobs.NE.2 .OR. n.LE.NLU ) .AND. &
+         &( ilorr.EQ.2 .OR. iobs.NE.3 .OR. n.LE.NLG ) .AND. &
+         &( ilorr.EQ.1 .OR. iobs.NE.1 .OR. n.LE.NRC ) .AND. &
+         &( ilorr.EQ.1 .OR. iobs.NE.2 .OR. n.LE.NRU ) .AND. &
+         &( ilorr.EQ.1 .OR. iobs.NE.3 .OR. n.LE.NRG )) THEN
+
+            idat = idat + 1
+            lorr(idat) = ilorr
+            porg(idat) = iobs
+            mode(idat) = n
+            !-----
+            !     SURF96 input is always period!!!
+            !     SURF96 DISPERSION UNITS ARE ALWAYS km/sec and 1/km
+            !-----
+            tper(idat) = f
+            vel(idat) = c
+            IF ( dc.EQ.0.0 ) dc = 1.0
+            dvel(idat) = dc
+            key(idat) = idat
+            tmp(idat) = tper(idat)
+            !!-----
+            !!     make gamma seem to be phase data
+            !!-----
+            !                        mm = iobs
+            !                        IF ( mm.EQ.3 ) mm = 1
+            !                        IF ( n.GT.modemx(ilorr,mm) ) modemx(ilorr,mm) = n
+            IF ( n.GT.modemx(ilorr,iobs) ) modemx(ilorr,iobs) = n
       ENDIF
+
       GOTO 100
 
  200  CALL SORT(tmp,key,idat)
