@@ -31,9 +31,7 @@
       IMPLICIT NONE
 
 
-
-
-!
+!      real :: start, finish, start1, finish1 ! for cpu timer
 !
 !   This is a combination of program 'surface80' which search the poles
 !   on C-T domain, and the program 'surface81' which search in the F-K
@@ -76,17 +74,23 @@
 !     LLW - index of the first solid layer, starting with 1 from top
 !     idispl, idispr = number of dispersion points to compute for love and rayleigh
 !     Mmax = max number of layers in the mode, used in common with other subroutines
-!-----
+!     ifunc = 1 for love 2 for rayleig
+!     betmn, betmx = extramal values for S-wave velocity in the model in km/s
+!                    in case of a water layer, use P-wave velocity instead of S for betmn
+!     jmn = index of layer where betmn is encountered, starting from 1, from top to botto
+!     jsol = a flag to tell if betmn corresponds to a liquid layer
+      !-----
       ! uderstood variables
       INTEGER LIN, LOT
       PARAMETER (LIN=5,LOT=6)
-      INTEGER LLW,idispl,idispr,Mmax
+      INTEGER LLW,idispl,idispr,Mmax,ifunc,jmn
+      REAL betmn,betmx
 
       ! not uderstood variables
-      REAL betmn,betmx,cc0,cc1,ddc,h,sone,t1a,t1b
+      REAL cc0,cc1,ddc,h,sone,t1a,t1b
 
-      INTEGER i,ie,ierr,ifirst,ift,ifunc, &
-            & igr,iq,iret,is,itst,jmn,jsol,k,kmax
+      INTEGER i,ie,ierr,ifirst,ift, &
+            & igr,iq,iret,is,itst,jsol,k,kmax
       INTEGER mode
       INTEGER NP, NL,NLAY
 
@@ -95,15 +99,15 @@
       DOUBLE PRECISION TWOpi,one,onea
       DOUBLE PRECISION cc,c1,clow,cm,dc,t1
       DOUBLE PRECISION c(NP),cb(NP)
-      REAL*4 D(NL),A(NL),B(NL),RHO(NL),RTP(NL),DTP(NL),     &
-           & t(NP),BTP(NL)
+      REAL*4 D(NL),A(NL),B(NL),RHO(NL),RTP(NL),DTP(NL),t(NP),BTP(NL)
       REAL*4 qbinv(NL),qainv(NL)
       COMMON /MODL  / D,A,B,RHO,RTP,DTP,BTP
       COMMON /PARA  / Mmax,LLW,TWOpi
 
       INTEGER iunit,iiso,idimen,icnvel
-
+      CHARACTER(LEN=80) :: FMT ! WARNING must be long enough for FMT
 !-----
+      FMT = "(I2,I2,F14.8,F14.8,F14.8,F14.8)" ! print format for output
       read(LIN,*) Mmax
       iunit = 0 ! read(LIN,*) iunit! was overwrite by 0 anyway
       iiso = 0 !read(LIN,*) iiso ! not used
@@ -121,7 +125,7 @@
 !-----
 !     check for water layer
 !-----
-      LLW = 1
+      LLW = 1 !first solid layer index
       IF ( B(1).LE.0.0 ) LLW = 2
       TWOpi = 2.D0*3.141592653589793D0
       one = 1.0D-2
@@ -131,6 +135,7 @@
 !-----
 !     find the extremal velocities to assist in starting search
 !-----
+!      call cpu_time(start)
       DO i = 1 , Mmax
          IF ( B(i).GT.0.01 .AND. B(i).LT.betmn ) THEN
             betmn = B(i)
@@ -143,34 +148,36 @@
          ENDIF
          IF ( B(i).GT.betmx ) betmx = B(i)
       ENDDO
+!      call cpu_time(finish)
+!      print '("T1 = ",f6.3," seconds.")',finish-start
 
-      DO ifunc = 1 , 2
-         IF ( ifunc.NE.1 .OR. idispl.GT.0 ) THEN
-            IF ( ifunc.NE.2 .OR. idispr.GT.0 ) THEN
+
+!      call cpu_time(start)
+      DO ifunc = 1 , 2 ! 1 = love 2 = rayleigh
+!         IF ( ifunc.NE.1 .OR. idispl.GT.0) THEN       < who is the fucking bastard who coded that?
+!            IF ( ifunc.NE.2 .OR. idispr.GT.0 ) THEN   < who is the fucking bastard who coded that?
+          IF   ((ifunc.EQ.1 .AND. idispl.GT.0) &
+            .OR.(ifunc.EQ.2 .AND. idispr.GT.0)) THEN
+
                READ (LIN,*) kmax , mode , ddc , sone , igr , h
                READ (LIN,*) (t(i),i=1,kmax)
 
+
                IF ( sone.LT.0.01 ) sone = 2.0
                onea = DBLE(sone)
-!-----
-!     get starting value for phase velocity,
-!         which will correspond to the
-!     VP/VS ratio
-!-----
-               IF ( jsol.EQ.0 ) THEN
-!-----
-!     water layer
-!-----
+               !-----
+               !     get starting value for phase velocity,
+               !         which will correspond to the
+               !     VP/VS ratio
+               !-----
+               IF ( jsol.EQ.0 ) THEN ! water layer
                   cc1 = betmn
-               ELSE
-!-----
-!     solid layer solve halfspace period equation
-!-----
+               ELSE ! solid layer solve halfspace period equation
                   CALL GTSOLH(A(jmn),B(jmn),cc1)
                ENDIF
-!-----
-!     back off a bit to get a starting value at a lower phase velocity
-!-----
+               !-----
+               !     back off a bit to get a starting value at a lower phase velocity
+               !-----
                cc1 = .95*cc1
                cc1 = .90*cc1
                cc = DBLE(cc1)
@@ -183,32 +190,35 @@
                   c(i) = 0.0D0
                ENDDO
                ift = 999
+
                DO iq = 1 , mode
+!                  call cpu_time(start1)
+
                   READ (LIN,*) is , ie
                   itst = ifunc
                   DO k = is , ie
                      IF ( k.GE.ift ) GOTO 5
-                     t1 = DBLE(t(k))
+                     t1 = DBLE(t(k)) ! period at which to compute phase velo
                      IF ( igr.GT.0 ) THEN
-                        t1a = t1/(1.+h)
-                        t1b = t1/(1.-h)
+                        t1a = t1/(1.+h) ! for group, shift the period a little bit for differential
+                        t1b = t1/(1.-h) ! for group, shift the period a little bit for differential
                         t1 = DBLE(t1a)
                      ELSE
                         t1a = SNGL(t1)
                      ENDIF
-!-----
-!     get initial phase velocity estimate to begin search
-!
-!     in the notation here, c() is an array of phase velocities
-!     c(k-1) is the velocity estimate of the present mode
-!     at the k-1 period, while c(k) is the phase velocity of the
-!     previous mode at the k period. Since there must be no mode
-!     crossing, we make use of these values. The only complexity
-!     is that the dispersion may be reversed.
-!
-!     The subroutine getsol determines the zero crossing and refines
-!     the root.
-!-----
+                    !-----
+                    !     get initial phase velocity estimate to begin search
+                    !
+                    !     in the notation here, c() is an array of phase velocities
+                    !     c(k-1) is the velocity estimate of the present mode
+                    !     at the k-1 period, while c(k) is the phase velocity of the
+                    !     previous mode at the k period. Since there must be no mode
+                    !     crossing, we make use of these values. The only complexity
+                    !     is that the dispersion may be reversed.
+                    !
+                    !     The subroutine getsol determines the zero crossing and refines
+                    !     the root.
+                    !-----
                      IF ( k.EQ.is .AND. iq.EQ.1 ) THEN
                         c1 = cc
                         clow = cc
@@ -219,8 +229,8 @@
                         ifirst = 1
                      ELSEIF ( k.GT.is .AND. iq.GT.1 ) THEN
                         ifirst = 0
-!             clow = c(k) + one*dc
-!             c1 = c(k-1) -onea*dc
+                    ! clow = c(k) + one*dc
+                    ! c1 = c(k-1) -onea*dc
                         clow = c(k) + one*dc
                         c1 = c(k-1)
                         IF ( c1.LT.clow ) c1 = clow
@@ -229,26 +239,25 @@
                         c1 = c(k-1) - onea*dc
                         clow = cm
                      ENDIF
-!-----
-!     bracket root and refine it
-!-----
-                     CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,     &
-                               & ifirst)
-                     IF ( iret.EQ.-1 ) GOTO 5
+                     !-----
+                     !     bracket root and refine it
+                     !-----
+                     CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst)
+                     IF ( iret.EQ.-1 ) GOTO 5 ! if root not found
                      c(k) = c1
-!-----
-!     for group velocities compute near above solution
-!-----
+                     !-----
+                     !     for group velocities compute near above solution
+                     !-----
                      IF ( igr.GT.0 ) THEN
+                        ! for group, need to compute phase velo at periods t1a and t1b instead of just t1
                         t1 = DBLE(t1b)
                         ifirst = 0
                         clow = cb(k) + one*dc
                         c1 = c1 - onea*dc
-                        CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,  &
-                                  & ifirst)
-!-----
-!     test if root not found at slightly larger period
-!-----
+                        CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst)
+                        !-----
+                        !     test if root not found at slightly larger period
+                        !-----
                         IF ( iret.EQ.-1 ) c1 = c(k)
                         cb(k) = c1
                      ELSE
@@ -256,39 +265,44 @@
                      ENDIF
                      cc0 = SNGL(c(k))
                      cc1 = SNGL(c1)
-                     WRITE (LOT,*) itst , iq - 1 , t1a , t1b , cc0 , cc1
+!                     WRITE (LOT,*)
+
+                      WRITE(*,FMT) itst,iq - 1,t1a,t1b,cc0,cc1
+
                   ENDDO
+!                  call cpu_time(finish1)
+!                  print '("elapsed time ",f6.3," seconds.")',finish1-start1
                   GOTO 10
- 5                IF ( iq.GT.1 ) THEN
-                  ENDIF
 
-                  ift = k
+! 5                IF ( iq.GT.1 ) THEN < what is the point?
+!                  ENDIF               < what is the point?
+
+ 5                ift = k
                   itst = 0
-!            do 1770 i=k,ie
-!                t1a=t(i)
-!!                write(ifunc) itst,iq,t1a,t1a,t1a,t1a
-!                write(LOT,*) itst,iq-1,t1a,t1a,t1a,t1a
-! 1770     continue
  10            ENDDO
-            ENDIF
-         ENDIF
-!        close(ifunc,status='keep')
+          ENDIF
       ENDDO
-!        close(3,status='keep')
-      END
-!*==GTSOLH.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
+!      call cpu_time(finish)
+!      print '("T2 = ",f6.3," seconds.")',finish-start
 
+      END
+
+
+! -------------------------------------------------------------
+! -------------------------------------------------------------
       SUBROUTINE GTSOLH(A,B,C)
       IMPLICIT NONE
-!*--GTSOLH303
-!*** Start of declarations inserted by SPAG
+
       REAL A , B , C , fac1 , fac2 , fr , frp , gamma
       INTEGER i
-!*** End of declarations inserted by SPAG
+
 !-----
 !     starting solution
 !-----
       REAL*4 kappa , k2 , gk2
+!      real :: start, finish ! for cpu timer
+!      call cpu_time(start)
+
       C = 0.95*B
       DO i = 1 , 5
          gamma = B/A
@@ -303,8 +317,9 @@
          frp = frp/B
          C = C - fr/frp
       ENDDO
+!      call cpu_time(finish)
+!      print '("GTSOLH = ",f6.3," seconds.")',finish-start
       END
-!*==GETSOL.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
 
       SUBROUTINE GETSOL(T1,C1,Clow,Dc,Cm,Betmx,Iret,Ifunc,Ifirst)
       IMPLICIT NONE
@@ -330,11 +345,6 @@
 !             (this is to define period equation sign
 !              for mode jumping test)
 !-----
-      REAL*8 wvno , omega , twopi
-      REAL*8 C1 , c2 , cn , Cm , Dc , T1 , Clow
-      REAL*8 DLTAR , del1 , del2 , del1st , plmn
-      SAVE del1st
-!-----
 !     to avoid problems in mode jumping with reversed dispersion
 !     we note what the polarity of period equation is for phase
 !     velocities just beneath the zero crossing at the
@@ -342,6 +352,11 @@
 !-----
 !     bracket solution
 !-----
+      REAL*8 wvno , omega , twopi
+      REAL*8 C1 , c2 , cn , Cm , Dc , T1 , Clow
+      REAL*8 DLTAR , del1 , del2 , del1st , plmn
+      SAVE del1st
+
       twopi = 2.D0*3.141592653589793D0
       omega = twopi/T1
       wvno = omega/C1
@@ -377,10 +392,13 @@
       omega = twopi/T1
       wvno = omega/c2
       del2 = DLTAR(wvno,omega,Ifunc)
+
+
+
       IF ( DSIGN(1.0D+00,del1).NE.DSIGN(1.0D+00,del2) ) THEN
-!-----
-!     root bracketed, refine it
-!-----
+        !-----
+        !     root bracketed, refine it
+        !-----
          CALL NEVILL(T1,C1,c2,del1,del2,Ifunc,cn)
          C1 = cn
          IF ( C1.GT.(Betmx) ) THEN
@@ -400,6 +418,8 @@
          IF ( C1.LT.(Betmx+Dc) ) GOTO 100
          Iret = -1
       ENDIF
+
+
 99999 END
 !*==SPHERE.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
 !
@@ -549,11 +569,9 @@
 !   control the way to P-SV or SH.
 !
       IMPLICIT NONE
-!*--DLTAR650
-!*** Start of declarations inserted by SPAG
+
       DOUBLE PRECISION DLTAR , DLTAR1 , DLTAR4 , Omega , Wvno
       INTEGER Kk
-!*** End of declarations inserted by SPAG
 !
       IF ( Kk.EQ.1 ) THEN
 !   love wave period equation

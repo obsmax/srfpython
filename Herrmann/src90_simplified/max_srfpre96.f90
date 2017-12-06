@@ -588,14 +588,12 @@
          IF ( ie(n).GT.ie(n-1) ) ie(n-1) = ie(n)
       ENDDO
 !-----
-!     output on unit 4 starting with the first mode
+!     output starting with the first mode
 !-----
       DO n = 1,md
          WRITE (LOT,*) is(n),ie(n)
-!              write(4)is(n),ie(n)
       ENDDO
       END
-!*==UNIQ.spg  processed by SPAG 6.72Dc at 15:03 on  5 Dec 2017
 
 !#################################################################
       SUBROUTINE UNIQ(Y,X,Key,Nx,Ny,Imap)
