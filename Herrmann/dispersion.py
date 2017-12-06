@@ -381,35 +381,20 @@ def dispersion(ztop, vp, vs, rh, \
     instr3 = prep_srfpre96_3(waves, types, modes, freqs)
     pstdin = "\n".join([instr2, instr1, instr3])
 
-    # --------------
+    #--------------
     try:
         with Timeout(5):
-            #if True: #with Timer('2.1'):
-            p = Popen(srfpre96_exe, stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=False, preexec_fn=os.setsid)#, stderr = stderrfid)
-            p.stdin.write(pstdin)
-            pstdout, _ = p.communicate()
-            if p.returncode : raise CPiSError('error : %s failed' % srfpre96_exe)
-
-            #if True: #with Timer('2.2'):
-            #almost all time spent here
-            q = Popen(srfdis96_exe, stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=False, preexec_fn=os.setsid)#, stderr = stderrfid)
-            q.stdin.write(pstdout)
-            qstdout, _ = q.communicate()
-            if q.returncode : raise CPiSError('error : %s failed' % srfdis96_exe)
+            p = Popen("%s|%s" % (srfpre96_exe, srfdis96_exe), stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=True, preexec_fn=os.setsid)#, stderr = stderrfid)
+            qstdout, _ = p.communicate(pstdin)
+            if p.returncode : raise CPiSError('error : %s | %s failed' % (srfpre96_exe, srfdis96_exe))
     except TimeOutError:
         print ("error *123*", ztop, vp, vs, rh)
         os.killpg(os.getpgid(p.pid), signal.SIGKILL)
-        os.killpq(os.getpgid(q.pid), signal.SIGKILL)
         raise CPiSError('timeout')
     except: raise
     finally:
         try: p.stdin.close()
         except: pass
-        try: q.stdin.close()
-        except: pass
-
-
-
 
 
     #--------------

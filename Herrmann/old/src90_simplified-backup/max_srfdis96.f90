@@ -30,9 +30,38 @@
       PROGRAM SRFDIS96
       IMPLICIT NONE
 
+      REAL betmn,betmx,cc0,cc1,ddc,DL,ETAp,ETAs,FREfp,&
+         & FREfs,h,QA,QB,RRHo,sone,t1a,t1b,VA ,&
+         & VB !REFdep
+      INTEGER i,idispl,idispr,ie,ierr,ifirst,ift,ifunc, &
+            & igr,iq,iret,is,itst,jmn,jsol,k,kmax,    &
+            & LIN,LLW,LOT
+      INTEGER mlyr,mode,nsph
+      INTEGER NP, NL,NLAY
 
 
+      PARAMETER (LIN=5,LOT=6)
+      PARAMETER (NL=200,NLAY=200)
+      PARAMETER (NP=512)
+      DOUBLE PRECISION TWOpi,one,onea
+      DOUBLE PRECISION cc,c1,clow,cm,dc,t1
+      DOUBLE PRECISION c(NP),cb(NP)
+      REAL*4 D(NL),A(NL),B(NL),RHO(NL),RTP(NL),DTP(NL),     &
+           & t(NP),BTP(NL)
+      REAL*4 qbinv(NL),qainv(NL)
+      COMMON /MODL  / D,A,B,RHO,RTP,DTP,BTP
+      COMMON /PARA  / MMAx,LLW,TWOpi
+      INTEGER*4 iverb(2)
 
+      COMMON /ISOMOD/ DL(NLAY),VA(NLAY),VB(NLAY),RRHo(NLAY),    &
+                    & QA(NLAY),QB(NLAY),ETAp(NLAY),ETAs(NLAY),  &
+                    & FREfp(NLAY),FREfs(NLAY)
+!      COMMON /DEPREF/ REFdep
+      INTEGER MMAx,iunit,iiso,iflsph,idimen,icnvel
+      COMMON /MODTIT/ TITle
+      CHARACTER TITle*80
+
+!*** End of declarations inserted by SPAG
 !
 !
 !   This is a combination of program 'surface80' which search the poles
@@ -67,56 +96,72 @@
 !         Also permit one layer with fluid is base of the velocity is 0.001 km/sec
 !-----
 !
-!     NL  - layers in model
-!     NP  - number of unique periods
+
 
 !-----
 !     LIN - unit for FORTRAN read from terminal
 !     LOT - unit for FORTRAN write to terminal
-!     LLW - index of the first solid layer, starting with 1 from top
-!     idispl, idispr = number of dispersion points to compute for love and rayleigh
-!     Mmax = max number of layers in the mode, used in common with other subroutines
+!     LER - unit for FORTRAN error output to terminal
+!     NL  - layers in model
+!     NP  - number of unique periods
 !-----
-      ! uderstood variables
-      INTEGER LIN, LOT
-      PARAMETER (LIN=5,LOT=6)
-      INTEGER LLW,idispl,idispr,Mmax
 
-      ! not uderstood variables
-      REAL betmn,betmx,cc0,cc1,ddc,h,sone,t1a,t1b
-
-      INTEGER i,ie,ierr,ifirst,ift,ifunc, &
-            & igr,iq,iret,is,itst,jmn,jsol,k,kmax
-      INTEGER mode
-      INTEGER NP, NL,NLAY
-
-      PARAMETER (NL=200,NLAY=200)
-      PARAMETER (NP=512)
-      DOUBLE PRECISION TWOpi,one,onea
-      DOUBLE PRECISION cc,c1,clow,cm,dc,t1
-      DOUBLE PRECISION c(NP),cb(NP)
-      REAL*4 D(NL),A(NL),B(NL),RHO(NL),RTP(NL),DTP(NL),     &
-           & t(NP),BTP(NL)
-      REAL*4 qbinv(NL),qainv(NL)
-      COMMON /MODL  / D,A,B,RHO,RTP,DTP,BTP
-      COMMON /PARA  / Mmax,LLW,TWOpi
-
-      INTEGER iunit,iiso,idimen,icnvel
 
 !-----
-      read(LIN,*) Mmax
+!     common for iget
+!-----
+
+!-----
+!###      CALL GETMOD(2,'STDIN',MMAx,TITle,iunit,iiso,iflsph,idimen,icnvel, &
+!###                & ierr,.FALSE.)
+      TITle = '' ! dont care about model title
+      read(LIN,*) MMAx
       iunit = 0 ! read(LIN,*) iunit! was overwrite by 0 anyway
       iiso = 0 !read(LIN,*) iiso ! not used
+      iflsph = 0 !read(LIN,*) iflsph ! was overwrite by 0 anyway
       idimen = 0  !read(LIN,*) idimen ! model is always 1d
       icnvel = 0  !read(LIN,*) icnvel ! model is always constant velo
       ierr = 0 !read(LIN,*) ierr
-      read(LIN,*) D(1:MMax-1)
-      read(LIN,*) A(1:Mmax)
-      read(LIN,*) B(1:MMax)
-      read(LIN,*) RHO(1:MMax)
+      read(LIN,*) DL(1:MMAx-1)
+      read(LIN,*) VA(1:MMAx)
+      read(LIN,*) VB(1:MMAx)
+      read(LIN,*) RRHo(1:MMAx)
+!      read(LIN,*) QA(1:MMAx)    !not used aftewards, fakenews...
+!      read(LIN,*) QB(1:MMAx)    !not used aftewards, fakenews...
+!      read(LIN,*) ETAp(1:MMAx)  !not used aftewards, fakenews...
+!      read(LIN,*) ETAs(1:MMAx)  !not used aftewards, fakenews...
+!      read(LIN,*) FREfp(1:MMAx) !not used aftewards, fakenews...
+!      read(LIN,*) FREfs(1:MMAx) !not used aftewards, fakenews...
 !-----
+      iverb(1) = 0
+      iverb(2) = 0
+!      READ (LIN,*) idispl , idispr , nsph
       READ (LIN,*) idispl
       idispr=idispl ! always true, see srfpre96
+
+!-----
+      mlyr = MMAx
+      iunit = 0
+      nsph = iflsph
+!-----
+!     save current values
+!-----
+      DO i = 1 , MMAx
+!notused     IF ( QB(i).GT.0.0 ) THEN
+!notused            qbinv(i) = 1.0/QB(i)
+!notused         ELSE
+!notused            qbinv(i) = QB(i)
+!notused         ENDIF
+!notused         IF ( QA(i).GT.0.0 ) THEN
+!notused            qainv(i) = 1.0/QA(i)
+!notused         ELSE
+!notused            qainv(i) = QA(i)
+!notused         ENDIF
+         B(i) = VB(i)
+         A(i) = VA(i)
+         D(i) = DL(i)
+         RHO(i) = RRHo(i)
+      ENDDO
 
 !-----
 !     check for water layer
@@ -125,13 +170,14 @@
       IF ( B(1).LE.0.0 ) LLW = 2
       TWOpi = 2.D0*3.141592653589793D0
       one = 1.0D-2
+!      IF ( nsph.EQ.1 ) CALL SPHERE(0,0)
       jmn = 1
       betmx = -1.E20
       betmn = 1.E20
 !-----
 !     find the extremal velocities to assist in starting search
 !-----
-      DO i = 1 , Mmax
+      DO i = 1 , MMAx
          IF ( B(i).GT.0.01 .AND. B(i).LT.betmn ) THEN
             betmn = B(i)
             jmn = i
@@ -147,6 +193,7 @@
       DO ifunc = 1 , 2
          IF ( ifunc.NE.1 .OR. idispl.GT.0 ) THEN
             IF ( ifunc.NE.2 .OR. idispr.GT.0 ) THEN
+               IF ( nsph.EQ.1 ) CALL SPHERE(ifunc,1)
                READ (LIN,*) kmax , mode , ddc , sone , igr , h
                READ (LIN,*) (t(i),i=1,kmax)
 
@@ -405,6 +452,83 @@
 !
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
+      SUBROUTINE SPHERE(Ifunc,Iflag)
+      IMPLICIT NONE
+!*--SPHERE433
+!*** Start of declarations inserted by SPAG
+      REAL dhalf
+      INTEGER i , Iflag , Ifunc , LLW , MMAx , NL
+!*** End of declarations inserted by SPAG
+!-----
+!     Transform spherical earth to flat earth
+!
+!     Schwab, F. A., and L. Knopoff (1972). Fast surface wave and free
+!     mode computations, in  Methods in Computational Physics,
+!         Volume 11,
+!     Seismology: Surface Waves and Earth Oscillations,
+!         B. A. Bolt (ed),
+!     Academic Press, New York
+!
+!     Love Wave Equations  44, 45 , 41 pp 112-113
+!     Rayleigh Wave Equations 102, 108, 109 pp 142, 144
+!
+!     Revised 28 DEC 2007 to use mid-point, assume linear variation in
+!     slowness instead of using average velocity for the layer
+!     Use the Biswas (1972:PAGEOPH 96, 61-74, 1972) density mapping
+!
+!     ifunc   I*4 1 - Love Wave
+!                 2 - Rayleigh Wave
+!     iflag   I*4 0 - Initialize
+!                 1 - Make model  for Love or Rayleigh Wave
+!-----
+      PARAMETER (NL=200)
+      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) , RTP(NL) , DTP(NL) ,      &
+           & BTP(NL)
+      COMMON /MODL  / D , A , B , RHO , RTP , DTP , BTP
+      COMMON /PARA  / MMAx , LLW , TWOpi
+      DOUBLE PRECISION z0 , z1 , r0 , r1 , dr , ar , tmp , TWOpi
+      SAVE dhalf
+      ar = 6370.0D0
+      dr = 0.0D0
+      r0 = ar
+      D(MMAx) = 1.0
+      IF ( Iflag.EQ.0 ) THEN
+         DO i = 1 , MMAx
+            DTP(i) = D(i)
+            RTP(i) = RHO(i)
+         ENDDO
+         DO i = 1 , MMAx
+            dr = dr + DBLE(D(i))
+            r1 = ar - dr
+            z0 = ar*DLOG(ar/r0)
+            z1 = ar*DLOG(ar/r1)
+            D(i) = z1 - z0
+!-----
+!               use layer midpoint
+!-----
+            tmp = (ar+ar)/(r0+r1)
+            A(i) = A(i)*tmp
+            B(i) = B(i)*tmp
+            BTP(i) = tmp
+            r0 = r1
+         ENDDO
+         dhalf = D(MMAx)
+      ELSE
+         D(MMAx) = dhalf
+         DO i = 1 , MMAx
+            IF ( Ifunc.EQ.1 ) THEN
+               RHO(i) = RTP(i)*BTP(i)**(-5)
+            ELSEIF ( Ifunc.EQ.2 ) THEN
+               RHO(i) = RTP(i)*BTP(i)**(-2.275)
+            ENDIF
+         ENDDO
+      ENDIF
+      D(MMAx) = 0.0
+      END
+!*==NEVILL.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
+!
+! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
       SUBROUTINE NEVILL(T,C1,C2,Del1,Del2,Ifunc,Cc)
 !-----
 !   hybrid method for refining root once it has been bracketted
@@ -428,7 +552,7 @@
                      & DLTAR , omega , s1 , s13 , s2 , s32 , ss1 , ss2 ,&
                      & T , TWOpi , wvno , x
       DOUBLE PRECISION y
-      INTEGER Ifunc , j , kk , LLW , m , Mmax , nctrl , nev , NL
+      INTEGER Ifunc , j , kk , LLW , m , MMAx , nctrl , nev , NL
 !*** End of declarations inserted by SPAG
 
       PARAMETER (NL=200)
@@ -436,7 +560,7 @@
            & BTP(NL)
       DIMENSION x(20) , y(20)
       COMMON /MODL  / D , A , B , RHO , RTP , DTP , BTP
-      COMMON /PARA  / Mmax , LLW , TWOpi
+      COMMON /PARA  / MMAx , LLW , TWOpi
 !-----
 !     initial guess
 !-----
@@ -577,26 +701,26 @@
                      & fac , Omega , q , rb , rho1 , sinq , TWOpi ,     &
                      & Wvno , wvnom , wvnop , xkb , xmu , xnor
       DOUBLE PRECISION y , ynor , z
-      INTEGER LLW , m , Mmax , mmm1 , NL
+      INTEGER LLW , m , MMAx , mmm1 , NL
 !*** End of declarations inserted by SPAG
       PARAMETER (NL=200)
       REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) , RTP(NL) , DTP(NL) ,      &
            & BTP(NL)
       COMMON /MODL  / D , A , B , RHO , RTP , DTP , BTP
-      COMMON /PARA  / Mmax , LLW , TWOpi
+      COMMON /PARA  / MMAx , LLW , TWOpi
 !
 !   Haskell-Thompson love wave formulation from halfspace
 !   to surface.
 !
-      beta1 = DBLE(B(Mmax))
-      rho1 = DBLE(RHO(Mmax))
+      beta1 = DBLE(B(MMAx))
+      rho1 = DBLE(RHO(MMAx))
       xkb = Omega/beta1
       wvnop = Wvno + xkb
       wvnom = DABS(Wvno-xkb)
       rb = DSQRT(wvnop*wvnom)
       e1 = rho1*rb
       e2 = 1.D+00/(beta1*beta1)
-      mmm1 = Mmax - 1
+      mmm1 = MMAx - 1
       DO m = mmm1 , LLW , -1
          beta1 = DBLE(B(m))
          rho1 = DBLE(RHO(m))
@@ -650,36 +774,36 @@
       DOUBLE PRECISION p , q , ra , rb , rho1 , t , TWOpi , w , w0 ,    &
                      & Wvno , wvno2 , wvnom , wvnop , WY , WZ , xka ,   &
                      & xkb , XY , XZ , znul
-      INTEGER i , j , LLW , m , Mmax , mmm1 , NL
+      INTEGER i , j , LLW , m , MMAx , mmm1 , NL
 !*** End of declarations inserted by SPAG
       PARAMETER (NL=200)
       DIMENSION e(5) , ee(5) , ca(5,5)
       REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) , RTP(NL) , DTP(NL) ,      &
            & BTP(NL)
       COMMON /MODL  / D , A , B , RHO , RTP , DTP , BTP
-      COMMON /PARA  / Mmax , LLW , TWOpi
+      COMMON /PARA  / MMAx , LLW , TWOpi
       COMMON /OVRFLW/ A0 , CPCq , CPY , CPZ , CQW , CQX , XY , XZ , WY ,&
                     & WZ
 !
       omega = Omga
       IF ( omega.LT.1.0D-4 ) omega = 1.0D-4
       wvno2 = Wvno*Wvno
-      xka = omega/DBLE(A(Mmax))
-      xkb = omega/DBLE(B(Mmax))
+      xka = omega/DBLE(A(MMAx))
+      xkb = omega/DBLE(B(MMAx))
       wvnop = Wvno + xka
       wvnom = DABS(Wvno-xka)
       ra = DSQRT(wvnop*wvnom)
       wvnop = Wvno + xkb
       wvnom = DABS(Wvno-xkb)
       rb = DSQRT(wvnop*wvnom)
-      t = DBLE(B(Mmax))/omega
+      t = DBLE(B(MMAx))/omega
 !-----
 !   E matrix for the bottom half-space.
 !-----
       gammk = 2.D+00*t*t
       gam = gammk*wvno2
       gamm1 = gam - 1.D+00
-      rho1 = DBLE(RHO(Mmax))
+      rho1 = DBLE(RHO(MMAx))
       e(1) = rho1*rho1*(gamm1*gamm1-gam*gammk*ra*rb)
       e(2) = -rho1*ra
       e(3) = rho1*(gamm1-gammk*ra*rb)
@@ -688,7 +812,7 @@
 !-----
 !   matrix multiplication from bottom layer upward
 !-----
-      mmm1 = Mmax - 1
+      mmm1 = MMAx - 1
       DO m = mmm1 , LLW , -1
          xka = omega/DBLE(A(m))
          xkb = omega/DBLE(B(m))

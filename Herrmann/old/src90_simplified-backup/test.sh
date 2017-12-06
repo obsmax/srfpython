@@ -2,7 +2,7 @@
 
 #test the modified version of fortran programs max_srfpre96 and max_srfdis96
 
-cat << END | ../max_srfpre96 | ../max_srfdis96
+../max_srfpre96 << END | ../max_srfdis96
 8
 0.25 0.2  0.2  0.2  0.2  0.48 0.27
 1.85 2.36 2.63 3.15 3.71 4.54 5.48 5.8
