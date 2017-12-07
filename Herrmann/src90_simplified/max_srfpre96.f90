@@ -202,9 +202,11 @@
 
       READ (LIN,*) NLC,NLU,NRC,NRU
 
+
+      WRITE(LOT,*) h
       CALL GETDSP(nmdisp,&
               & NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
-              & earthflat,dcl,dcr,onel,oner,h)
+              & earthflat,dcl,dcr,onel,oner)
       END
 
 !#################################################################
@@ -269,10 +271,10 @@
 
 !#################################################################
       SUBROUTINE GETDSP(Nmdisp,NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
-              & earthflat,Dcl,Dcr,Onel,Oner,H)
+              & earthflat,Dcl,Dcr,Onel,Oner)
       IMPLICIT NONE
 
-      REAL c,cper,dc,Dcl,Dcr,f,H,obs,obserr,one,    &
+      REAL c,cper,dc,Dcl,Dcr,f,obs,obserr,one,    &
          & Onel,Oner,pper,sd
       INTEGER i,idat,igr,ilorr,ilvry,imode,iobs, &
             & iobsyn,iporg,Iunitd,j,k,kmax,LGSTR,LIN ,&
@@ -507,7 +509,7 @@
 !           if(nmgr.gt.0 .and. nmph.gt.0 .and. nmgm.gt.0)igr=2
          IF ( nmgr.GT.0 .AND. nmph.GT.0 ) igr = 2
          nx = MAX(nmph,nmgr)
-         WRITE (LOT,*) kmax,nx,dc,one,igr,H
+         WRITE (LOT,*) kmax,nx,dc,one,igr!,H
          WRITE (LOT,*) (per(i),i=1,kmax)
 
          DO iporg = 1,2

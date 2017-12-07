@@ -79,18 +79,21 @@
 !                    in case of a water layer, use P-wave velocity instead of S for betmn
 !     jmn = index of layer where betmn is encountered, starting from 1, from top to botto
 !     jsol = a flag to tell if betmn corresponds to a liquid layer
+!     t1a,t1b = periods at which to compute phase velocity,
+!               for group velocity dispersions, these two values are used for differentiation
+!               for phase velocity, only t1a is used
       !-----
       ! uderstood variables
       INTEGER LIN, LOT
       PARAMETER (LIN=5,LOT=6)
-      INTEGER LLW,idispl,idispr,Mmax,ifunc,jmn
-      REAL betmn,betmx
+      INTEGER LLW,idispl,idispr,Mmax,ifunc,jmn,jsol
+      REAL betmn,betmx,t1a,t1b
 
       ! not uderstood variables
-      REAL cc0,cc1,ddc,h,sone,t1a,t1b
+      REAL cc0,cc1,ddc,h,sone
 
       INTEGER i,ie,ierr,ifirst,ift, &
-            & igr,iq,iret,is,itst,jsol,k,kmax
+            & igr,iq,iret,is,itst,k,kmax
       INTEGER mode
       INTEGER NP, NL,NLAY
 
@@ -119,6 +122,7 @@
       read(LIN,*) B(1:MMax)
       read(LIN,*) RHO(1:MMax)
 !-----
+      READ (LIN,*) h
       READ (LIN,*) idispl
       idispr=idispl ! always true, see srfpre96
 
@@ -159,9 +163,8 @@
           IF   ((ifunc.EQ.1 .AND. idispl.GT.0) &
             .OR.(ifunc.EQ.2 .AND. idispr.GT.0)) THEN
 
-               READ (LIN,*) kmax , mode , ddc , sone , igr , h
+               READ (LIN,*) kmax, mode, ddc, sone, igr!, h
                READ (LIN,*) (t(i),i=1,kmax)
-
 
                IF ( sone.LT.0.01 ) sone = 2.0
                onea = DBLE(sone)
@@ -242,7 +245,9 @@
                      !-----
                      !     bracket root and refine it
                      !-----
+!                     write(*,*) "av1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
                      CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst)
+!                     write(*,*) "ap1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
                      IF ( iret.EQ.-1 ) GOTO 5 ! if root not found
                      c(k) = c1
                      !-----
@@ -254,7 +259,9 @@
                         ifirst = 0
                         clow = cb(k) + one*dc
                         c1 = c1 - onea*dc
+!                        write(*,*) "av2",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
                         CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst)
+!                        write(*,*) "ap2",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
                         !-----
                         !     test if root not found at slightly larger period
                         !-----
@@ -320,22 +327,27 @@
 !      call cpu_time(finish)
 !      print '("GTSOLH = ",f6.3," seconds.")',finish-start
       END
-
+! -------------------------------------------------------------
+! -------------------------------------------------------------
       SUBROUTINE GETSOL(T1,C1,Clow,Dc,Cm,Betmx,Iret,Ifunc,Ifirst)
       IMPLICIT NONE
       REAL Betmx
-      INTEGER idir , Ifirst , Ifunc , Iret
+      INTEGER Ifirst , Ifunc , Iret
       REAL*8 wvno , omega , twopi
-      REAL*8 C1 , c2 , cn , Cm , Dc , T1 , Clow
+      REAL*8 C1 , c2 , cn , Cm , Dc , T1 , Clow, fdir
       REAL*8 DLTAR , del1 , del2 , del1st , plmn
       SAVE del1st
+
+      ! presumed inputs = T1, Clow, DC, CM, Betmx, Ifunc, Ifirst
+      ! presumed outputs = C1, Iret
+
 !-----
 !     subroutine to bracket dispersion curve
 !     and then refine it
 !-----
 !     t1  - period
 !     c1  - initial guess on low side of mode
-!     clow    - lowest possible value for present mode in a
+!     clow - lowest possible value for present mode in a
 !           reversed direction search
 !     dc  - phase velocity search increment
 !     cm  - minimum possible solution
@@ -365,11 +377,11 @@
       IF ( Ifirst.EQ.1 ) del1st = del1
       plmn = DSIGN(1.0D+00,del1st)*DSIGN(1.0D+00,del1)
       IF ( Ifirst.EQ.1 ) THEN
-         idir = +1
+         fdir = +1.0
       ELSEIF ( Ifirst.NE.1 .AND. plmn.GE.0.0D+00 ) THEN
-         idir = +1
+         fdir = +1.0
       ELSEIF ( Ifirst.NE.1 .AND. plmn.LT.0.0D+00 ) THEN
-         idir = -1
+         fdir = -1.0
       ENDIF
 !-----
 !     idir indicates the direction of the search for the
@@ -380,21 +392,32 @@
 !     downward from the present estimate. However, we never
 !     go below the floor of clow, when the direction is reversed
 !-----
- 100  IF ( idir.GT.0 ) THEN
-         c2 = C1 + Dc
-      ELSE
-         c2 = C1 - Dc
-      ENDIF
+!     original syntax
+! 100  IF ( idir.GT.0 ) THEN
+!         c2 = C1 + Dc
+!      ELSE
+!         c2 = C1 - Dc
+!      ENDIF
+!      IF ( c2.LE.Clow ) THEN
+!         idir = +1
+!         C1 = Clow
+!      ENDIF
+!      IF ( c2.LE.Clow ) GOTO 100
+
+!     syntax 1
+100   C2 = C1 + fdir * Dc
       IF ( c2.LE.Clow ) THEN
-         idir = +1
+         ! wrong start
+         ! we are below Clow, force research direction to upward
+         ! put C1 to Clow and restart the loop from beginning
+         fdir = +1.0
          C1 = Clow
+         GOTO 100
       ENDIF
-      IF ( c2.LE.Clow ) GOTO 100
+
       omega = twopi/T1
       wvno = omega/c2
       del2 = DLTAR(wvno,omega,Ifunc)
-
-
 
       IF ( DSIGN(1.0D+00,del1).NE.DSIGN(1.0D+00,del2) ) THEN
         !-----
@@ -403,21 +426,22 @@
          CALL NEVILL(T1,C1,c2,del1,del2,Ifunc,cn)
          C1 = cn
          IF ( C1.GT.(Betmx) ) THEN
-            Iret = -1
-            GOTO 99999
+            Iret = -1  ! failure signal
+!            GOTO 99999 ! quit subroutine
          ELSE
-            Iret = 1
-            RETURN
+            Iret = 1  !            GOTO 99999
+!            RETURN
          ENDIF
+         GOTO 99999
       ENDIF
       C1 = c2
       del1 = del2
 !   check that c1 is in region of solutions
       IF ( C1.LT.Cm ) THEN
-         Iret = -1
+         Iret = -1 ! failure signal
       ELSE
          IF ( C1.LT.(Betmx+Dc) ) GOTO 100
-         Iret = -1
+         Iret = -1 ! failure signal
       ENDIF
 
 
