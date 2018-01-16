@@ -1,5 +1,7 @@
 import numpy as np
 
+
+# -------------------------------
 def unpacksurf96(string):
     """unpack dispersion curves at surf96 format (see Herrmann's doc)"""
     string = [line.strip() for line in string.split('\n')]
@@ -24,8 +26,20 @@ def unpacksurf96(string):
     return WAVE, TYPE, FLAG, MODE, PERIOD, VALUE, DVALUE, NLC, NLU, NRC, NRU
 
 
+# -------------------------------
 def readsurf96(filename):
-    """read dispersion files at surf96 format"""
+    """read dispersion depthdisp at surf96 format"""
     with open(filename, 'r') as fid:
         L = fid.readlines()
     return unpacksurf96("".join(L))
+
+
+# -------------------------------
+def packsurf96(wave, type, flag, mode, period, value, dvalue):
+    fmt = "SURF96 {wave} {type} {flag} {mode} {period} {value} {dvalue}"
+    assert np.all([len(_) == len(wave) for _ in type, flag, mode, period, value, dvalue])
+    return "\n".join([fmt.format( \
+        wave=w, type=t, mode=m, period=p,
+        value=v, dvalue=d, flag="X")
+        for w, t, m, p, v, d in \
+            zip([wave, type, flag, mode, period, value, dvalue])])

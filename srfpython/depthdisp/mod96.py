@@ -1,8 +1,9 @@
 import numpy as np
 
 
+# -------------------------------
 def unpackmod96(string):
-    """unpack 1D deptmodel files at mod96 format (see Herrmann's doc)
+    """unpack 1D deptmodel depthdisp at mod96 format (see Herrmann's doc)
     """
     string = [line.strip() for line in string.split('\n')]
     string.remove('')
@@ -10,7 +11,7 @@ def unpackmod96(string):
     # title = string[1].strip()
     # isotropic = string[2].strip().upper() #== "ISOTROPIC"
     # kgs = string[3].strip().upper() #== "KGS"
-    # flatearth = string[4].strip().upper() #== "FLAT EARTH"
+    # flatearth = string[4].strip().upper() #== "FLAT EARTH"
     # oned = string[5].strip().upper() == "1-D"
     # cstvelo = string[6].strip().upper() == "CONSTANT VELOCITY"
     # assert string[7].strip() == "LINE08"
@@ -34,13 +35,15 @@ def unpackmod96(string):
     return nlayer, Z, H, VP, VS, RHO, QP, QS, ETAP, ETAS, FREFP, FREFS
 
 
+# -------------------------------
 def readmod96(filename):
-    """read 1D deptmodel files at mod96 format (see Herrmann's doc)"""
+    """read 1D deptmodel depthdisp at mod96 format (see Herrmann's doc)"""
     with open(filename, 'r') as fid:
         L = fid.readlines()
     return unpackmod96("".join(L))
 
 
+# -------------------------------
 def packmod96(Z, VP, VS, RHO, QP=None, QS=None, ETAP=None, ETAS=None, FREFP=None, FREFS=None):
     if QP is None: QP = np.zeros_like(VS)
     if QS is None: QS = np.zeros_like(VS)

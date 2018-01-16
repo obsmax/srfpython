@@ -1,4 +1,4 @@
-from srfpython.files.mod96 import packmod96, unpackmod96
+from srfpython.depthdisp.mod96 import packmod96, unpackmod96
 from srfpython.utils import discrete_time_primitive, cosTaperwidth
 from scipy.fftpack import fft, ifft, fftfreq
 import numpy as np
@@ -6,11 +6,13 @@ import copy
 import os
 
 
+# -------------------------------------------------
 class depthmodel1D(object):
     """self.z = ztop !!!
        can handle irregular layers
     """
 
+    # -------------------------------------------------
     def __init__(self, ztop, values, interpmethod="stairs"):
         #last value of v stand for half space
         assert len(ztop) == len(values)
@@ -19,21 +21,27 @@ class depthmodel1D(object):
         self.values, self.z = np.array(values), np.array(ztop)
         self.interpmethod = interpmethod #to be used by default
 
+    # -------------------------------------------------
     def __len__(self):
         return len(self.z)#number of layers including the lower half space
 
+    # -------------------------------------------------
     def ztop(self):
         return self.z
 
+    # -------------------------------------------------
     def thickness(self):
         return np.concatenate((self.z[1:] - self.z[:-1], [np.inf]))
 
+    # -------------------------------------------------
     def zbot(self):
         return self.z + self.thickness()
 
+    # -------------------------------------------------
     def zmid(self):
         return self.z + 0.5 * self.thickness()
 
+    # -------------------------------------------------
     def stairs(self):
         """
         :return:
@@ -46,6 +54,7 @@ class depthmodel1D(object):
         I = np.sort( np.concatenate( (range(N), range(N)) ) )
         return Z, self.values[I]
 
+    # -------------------------------------------------
     def show(self, ax, marker = "-", **kwargs): #halfspacemarker="-",
 
         zz, vv = self.stairs()
@@ -60,6 +69,7 @@ class depthmodel1D(object):
             ax.invert_yaxis()
         return hdl
 
+    # -------------------------------------------------
     def interp(self, z, interpmethod = None):
         """
         :param z: depth at which to interpolate the model
@@ -94,9 +104,11 @@ class depthmodel1D(object):
         else:
             raise ValueError('interpmethod %s not valid for %s' % (interpmethod, type(self)))
 
+    # -------------------------------------------------
     def copy(self):
         return copy.deepcopy(self)
 
+    # -------------------------------------------------
     def split(self, thickness):
         """tries to split layers with a resolution of thickness
            while preserving the interfaces already in place
@@ -127,6 +139,7 @@ class depthmodel1D(object):
 
         self.__init__(ztop, values)
 
+    # -------------------------------------------------
     def add_layer(self, thickness):
         """add one layer on top of half-space
            overwrites self
@@ -140,6 +153,7 @@ class depthmodel1D(object):
             values = np.concatenate((self.values[:], [self.values[-1]]))
             self.__init__(ztop, values)
 
+    # -------------------------------------------------
     def smooth(self):
         """split every layer in two peace
            overwrites self
@@ -172,6 +186,7 @@ class depthmodel1D(object):
         #print newztop[1:] - newztop[:-1]
         #self.__init__(newztop, newv)
 
+    # -------------------------------------------------
     def blur(self, thickness):
         """
         apply gaussian smoothing to the depthmodel
@@ -215,12 +230,14 @@ class depthmodel1D(object):
         zi[-1] = self.z[-1]
         self.values = np.interp(xp = z, fp = v3, x = zi)
 
+    # -------------------------------------------------
     def __call__(self, z):
         raise Exception('obsolet, use depthmodel1D.interp instead')
         zz, vv = self.stairs()
         return np.interp(xp = zz, fp = vv, x = z)
 
 
+# -------------------------------------------------
 class depthmodel(object):
     def __init__(self, vp, vs, rh):
         assert isinstance(vp, depthmodel1D)
@@ -235,21 +252,27 @@ class depthmodel(object):
 
         self.vp, self.vs, self.rh = vp, vs, rh
 
+    # -------------------------------------------------
     def ztop(self):
         return self.vs.ztop()
 
+    # -------------------------------------------------
     def zbot(self):
         return self.vs.zbot()
 
+    # -------------------------------------------------
     def zmid(self):
         return self.vs.zmid()
 
+    # -------------------------------------------------
     def thickness(self):
         return self.vs.thickness()
 
+    # -------------------------------------------------
     def __len__(self):
         return len(self.vs)
 
+    # -------------------------------------------------
     def simplify(self):
         # group layers with same values, return it as a new object
         ztop, vp, vs, rh = [self.vp.z[0]], [self.vp.values[0]], [self.vs.values[0]], [self.rh.values[0]]
@@ -266,52 +289,64 @@ class depthmodel(object):
             depthmodel1D(ztop, vs),
             depthmodel1D(ztop, rh))
 
+    # -------------------------------------------------
     def vp_over_vs(self):
         return depthmodel1D(self.ztop(), self.vp.values / self.vs.values)
 
+    # -------------------------------------------------
     def pr(self):
         return self.vp_over_vs()
 
+    # -------------------------------------------------
     def mu(self):
         return depthmodel1D(self.ztop(), self.rh.values * self.vs.values ** 2.)
 
+    # -------------------------------------------------
     def lamda(self):
         return depthmodel1D(self.ztop(), self.rh.values * (self.vp.values ** 2. - 2. * self.vs.values ** 2.))
 
+    # -------------------------------------------------
     def __str__(self):
         return packmod96(self.z, self.vp.values, self.vs.values, self.rh.values)
 
+    # -------------------------------------------------
     def write96(self, filename, overwrite=False):
         if not overwrite and os.path.exists(filename):
             raise Exception('%s already exists' % filename)
         with open(filename, 'w') as fid:
             fid.write(self.__str__())
 
+    # -------------------------------------------------
     def copy(self):
         return copy.deepcopy(self)
 
+    # -------------------------------------------------
     def split(self, *args, **kwargs):
         for d in self.vp, self.vs, self.rh:
             d.split(*args, **kwargs)
 
+    # -------------------------------------------------
     def add_layer(self, *args, **kwargs):
         for d in self.vp, self.vs, self.rh:
             d.add_layer(*args, **kwargs)
 
+    # -------------------------------------------------
     def interp(self, ztop, **kwargs):
         vp = depthmodel1D(ztop, self.vp.interp(ztop, **kwargs))
         vs = depthmodel1D(ztop, self.vs.interp(ztop, **kwargs))
         rh = depthmodel1D(ztop, self.rh.interp(ztop, **kwargs))
         return depthmodel(vp, vs, rh)
 
+    # -------------------------------------------------
     def blur(self, thickness):
         for d in self.vp, self.vs, self.rh:
             d.blur(thickness)
 
+    # -------------------------------------------------
     def ztopvpvsrh(self):
         return self.ztop(), self.vp.values, self.vs.values, self.rh.values
 
-
+    # -------------------------------------------------
     def show(self, ax, *args, **kwargs):
 
         hdls = []
@@ -324,7 +359,8 @@ class depthmodel(object):
         return hdls
 
 
-class depthmodel_from_mod96_string(depthmodel):
+# -------------------------------------------------
+class depthmodel_from_mod96string(depthmodel):
     def __init__(self, mod96string):
         _, Z, _, VP, VS, RHO, _, _, _, _, _, _ = \
             unpackmod96(mod96string)
@@ -335,8 +371,8 @@ class depthmodel_from_mod96_string(depthmodel):
                             rh=depthmodel1D(Z, RHO))
 
 
-class depthmodel_from_mod96(depthmodel_from_mod96_string):
+# -------------------------------------------------
+class depthmodel_from_mod96(depthmodel_from_mod96string):
     def __init__(self, filename):
         with open(filename, 'r') as fid:
-            string = fid.readlines()
-        depthmodel_from_mod96_string.__init__(self, string)
+            depthmodel_from_mod96string.__init__(self, "".join(fid.readlines()))

@@ -1,6 +1,6 @@
 *.pyc
-Herrmann/max_srfdis96
-Herrmann/max_srfpre96
+Herrmann/bin/max_srfdis96
+Herrmann/bin/max_srfpre96
 .idea
 .idea/*
 *._*

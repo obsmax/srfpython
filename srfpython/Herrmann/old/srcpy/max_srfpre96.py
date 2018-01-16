@@ -2,7 +2,7 @@ import sys, numpy as np
 
 # -----------------------------------------------------------------
 def unpackmod96(string):
-    """read files at mod96 format (see Herrmann's doc)
+    """read depthdisp at mod96 format (see Herrmann's doc)
     """
     string = [line.strip() for line in string.split('\n')]
     string.remove('')

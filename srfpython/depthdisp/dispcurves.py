@@ -1,8 +1,10 @@
-from srfpython.utils import discrete_time_primitive
+from srfpython.depthdisp.surf96 import unpacksurf96, packsurf96
+from srfpython.utils import discrete_time_primitive, munique
 from scipy import __version__ as scipyversion
 from scipy.interpolate import interp1d
 import numpy as np
 import copy
+import os
 
 assert scipyversion >= "0.14.0"
 
@@ -22,7 +24,6 @@ def C2U(nu, c):
     # F = nus / cs
     # us = (nus[1:] - nus[:-1]) / (F[1:] - F[:-1])
     # nu_ = .5 * (nus[1:] + nus[:-1])
-
 
     numean = np.sqrt(nus[1:] * nus[:-1])  # see Jeffreys parameters, Tarantola et al 2005
     lu = (np.log(cs[1:]) - np.log(cs[:-1])) / (np.log(nus[1:]) - np.log(nus[:-1]))
@@ -262,3 +263,106 @@ class nanUlaw(Ulaw):
 
     def __call__(self, freq):
         return np.nan * np.ones(len(freq))
+
+
+# -------------------------------------------------
+class surf96reader_from_surf96string(object):
+    def __init__(self, surf96string):
+        self.data = {}
+        self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], self.data['MODE'], self.data['PERIOD'], \
+            self.data['VALUE'], self.data['DVALUE'], _, _, _, _ = unpacksurf96(surf96string)
+
+    # ---------------------------------------------
+    def get_all(self):
+        for WAVE, TYPE, FLAG, MODE  in \
+                munique(self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], self.data['MODE']):
+            yield self.get(mode=MODE, wave=WAVE, type=TYPE, flag=FLAG)
+
+    # ---------------------------------------------
+    def get(self, wave="R", type="C", mode=0, flag=None):
+        """generate a dispersion law according to the (read) file content"""
+        I = (self.data.MODE == mode) & (self.data.WAVE == wave) & (self.data.TYPE == type)
+        if flag is not None: I = I & (self.data.FLAG == flag)
+
+        if not np.any(I):
+            raise Exception(
+                'mode %d, wave %s, type %s and flag %s not found' %
+                (mode, wave, type, flag))
+        freq = 1. / self.data.PERIOD[I]
+        valu = self.data.VALUE[I]
+        dval = self.data.DVALUE[I]
+        J = np.argsort(freq)
+        if type == "C":
+            W = Claw
+        elif type == "U":
+            W = Ulaw
+        else:
+            raise ValueError('only for types C and U')
+        return W(freq[J], valu[J], extrapolationmode=int(mode != 0), dvalue=dval[J],
+                 mode=mode, wave=wave, type=type, flag=flag)
+
+    # ---------------------------------------------
+    def get_lower(self, wave="R", type="C", mode=0, flag=None):
+        law = self.get(wave=wave, type=type, mode=mode, flag=flag)
+        if type == "C":
+            W = Claw
+        elif type == "U":
+            W = Ulaw
+        else:
+            raise ValueError('only for types C and U')
+        return W(law.freq, law.value * np.exp(-law.dvalue / law.value), extrapolationmode=int(mode != 0), dvalue=None,
+                 mode=mode, wave=wave, type=type, flag=flag)
+
+    # ---------------------------------------------
+    def get_upper(self, wave="R", type="C", mode=0, flag=None):
+        law = self.get(wave=wave, type=type, mode=mode, flag=flag)
+        if type == "C":
+            W = Claw
+        elif type == "U":
+            W = Ulaw
+        else:
+            raise ValueError('only for types C and U')
+        return W(law.freq, law.value * np.exp(+law.dvalue / law.value), extrapolationmode=int(mode != 0), dvalue=None,
+                 mode=mode, wave=wave, type=type, flag=flag)
+
+    # ---------------------------------------------
+    def wtm(self):
+        for w, t, m in zip(*munique(self.data['WAVE'], self.data['TYPE'], self.data['MODE'])):
+            yield w, t, m
+
+    # ---------------------------------------------
+    def wtmfvd(self):
+        return self.data['WAVE'], \
+               self.data['TYPE'], \
+               self.data['MODE'], \
+               1. / self.data['PERIOD'], \
+               self.data['VALUE'], \
+               self.data['DVALUE']
+
+    # ---------------------------------------------
+    def wtmfv(self):
+        return self.data['WAVE'], \
+               self.data['TYPE'], \
+               self.data['MODE'], \
+               1. / self.data['PERIOD'], \
+               self.data['VALUE']
+
+    # ---------------------------------------------
+    def __str__(self):
+        return packsurf96(self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], self.data['MODE'],
+                          self.data['PERIOD'], self.data['VALUE'], self.data['DVALUE'])
+
+    # -------------------------------------------------
+    def write96(self, filename, overwrite=False):
+        if not overwrite and os.path.exists(filename):
+            raise Exception('%s already exists' % filename)
+        with open(filename, 'w') as fid:
+            fid.write(self.__str__())
+
+
+# -------------------------------------------------
+class surf96reader(surf96reader_from_surf96string):
+    def __init__(self, filename):
+        with open(filename, 'r') as fid:
+            surf96reader_from_surf96string.__init__(self, "".join(fid.readlines()))
+
