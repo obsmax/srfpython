@@ -1,15 +1,16 @@
 #!/usr/bin/python2.7
 from __future__ import print_function
 from subprocess import Popen, PIPE
-from numpy import log, log10
+from numpy import log
 import numpy as np
-import sys, glob, os, time, signal
+import os
+import signal
+from srfpython.utils import Timer, TimeOutError, Timeout, munique
 
 
 """
-dispersion, Maximilien Lehujeur, 01/11/2017
-module to compute surface wave dispersion curves
-see documentation in function 
+program to compute surface wave dispersion curves, Maximilien Lehujeur, 01/11/2017
+see documentation in function dispersion
 use __main__ for demo
 """
 
@@ -20,54 +21,7 @@ srfdis96_exe = _pathfile.replace('/src/', '/bin/').replace(_file, 'max_srfdis96'
 if not os.path.exists(srfpre96_exe) or not os.path.exists(srfdis96_exe):
     raise Exception('could not find %s and/or %s' % (srfpre96_exe, srfdis96_exe))
 
-###################################### TOOLS
-class TimeOutError(Exception): pass
-class Timeout():
-    def __init__(self, sec):
-        self.sec = sec
-    def __enter__(self):
-        signal.signal(signal.SIGALRM, self.raise_timeout)
-        signal.alarm(self.sec)
-    def __exit__(self, *args):
-        signal.alarm(0)
-    def raise_timeout(self, *args):
-        raise TimeOutError()
-#_____________________________________
-class Timer(object):
-    def __init__(self, title):
-        self.title = title
-    def __enter__(self):
-        self.start = time.time()
-        return self
-    def __exit__(self, *args, **kwargs):
-        print ("elapsed time %s : %fs" % (self.title, time.time() - self.start))
-#_____________________________________
-def firstfalse(I):
-    if not I[0] : return 0
-    II = I[1:] != I[:-1]
-    r = np.arange(len(I) - 1)
-    return r[II][0] + 1
-#_____________________________________
-def munique(*Xs):
-    assert np.all(len(X) == len(Xs[0]) for X in Xs)
-    L = []
-    for tup in zip(*Xs):
-        if tup not in L: 
-            L.append(tup)
-    return tuple([np.array(w) for w in zip(*L)])
-#_____________________________________
-def freqspace(freqmin, freqmax, nfreq, scale="flin"):
-    if "lin" in scale.lower():
-        return np.linspace(freqmin, freqmax, nfreq)
-    elif "log" in scale.lower():
-        return np.logspace(log10(freqmin), log10(freqmax), nfreq)
-    else: raise ValueError('%s not understood' % scale)
-#_____________________________________
-def minmax(X):
-    if hasattr(X, "min"): #numpy arrays
-        return X.min(), X.max()
-    else:
-        return min(X), max(X)    
+
 ###################################### MODIFIED HERRMANN'S CODES
 def prep_srfpre96_1(h = 0.005, dcl = 0.005, dcr = 0.005):
     """prepare input for modified srfpre96 (max_srfpre96)
@@ -450,15 +404,15 @@ if __name__ == "__main__":
         out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
 
     ###display results
+    ax = plt.gca()
     for w, t, m, fs, us in out:
-        plt.gca().loglog(1. / fs, us, '+-', label = "%s%s%d" % (w, t, m))
-    plt.gca().set_xlabel('period (s)')
-    plt.gca().set_ylabel('velocity (km/s)')    
-    plt.gca().grid(True, which = "major")
-    plt.gca().grid(True, which = "minor")    
+        ax.loglog(1. / fs, us, '+-', label = "%s%s%d" % (w, t, m))
+    ax.set_xlabel('period (s)')
+    ax.set_ylabel('velocity (km/s)')    
+    ax.grid(True, which = "major")
+    ax.grid(True, which = "minor")    
     plt.legend()
-    plt.gcf().show()
-
+    ax.figure.show()
     raw_input('pause')
 
 

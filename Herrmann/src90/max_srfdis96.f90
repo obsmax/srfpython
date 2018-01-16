@@ -102,9 +102,9 @@
       DOUBLE PRECISION TWOpi,one,onea
       DOUBLE PRECISION cc,c1,clow,cm,dc,t1
       DOUBLE PRECISION c(NP),cb(NP)
-      REAL*4 D(NL),A(NL),B(NL),RHO(NL),RTP(NL),DTP(NL),t(NP),BTP(NL)
+      REAL*4 t(NP), D(NL),A(NL),B(NL),RHO(NL) !,RTP(NL),DTP(NL),BTP(NL)
       REAL*4 qbinv(NL),qainv(NL)
-      COMMON /MODL  / D,A,B,RHO,RTP,DTP,BTP
+      COMMON /MODL  / D , A , B , RHO ! , RTP , DTP , BTP
       COMMON /PARA  / Mmax,LLW,TWOpi
 
       INTEGER iunit,iiso,idimen,icnvel
@@ -163,7 +163,7 @@
           IF   ((ifunc.EQ.1 .AND. idispl.GT.0) &
             .OR.(ifunc.EQ.2 .AND. idispr.GT.0)) THEN
 
-               READ (LIN,*) kmax, mode, ddc, sone, igr!, h
+               READ (LIN,*) kmax, mode, ddc, sone, igr !, h
                READ (LIN,*) (t(i),i=1,kmax)
 
                IF ( sone.LT.0.01 ) sone = 2.0
@@ -245,9 +245,9 @@
                      !-----
                      !     bracket root and refine it
                      !-----
-!                     write(*,*) "av1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
+!                     !WRITE(*,*) "VERBOSE : av1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
                      CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst)
-!                     write(*,*) "ap1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
+!                     !WRITE(*,*) "VERBOSE : ap1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
                      IF ( iret.EQ.-1 ) GOTO 5 ! if root not found
                      c(k) = c1
                      !-----
@@ -302,13 +302,14 @@
 
       REAL A , B , C , fac1 , fac2 , fr , frp , gamma
       INTEGER i
+      REAL*4 kappa , k2 , gk2
+      !WRITE(*,*) "VERBOSE : ENTER GTSOLH" !VERBOSE!
 
 !-----
 !     starting solution
 !-----
-      REAL*4 kappa , k2 , gk2
-!      real :: start, finish ! for cpu timer
-!      call cpu_time(start)
+
+
 
       C = 0.95*B
       DO i = 1 , 5
@@ -337,6 +338,8 @@
       REAL*8 C1 , c2 , cn , Cm , Dc , T1 , Clow, fdir
       REAL*8 DLTAR , del1 , del2 , del1st , plmn
       SAVE del1st
+
+      !WRITE(*,*) "VERBOSE : ENTER GETSOL" !VERBOSE!
 
       ! presumed inputs = T1, Clow, DC, CM, Betmx, Ifunc, Ifirst
       ! presumed outputs = C1, Iret
@@ -368,7 +371,6 @@
 !-----
 !     bracket solution
 !-----
-
 
       twopi = 2.D0*3.141592653589793D0
       omega = twopi/T1
@@ -477,10 +479,9 @@
 !*** End of declarations inserted by SPAG
 
       PARAMETER (NL=200)
-      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) , RTP(NL) , DTP(NL) ,      &
-           & BTP(NL)
+      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) , BTP(NL)
       DIMENSION x(20) , y(20)
-      COMMON /MODL  / D , A , B , RHO , RTP , DTP , BTP
+      COMMON /MODL  / D , A , B , RHO !, RTP , DTP , BTP
       COMMON /PARA  / Mmax , LLW , TWOpi
 !-----
 !     initial guess
@@ -590,43 +591,45 @@
 !
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
-      FUNCTION DLTAR(Wvno,Omega,Kk)
+      FUNCTION DLTAR(Wvno,Omega,Ifunc)
 !   control the way to P-SV or SH.
-!
+!   -> call DLTAR1 for LOVE waves
+!      and DLTAR4 for RAYLEIGH waves
       IMPLICIT NONE
 
       DOUBLE PRECISION DLTAR , DLTAR1 , DLTAR4 , Omega , Wvno
-      INTEGER Kk
-!
-      IF ( Kk.EQ.1 ) THEN
-!   love wave period equation
+      INTEGER Ifunc
+      !WRITE(*,*) "VERBOSE : ENTER DLTAR" !VERBOSE!
+
+      IF ( Ifunc.EQ.1 ) THEN
+         !love wave period equation
          DLTAR = DLTAR1(Wvno,Omega)
-      ELSEIF ( Kk.EQ.2 ) THEN
-!   rayleigh wave period equation
+      ELSEIF ( Ifunc.EQ.2 ) THEN
+         !rayleigh wave period equation
          DLTAR = DLTAR4(Wvno,Omega)
       ENDIF
+      !WRITE(*,*) "VERBOSE : EXIT DLTAR", DLTAR !VERBOSE!
       END
-!*==DLTAR1.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
 !
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
       FUNCTION DLTAR1(Wvno,Omega)
+!
 !   find SH dispersion values.
 !
       IMPLICIT NONE
-!*--DLTAR1673
-!*** Start of declarations inserted by SPAG
       DOUBLE PRECISION beta1 , cosq , DLTAR1 , e1 , e10 , e2 , e20 ,    &
                      & fac , Omega , q , rb , rho1 , sinq , TWOpi ,     &
                      & Wvno , wvnom , wvnop , xkb , xmu , xnor
       DOUBLE PRECISION y , ynor , z
       INTEGER LLW , m , Mmax , mmm1 , NL
-!*** End of declarations inserted by SPAG
       PARAMETER (NL=200)
-      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) , RTP(NL) , DTP(NL) ,      &
-           & BTP(NL)
-      COMMON /MODL  / D , A , B , RHO , RTP , DTP , BTP
+      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) ,  BTP(NL)
+      COMMON /MODL  / D , A , B , RHO !, RTP , DTP , BTP
       COMMON /PARA  / Mmax , LLW , TWOpi
+
+      !WRITE(*,*) "VERBOSE : ENTER DLTAR1" !VERBOSE!
+
 !
 !   Haskell-Thompson love wave formulation from halfspace
 !   to surface.
@@ -677,7 +680,6 @@
       ENDDO
       DLTAR1 = e1
       END
-!*==DLTAR4.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
 !
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -685,8 +687,6 @@
 !   find P-SV dispersion values.
 !
       IMPLICIT NONE
-!*--DLTAR4744
-!*** Start of declarations inserted by SPAG
       DOUBLE PRECISION A0 , beta , ca , cosp , CPCq , CPY , CPZ , CQW , &
                      & CQX , cr , DLTAR4 , dpth , e , ee , exa , gam ,  &
                      & gamm1 , gammk , omega , Omga
@@ -694,16 +694,15 @@
                      & Wvno , wvno2 , wvnom , wvnop , WY , WZ , xka ,   &
                      & xkb , XY , XZ , znul
       INTEGER i , j , LLW , m , Mmax , mmm1 , NL
-!*** End of declarations inserted by SPAG
       PARAMETER (NL=200)
       DIMENSION e(5) , ee(5) , ca(5,5)
-      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) , RTP(NL) , DTP(NL) ,      &
-           & BTP(NL)
-      COMMON /MODL  / D , A , B , RHO , RTP , DTP , BTP
+      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL)
+      COMMON /MODL  / D , A , B , RHO
       COMMON /PARA  / Mmax , LLW , TWOpi
       COMMON /OVRFLW/ A0 , CPCq , CPY , CPZ , CQW , CQX , XY , XZ , WY ,&
                     & WZ
 !
+      !WRITE(*,*) "VERBOSE : ENTER DLTAR4" !VERBOSE!
       omega = Omga
       IF ( omega.LT.1.0D-4 ) omega = 1.0D-4
       wvno2 = Wvno*Wvno
@@ -845,6 +844,9 @@
 !*** End of declarations inserted by SPAG
       COMMON /OVRFLW/ A0 , CPCq , CPY , CPZ , CQW , CQX , XY , XZ , WY ,&
                     & WZ
+
+      !WRITE(*,*) "VERBOSE : ENTER VAR" !VERBOSE!
+
       Exa = 0.0D+00
       A0 = 1.0D+00
 !-----
@@ -915,9 +917,8 @@
       y = fac*y
       z = fac*z
       END
-!*==NORMC.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
 !
-!
+! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
       SUBROUTINE NORMC(Ee,Ex)
 !   This routine is an important step to control over- or
@@ -927,12 +928,12 @@
 !   Note that some precision will be lost during normalization.
 !
       IMPLICIT NONE
-!*--NORMC985
-!*** Start of declarations inserted by SPAG
       DOUBLE PRECISION Ee , Ex , t1 , t2
       INTEGER i
-!*** End of declarations inserted by SPAG
       DIMENSION Ee(5)
+
+      !WRITE(*,*) "VERBOSE : ENTER NORMC"
+
       Ex = 0.0D+00
       t1 = 0.0D+00
       DO i = 1 , 5
@@ -949,25 +950,23 @@
 !-----
       Ex = DLOG(t1)
       END
-!*==DNKA.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
 !
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
       SUBROUTINE DNKA(Ca,Wvno2,Gam,Gammk,Rho)
-!    Dunkin's matrix.
+!     Dunkin's matrix.
 !
       IMPLICIT NONE
-!*--DNKA1015
-!*** Start of declarations inserted by SPAG
       DOUBLE PRECISION A0 , a0pq , Ca , CPCq , CPY , CPZ , CQW , CQX ,  &
                      & Gam , gamm1 , Gammk , gm1sq , gmgm1 , gmgmk ,    &
                      & one , Rho , rho2 , t , twgm1 , two
       DOUBLE PRECISION Wvno2 , WY , WZ , XY , XZ
-!*** End of declarations inserted by SPAG
       DIMENSION Ca(5,5)
       COMMON /OVRFLW/ A0 , CPCq , CPY , CPZ , CQW , CQX , XY , XZ , WY ,&
                     & WZ
       DATA one , two/1.D+00 , 2.D+00/
+
+      !WRITE(*,*) "VERBOSE : ENTER DNKA"
       gamm1 = Gam - one
       twgm1 = Gam + gamm1
       gmgmk = Gam*Gammk

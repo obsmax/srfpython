@@ -1,6 +1,6 @@
 # from Herrmann.dispersion import *
 import numpy as np
-from srfpython.Herrmann.dispersion import dispersion, dispersion_1, Timer, groupbywtm, igroupbywtm, minmax
+from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, Timer, groupbywtm, igroupbywtm, minmax
 
 """
 srfker17, Maximilien Lehujeur, 01/11/2017
