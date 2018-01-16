@@ -29,7 +29,8 @@ def prep_srfpre96_1(h = 0.005, dcl = 0.005, dcr = 0.005):
     h, dcl,dcr : see srfpre96
     """
     return "%f %f %f" % (h, dcl, dcr)
-#_____________________________________
+
+# _____________________________________
 def prep_srfpre96_2(z, vp, vs, rh):
     """prepare input for modified srfpre96 (max_srfpre96)
        z   = depth in km, z[0] must be 0
@@ -102,7 +103,8 @@ def prep_srfpre96_3(waves,types,modes,freqs):
 
     out = "%d %d %d %d" %(nlc,nlu,nrc,nru) + out
     return out
-#_____________________________________
+
+# _____________________________________
 def groupbywtm(waves, types, modes, freqs, values, dvalues = None, keepnans = True):
     """group outputs from dispersion by wave, type, modes
 
@@ -136,8 +138,9 @@ def groupbywtm(waves, types, modes, freqs, values, dvalues = None, keepnans = Tr
         if dvalues is None:
             yield w, t, m, freqs[J][K][L], values[J][K][L]
         else:
-            yield  w, t, m, freqs[J][K][L], values[J][K][L], dvalues[J][K][L]
-#_____________________________________
+            yield w, t, m, freqs[J][K][L], values[J][K][L], dvalues[J][K][L]
+
+# _____________________________________
 def igroupbywtm(Waves, Types, Modes, Freqs):
     """
     make the opposite of groupbywtm, prepare input for dispersion
@@ -162,8 +165,9 @@ def igroupbywtm(Waves, Types, Modes, Freqs):
     types = np.array(types, '|S1')
     modes = np.array(modes, int)
     freqs = np.concatenate(Freqs)
-    return waves, types, modes, freqs 
-#_____________________________________
+    return waves, types, modes, freqs
+
+# _____________________________________
 class CPiSError(Exception): pass
 class CPiSDomainError(CPiSError): pass
 
@@ -224,7 +228,6 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
 
         values[n] = val
     return values
-  
 
 #_____________________________________
 def argcrossfind(X, Y):
@@ -243,7 +246,7 @@ def argcrossfind(X, Y):
         elif X[ix] > Y[iy]: iy += 1
     return np.asarray(IX, int), np.asarray(IY, int)
 
-#_____________________________________
+# _____________________________________
 def readsrfdis96(stdout, waves, types, modes, freqs):
     "converts output from max_srfdis96"
     periods = 1./freqs
@@ -259,7 +262,7 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
     L = W == 0    #True means Love
     R = ~L        #assume only R or L
 
-    #---------------------------------
+    # ---------------------------------
     nI = ~I
     T, C, U = np.zeros(n, float), np.zeros(n, float), np.zeros(n, float) * np.nan
     if I.any():
@@ -270,7 +273,8 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
         C[nI] = np.sqrt(CC0[nI] * CC1[nI]) #Jeffreys average #A[nI,4:6].mean(axis = 1)
         LnI = (log(CC1[nI]) - log(CC0[nI])) / (log(T1A[nI]) - log(T1B[nI]))
         U[nI] = C[nI] / (1. - LnI)
-    #---------------------------------
+
+    # ---------------------------------
     #arange available data
     umodes = np.arange(max(modes) + 1)
     D = {"L" : [], "R" : []}
@@ -281,8 +285,7 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
         D["L"].append({"T" : T[IL], "C" : C[IL], "U" : U[IL]})
         D["R"].append({"T" : T[IR], "C" : C[IR], "U" : U[IR]})
 
-
-    #---------------------------------
+    # ---------------------------------
     values = np.zeros(len(waves), float) * np.nan
     indexs  = np.arange(len(waves))  
     for w, t, m, P, I in groupbywtm(waves, types, modes, periods, indexs, dvalues = None, keepnans = True):
@@ -293,7 +296,8 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
 
     return values
 
-#_____________________________________
+
+# _____________________________________
 def dispersion(ztop, vp, vs, rh, \
     waves, types, modes, freqs,
     h=0.005, dcl=0.005, dcr=0.005):
@@ -329,13 +333,13 @@ def dispersion(ztop, vp, vs, rh, \
         igroupbywtm
     """
 
-    #--------------
+    # --------------
     instr2 = prep_srfpre96_2(ztop, vp, vs, rh)
     instr1 = prep_srfpre96_1(h = h, dcl = dcl, dcr = dcr)
     instr3 = prep_srfpre96_3(waves, types, modes, freqs)
     pstdin = "\n".join([instr2, instr1, instr3])
 
-    #--------------
+    # --------------
     try:
         with Timeout(5):
             p = Popen("%s|%s" % (srfpre96_exe, srfdis96_exe), stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=True, preexec_fn=os.setsid)#, stderr = stderrfid)
@@ -350,12 +354,12 @@ def dispersion(ztop, vp, vs, rh, \
         try: p.stdin.close()
         except: pass
 
-
-    #--------------
+    # --------------
     values = readsrfdis96(qstdout, waves, types, modes, freqs)
     return values
 
-#_____________________________________
+
+# _____________________________________
 def dispersion_1(ztop, vp, vs, rh, \
     Waves, Types, Modes, Freqs,
     h = 0.005, dcl = 0.005, dcr = 0.005, keepnans = False):
@@ -381,7 +385,8 @@ def dispersion_1(ztop, vp, vs, rh, \
     for w, t, m, F, V in groupbywtm(waves, types, modes, freqs, values, keepnans = keepnans):
         yield w, t, m, F, V
 
-#_____________________________________
+
+# _____________________________________
 if __name__ == "__main__":
     """ DEMO """
     import matplotlib.pyplot as plt
