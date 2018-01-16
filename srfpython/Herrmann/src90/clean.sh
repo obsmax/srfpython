@@ -9,6 +9,6 @@ rm -f max_mchdep.o
 rm -f max_srfdis96.o
 rm -f max_srfpre96.o
 
-rm -f ../max_srfpre96
-rm -f ../max_srfdis96
+rm -f ../bin/max_srfpre96
+rm -f ../bin/max_srfdis96
 

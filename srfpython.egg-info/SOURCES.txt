@@ -1,0 +1,13 @@
+srfpython/__init__.py
+srfpython/utils.py
+srfpython.egg-info/PKG-INFO
+srfpython.egg-info/SOURCES.txt
+srfpython.egg-info/dependency_links.txt
+srfpython.egg-info/top_level.txt
+srfpython/Herrmann/Herrmann.py
+srfpython/Herrmann/__init__.py
+srfpython/files/__init__.py
+srfpython/files/depthmodels.py
+srfpython/files/files.py
+srfpython/sensitivitykernels/__init__.py
+srfpython/sensitivitykernels/sker17.py

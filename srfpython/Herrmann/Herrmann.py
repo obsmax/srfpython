@@ -16,8 +16,8 @@ use __main__ for demo
 
 _pathfile = os.path.realpath(__file__) #.../srfpyhon/HerrMann/dispersion.py
 _file     = _pathfile.split('/')[-1]
-srfpre96_exe = _pathfile.replace('/src/', '/bin/').replace(_file, 'max_srfpre96') #.../srfpyhon/HerrMann/max_srfpre96
-srfdis96_exe = _pathfile.replace('/src/', '/bin/').replace(_file, 'max_srfdis96') #.../srfpyhon/HerrMann/max_srfdis96
+srfpre96_exe = _pathfile.replace(_file, 'bin/max_srfpre96')
+srfdis96_exe = _pathfile.replace(_file, 'bin/max_srfdis96')
 if not os.path.exists(srfpre96_exe) or not os.path.exists(srfdis96_exe):
     raise Exception('could not find %s and/or %s' % (srfpre96_exe, srfdis96_exe))
 

@@ -1,4 +1,4 @@
-from srfpython.files.files import packmod96, unpackmod96
+from srfpython.files.mod96 import packmod96, unpackmod96
 from srfpython.utils import discrete_time_primitive, cosTaperwidth
 from scipy.fftpack import fft, ifft, fftfreq
 import numpy as np

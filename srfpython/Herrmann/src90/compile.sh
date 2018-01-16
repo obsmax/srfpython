@@ -28,4 +28,4 @@ rm -f max_srfpre96.o
 #---------------------------------
 #move executable files
 
-mv max_srfdis96 max_srfpre96 ..
+mv max_srfdis96 max_srfpre96 ../bin
