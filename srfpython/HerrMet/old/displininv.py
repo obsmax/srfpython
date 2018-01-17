@@ -534,86 +534,10 @@ class Parameterizer_logH_PRlaw_RHlaw(Parameterizer_logH_logVS_PRlaw_RHlaw):
 
         CMinv = siglogH ** -2.
         return mapr, CMinv
-#------------------
-def makeparameterizer(mod96, which = Parameterizer_logH_logMU_logK_logRH, **kwargs):
-    if os.path.exists(mod96): dm = depthmodel_from_mod96(mod96)
-    else:                     dm = depthmodel_from_mod96_txt(mod96)
-    return which(dm.vp.z, dm.vp.values, dm.vs.values, dm.rh.values, **kwargs)
-###################
-class Datacoder(object):
-    def __init__(self, waves, types, modes, freqs, values, dvalues):
-        "init with the target data and uncertainty"
-        assert np.all(~np.isnan(values))
-        assert np.all([len(w) == len(waves) for w in [types, modes, freqs, values, dvalues]])
-        self.waves = waves     #parameters for forward problem
-        self.types = types     #parameters for forward problem
-        self.modes = modes     #parameters for forward problem
-        self.freqs = freqs     #parameters for forward problem
-        self.values = values   #target dispersion
-        self.dvalues = dvalues #target dispersion
-    #------------------
-    def target(self): 
-        dobs   =  self.values          #target data array
-        CDinv  = (self.dvalues) ** -2. #target data covariance (inverted, diagonal terms)
-        return dobs, CDinv
-    #------------------
-    def __call__(self, values):
-        assert len(values) == len(self.values)
-        d = values
-        return d
-    #------------------
-    def inv(self, d):
-        values = d
-        return values
-#------------------
-def log_nofail(x):
-     if np.isnan(x): return x
-     elif x < 0.: return np.nan
-     elif x == 0.: return -np.inf
-     else: return np.log(x)
-#------------------
-class Datacoder_log(Datacoder):
-    def __init__(self, waves, types, modes, freqs, values, dvalues):
-        Datacoder.__init__(self, waves, types, modes, freqs, values, dvalues)
-    #------------------
-    def target(self):
-        dobs   = np.log(self.values)
-        CDinv  = (self.dvalues / self.values) ** -2.
-        return dobs, CDinv
-    #------------------
-    def __call__(self, values):
-        assert len(values) == len(self.values)
-        return map(log_nofail, values)
-        # d = np.log(values)
-        # return d
-    #------------------
-    def inv(self, d):
-        values = np.exp(d)
-        return values
-#------------------
-def makedatacoder(s96, which = Datacoder_log):
-    if os.path.exists(s96): s = surf96reader(s96)
-    else:                   s = surf96reader_from_s96_txt(s96)
 
-    waves, types, modes, freqs, values, dvalues = s.wtmfvd()
-    return which(waves, types, modes, freqs, values, dvalues)
-###################
-class Theory(object):
-    h   = 0.005
-    dcl = 0.005
-    dcr = 0.005
-    def __init__(self, parameterizer, datacoder):
-        assert isinstance(parameterizer, Parameterizer)
-        assert isinstance(datacoder, Datacoder)
-        self.parameterizer, self.datacoder = parameterizer, datacoder
-    #------------------
-    def __call__(self, m):
-        D, P = self.datacoder, self.parameterizer
-        ZTOP, VP, VS, RH = P.inv(m) #recover model from parameterized array (m)
-        values = srfdis17(ZTOP, VP, VS, RH, \
-            D.waves, D.types, D.modes, D.freqs,
-            self.h, self.dcl, self.dcr)
-        return D(values) #convert dispersion data to coded array  (d)
+
+
+
 ###################
 def displininv(s96, mod96, \
         sigH       = 0.1, 
