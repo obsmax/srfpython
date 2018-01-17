@@ -63,6 +63,16 @@ def freqspace(freqmin, freqmax, nfreq, scale="flin"):
         raise ValueError('%s not understood' % scale)
 
 
+def depthspace(zbot, n):
+    """
+    zbot  = top of the half space
+    n     = desired number of layers
+    """
+    z = np.logspace(np.log10(0.1), np.log10(3.), n)
+    z = zbot * (z - z.min()) / (z.max() - z.min())
+    return z
+
+
 def minmax(X):
     if hasattr(X, "min"): #numpy arrays
         return X.min(), X.max()

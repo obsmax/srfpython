@@ -5,8 +5,8 @@ from numpy import log
 import numpy as np
 import os
 import signal
-from srfpython.utils import Timer, TimeOutError, Timeout, munique
-
+from srfpython.utils import Timer, TimeOutError, Timeout
+from srfpython.depthdisp.dispcurves import groupbywtm, igroupbywtm
 
 """
 program to compute surface wave dispersion curves, Maximilien Lehujeur, 01/11/2017
@@ -104,68 +104,6 @@ def prep_srfpre96_3(waves,types,modes,freqs):
     out = "%d %d %d %d" %(nlc,nlu,nrc,nru) + out
     return out
 
-# _____________________________________
-def groupbywtm(waves, types, modes, freqs, values, dvalues = None, keepnans = True):
-    """group outputs from dispersion by wave, type, modes
-
-    waves types modes freqs are the same length
-    groupbywtm demultiplexes these arrays to produce, for each mode
-    w (wave key, scalar), t (type key, scalar), m (mode number, scalar), freqs (array), values (array), dvalues (array)
-    
-    keepnans : by default the nan are removed from the arrays (this occurs especially for overtones below the cut-off period)
-
-    """
-    freqs = np.array(freqs, float)
-    types = np.array(list(types), "|S1")
-    waves = np.array(list(waves), "|S1")
-    modes = np.array(modes,  int)
-    assert len(waves) == len(types) == len(modes) == len(freqs)
-    if dvalues is not None:
-        dvalues = np.array(dvalues, float)
-        assert len(waves) == len(dvalues)
-
-    w, t, m = munique(waves, types, modes)
-    I = np.lexsort((m, t, w))
-
-    for w, t, m in zip(w[I], t[I], m[I]):
-        J = (waves == w) & (types == t) & (modes == m)
-        
-        if keepnans:   K = np.ones(len(values[J]), bool)
-        else:          K = ~np.isnan(values[J])
-        
-        L = np.argsort(freqs[J][K])
-
-        if dvalues is None:
-            yield w, t, m, freqs[J][K][L], values[J][K][L]
-        else:
-            yield w, t, m, freqs[J][K][L], values[J][K][L], dvalues[J][K][L]
-
-# _____________________________________
-def igroupbywtm(Waves, Types, Modes, Freqs):
-    """
-    make the opposite of groupbywtm, prepare input for dispersion
-    e.g. 
-    f = freqspace(0.1, 20, 5, 'plog')
-    Waves                = ['R', 'R', 'R', 'R']
-    Types                = ['U', 'U', 'C', 'C']
-    Modes                = [ 0,   1,   0,   1 ]
-    Freqs                = [ f,   f,   f,   f ]
-    
-    becomes 
-    array(['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R','R', 'R', 'R', 'R', 'R', 'R', 'R'], dtype='|S1')
-    array(['U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'], dtype='|S1')
-    array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
-    array([0.1, 0.37606031, 1.41421356, 5.3182959, 20., 0.1, 0.37606031, 1.41421356, 5.3182959, 20., 0.1, 0.37606031, 1.41421356, 5.3182959, 20., 0.1, 0.37606031, 1.41421356, 5.3182959, 20])
-    """
-    Waves, Types, Modes = [np.array(w, object) for w in [Waves, Types, Modes]]
-    waves = Waves.repeat([len(ff) for ff in Freqs])
-    types = Types.repeat([len(ff) for ff in Freqs])
-    modes = Modes.repeat([len(ff) for ff in Freqs])
-    waves = np.array(waves, '|S1')
-    types = np.array(types, '|S1')
-    modes = np.array(modes, int)
-    freqs = np.concatenate(Freqs)
-    return waves, types, modes, freqs
 
 # _____________________________________
 class CPiSError(Exception): pass

@@ -6,6 +6,14 @@ import copy
 import os
 
 
+# ----------------------------------------------------
+def gardner74(vp):
+    """Gardner's density law for sedimentary rocks, 1974
+       vp between 1.5 and 6.1 km/s
+    """
+    return 1.74 * vp ** 0.25 #density in g/cm3
+
+
 # -------------------------------------------------
 class depthmodel1D(object):
     """self.z = ztop !!!
