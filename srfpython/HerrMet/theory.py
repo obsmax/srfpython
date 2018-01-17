@@ -1,8 +1,8 @@
 from tetedoeuf.multipro.multipro8 import Job, MapSync
 from tetedoeuf.utils.stdout import waitbar
-from srfpython.HerrMet.parameterizers import Parameterizer
-from srfpython.HerrMet.datacoders import Datacoder
 from srfpython.Herrmann.Herrmann import dispersion
+from parameterizers import Parameterizer
+from datacoders import Datacoder
 import numpy as np
 
 """

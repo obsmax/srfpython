@@ -10,6 +10,16 @@ assert scipyversion >= "0.14.0"
 
 
 # ###################################################################################
+def freqspace(freqmin, freqmax, nfreq, scale="flin"):
+    if "lin" in scale.lower():
+        return np.linspace(freqmin, freqmax, nfreq)
+    elif "log" in scale.lower():
+        return np.logspace(np.log10(freqmin), np.log10(freqmax), nfreq)
+    else:
+        raise ValueError('%s not understood' % scale)
+
+
+# ###################################################################################
 def C2U(nu, c):
     """convert phase 2 group dispersion curve.
     input :
@@ -274,23 +284,23 @@ class surf96reader_from_surf96string(object):
 
     # ---------------------------------------------
     def get_all(self):
-        for WAVE, TYPE, FLAG, MODE  in \
-                munique(self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], self.data['MODE']):
+        for WAVE, TYPE, FLAG, MODE in \
+                zip(*munique(self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], self.data['MODE'])):
             yield self.get(mode=MODE, wave=WAVE, type=TYPE, flag=FLAG)
 
     # ---------------------------------------------
     def get(self, wave="R", type="C", mode=0, flag=None):
         """generate a dispersion law according to the (read) file content"""
-        I = (self.data.MODE == mode) & (self.data.WAVE == wave) & (self.data.TYPE == type)
-        if flag is not None: I = I & (self.data.FLAG == flag)
+        I = (self.data['MODE'] == mode) & (self.data['WAVE'] == wave) & (self.data['TYPE'] == type)
+        if flag is not None: I = I & (self.data['FLAG'] == flag)
 
         if not np.any(I):
             raise Exception(
                 'mode %d, wave %s, type %s and flag %s not found' %
                 (mode, wave, type, flag))
-        freq = 1. / self.data.PERIOD[I]
-        valu = self.data.VALUE[I]
-        dval = self.data.DVALUE[I]
+        freq = 1. / self.data['PERIOD'][I]
+        valu = self.data['VALUE'][I]
+        dval = self.data['DVALUE'][I]
         J = np.argsort(freq)
         if type == "C":
             W = Claw
@@ -353,9 +363,7 @@ class surf96reader_from_surf96string(object):
                           self.data['PERIOD'], self.data['VALUE'], self.data['DVALUE'])
 
     # -------------------------------------------------
-    def write96(self, filename, overwrite=False):
-        if not overwrite and os.path.exists(filename):
-            raise Exception('%s already exists' % filename)
+    def write96(self, filename):
         with open(filename, 'w') as fid:
             fid.write(self.__str__())
 

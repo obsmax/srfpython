@@ -34,27 +34,27 @@ Datacoder     : object to convert output from Herrmann.dispersion to an array of
 # -------------------------------------
 class Parameterizer(object):
     """default class and methods, to be overwriten by subclasses"""
-    def __init__(self, ZTOP, VP, VS, RH):
-        "init with the starting model and uncertainty"
-        self.ZTOP = ZTOP
-        self.VP   = VP
-        self.VS   = VS
-        self.RH   = RH
-
-    # ------------------
-    def getrange(self, hmin=0.001, hmax=1.0, prmin=r43, prmax=2.5, vsmin=0.08, vsmax=4.0, rhmin=2.0, rhmax=3.0):
-        "determines the lower and upper bounds in each dimension"
-        assert  0.001 <= hmin  < hmax
-        assert  r43   <= prmin < prmax
-        assert  0.08  <= vsmin < vsmax
-        assert  1.0   <= rhmin < rhmax
-        nlayer = len(self.VS)
-        o = np.ones(nlayer, float)
-        ztopinf = np.concatenate(([0.], (hmin * o)[:-1].cumsum()))
-        ztopsup = np.concatenate(([0.], (hmax * o)[:-1].cumsum()))
-        minf = self(ztopinf, prmin * vsmin * o, vsmin * o, rhmin * o)
-        msup = self(ztopsup, prmax * vsmax * o, vsmax * o, rhmax * o)
-        return minf, msup 
+    # def __init__(self, ZTOP, VP, VS, RH):
+    #     "init with the starting model and uncertainty"
+    #     self.ZTOP = ZTOP
+    #     self.VP   = VP
+    #     self.VS   = VS
+    #     self.RH   = RH
+    #
+    # # ------------------
+    # def getrange(self, hmin=0.001, hmax=1.0, prmin=r43, prmax=2.5, vsmin=0.08, vsmax=4.0, rhmin=2.0, rhmax=3.0):
+    #     "determines the lower and upper bounds in each dimension"
+    #     assert  0.001 <= hmin  < hmax
+    #     assert  r43   <= prmin < prmax
+    #     assert  0.08  <= vsmin < vsmax
+    #     assert  1.0   <= rhmin < rhmax
+    #     nlayer = len(self.VS)
+    #     o = np.ones(nlayer, float)
+    #     ztopinf = np.concatenate(([0.], (hmin * o)[:-1].cumsum()))
+    #     ztopsup = np.concatenate(([0.], (hmax * o)[:-1].cumsum()))
+    #     minf = self(ztopinf, prmin * vsmin * o, vsmin * o, rhmin * o)
+    #     msup = self(ztopsup, prmax * vsmax * o, vsmax * o, rhmax * o)
+    #     return minf, msup
     
     # ------------------
     def boundaries(self):
@@ -65,7 +65,7 @@ class Parameterizer(object):
         Ztopinf, VPhgh, VShgh, RHhgh = self.inv(self.MSUP)
         z = np.sort(np.unique(np.concatenate((Ztopinf, Ztopsup))))
 
-        #--------------------
+        # --------------------
         def f(Zinf, Zsup, V, which):
             v1 = depthmodel1D(Zinf, V).interp(z, interpmethod="stairs")
             v2 = depthmodel1D(Zsup, V).interp(z, interpmethod="stairs")

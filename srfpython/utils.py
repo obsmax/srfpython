@@ -1,8 +1,11 @@
 from __future__ import print_function
-from numpy import log10
 import time
 import signal
+import imp
+import os
+import sys
 import numpy as np
+from numpy import log10
 
 
 class TimeOutError(Exception):
@@ -54,25 +57,6 @@ def munique(*Xs):
     return tuple([np.array(w) for w in zip(*L)])
 
 
-def freqspace(freqmin, freqmax, nfreq, scale="flin"):
-    if "lin" in scale.lower():
-        return np.linspace(freqmin, freqmax, nfreq)
-    elif "log" in scale.lower():
-        return np.logspace(log10(freqmin), log10(freqmax), nfreq)
-    else:
-        raise ValueError('%s not understood' % scale)
-
-
-def depthspace(zbot, n):
-    """
-    zbot  = top of the half space
-    n     = desired number of layers
-    """
-    z = np.logspace(np.log10(0.1), np.log10(3.), n)
-    z = zbot * (z - z.min()) / (z.max() - z.min())
-    return z
-
-
 def minmax(X):
     if hasattr(X, "min"): #numpy arrays
         return X.min(), X.max()
@@ -104,3 +88,88 @@ def cosTaperwidth(data, sampling_rate, width):
     tap[:Nwidth] *= ttap[::-1]
     tap[-Nwidth:] *= ttap
     return tap
+
+
+# -------------------------------------
+def string2func(s):
+    "converts string into callable function using temporary python file"
+    pyfilename = "/tmp/%s.py" % randstr(10)
+    with open(pyfilename, 'w') as fid: fid.write(s)
+    funcname = s.split('def ')[-1].split('(')[0].strip()
+    func = getattr(imp.load_source(pyfilename.split('/')[-1].split('.py')[0], pyfilename), funcname)
+    os.remove(pyfilename)
+    os.remove(pyfilename + "c")
+    return func
+
+
+# -------------------------------------
+def minmax(X):
+    return min(X), max(X)
+
+
+# -------------------------------------
+def tostr(l, fmt):
+    return " ".join(fmt % v for v in l)
+
+
+# -------------------------------------
+def randstr(n):
+    """generate random strings with letters and numbers, not thread safe"""
+    chrs   = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+    indexs = np.floor(np.random.rand(n) * len(chrs))
+    return "".join([chrs[int(i)] for i in indexs])
+
+# -------------------------------------
+def string2func(s):
+    "converts string into callable function using temporary python file"
+    pyfilename = "/tmp/%s.py" % randstr(10)
+    with open(pyfilename, 'w') as fid: fid.write(s)
+    funcname = s.split('def ')[-1].split('(')[0].strip()
+    func = getattr(imp.load_source(pyfilename.split('/')[-1].split('.py')[0], pyfilename), funcname)
+    os.remove(pyfilename)
+    os.remove(pyfilename + "c")
+    return func
+
+
+# --------------------------------------
+def readargv():
+    "read sys.argv and store results into a dictionary"
+    def isnumeric(a):
+        try:
+            float(a)
+            return True
+        except ValueError:
+            return False
+
+    l = sys.argv[1:] #not array!
+    for n, arg in enumerate(l):
+        if n and arg[0] == "-" and not isnumeric(arg):
+            l[n] = "__qwerty__%s" % arg
+
+    l = "__azerty__".join(l)
+    l = l.split('__azerty____qwerty__')
+    l = [w.split('__azerty__') for w in l]
+
+    D = {}#structure({})
+    keyorder = []
+    for ll in l:
+        if ll[0][0] == "-":
+            key = ll[0].strip('-')
+            if key in D.keys(): raise Exception('argument repeated %s' % key)
+            D[key] = ll[1:]
+            keyorder.append(key)
+        elif not hasattr(D, 'remain'):
+            D['remain'] = ll
+            keyorder.append('remain')
+        else:
+            raise Exception('this should not append')
+    for k, v in D.items():
+        for n, vv in enumerate(v):
+            if isnumeric(vv): D[k][n] = eval(vv)
+        if len(v) > 1:        D[k] = np.array(v)
+        elif len(v) == 1:
+            D[k] = [v[0]] #not [v[0]]
+        else:
+            D[k] = None
+    D['_keyorder'] = keyorder
+    return D

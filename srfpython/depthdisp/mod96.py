@@ -61,7 +61,8 @@ LINE08
 LINE09
 LINE10
 LINE11
-H(KM) VP(KM/S) VS(KM/S) RHO(GM/CC) QP QS ETAP ETAS FREFP FREFS"""
+H(KM) VP(KM/S) VS(KM/S) RHO(GM/CC) QP QS ETAP ETAS FREFP FREFS
+"""
     fmt = "%.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n"
 
     H = np.zeros_like(Z)

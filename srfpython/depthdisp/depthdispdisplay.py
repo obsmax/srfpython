@@ -10,22 +10,26 @@ class DepthDispDisplay(object):
 
     def __init__(self, fig=None, targetfile=None):
         if fig is None:
-            self.fig = plt.figure(figsize=(18, 10))
+            self.fig = plt.figure(figsize=(12, 6))#figsize=(18, 10))
             self.fig.subplots_adjust(wspace=0.05)
         else:
             self.fig = fig
 
-        self.axvp = self.fig.add_subplot(1, 5, 1, title="$V_P$", ylabel="depth (km)")
-        self.axvs = self.fig.add_subplot(1, 5, 2, title="$V_S$", sharey=self.axvp)  # , sharex = self.axvp)
+        self.axvp = self.fig.add_subplot(1, 5, 1, title="$V_P\,(km/s)$", ylabel="depth (km)")
+        self.axvs = self.fig.add_subplot(1, 5, 2, title="$V_S\,(km/s)$", sharey=self.axvp)  # , sharex = self.axvp)
         self.axpr = self.fig.add_subplot(1, 5, 3, title=r"$V_P/V_S$", sharey=self.axvp)
-        self.axrh = self.fig.add_subplot(1, 5, 4, title=r"$\rho$", sharey=self.axvp)
-        if targetfile is None:
+        self.axrh = self.fig.add_subplot(1, 5, 4, title=r"$\rho\,(g/cm^3)$", sharey=self.axvp)
 
-            self.axru0 = self.fig.add_subplot(5, 5, 5,  title="RU0", ylabel="velocity (km/s)")
-            self.axru1 = self.fig.add_subplot(5, 5, 10, title="RU1", ylabel="velocity (km/s)", sharex=self.axru0, sharey=self.axru0)
-            self.axrc0 = self.fig.add_subplot(5, 5, 15, title="RC0", ylabel="velocity (km/s)", sharex=self.axru0, sharey=self.axru0)
-            self.axrc1 = self.fig.add_subplot(5, 5, 20, title="RC1", ylabel="velocity (km/s)", sharex=self.axru0, sharey=self.axru0)
+        if targetfile is None:
+            self.axru0 = self.fig.add_subplot(4, 5, 5,  title="RU0", ylabel="grpvel (km/s)")
+            self.axru1 = self.fig.add_subplot(4, 5, 10, title="RU1", ylabel="grpvel (km/s)", sharex=self.axru0, sharey=self.axru0)
+            self.axrc0 = self.fig.add_subplot(4, 5, 15, title="RC0", ylabel="phsvel (km/s)", sharex=self.axru0, sharey=self.axru0)
+            self.axrc1 = self.fig.add_subplot(4, 5, 20, title="RC1", ylabel="phsvel (km/s)", sharex=self.axru0, sharey=self.axru0)
             self.axdisp = [self.axru0, self.axru1, self.axrc0, self.axrc1]
+            for ax in self.axdisp:
+                ax.loglog([1.],[1.]) #fuck matplotlib v2
+                ax.yaxis.set_label_position("right")
+                ax.yaxis.tick_right()
         else:
             #adjust the suplots according to the target data
             s = surf96reader(targetfile)
@@ -35,8 +39,10 @@ class DepthDispDisplay(object):
             share = None
             for n, (w, t, m)  in enumerate(s.wtm()):
                 ax = self.fig.add_subplot(Ndisp, 5, (n+1)*5,
-                    title="%s%s%d" % (w, t, m), sharex=share, sharey=share,ylabel="velocity (km/s)")
-                            # ylabel="%s velocity (km/s)" % (["group", "phase"][int(t=="C")]))
+                                          title="%s%s%d" % (w, t, m),
+                                          sharex=share, sharey=share,
+                                          #ylabel="velocity (km/s)")
+                                          ylabel="%s (km/s)" % (["grpvel", "phsvel"][int(t=="C")]))
                 ax.yaxis.set_label_position("right")
                 ax.yaxis.tick_right()
                 share=ax

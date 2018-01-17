@@ -14,6 +14,16 @@ def gardner74(vp):
     return 1.74 * vp ** 0.25 #density in g/cm3
 
 
+# ----------------------------------------------------
+def depthspace(zbot, n):
+    """
+    zbot  = top of the half space
+    n     = desired number of layers
+    """
+    z = np.logspace(np.log10(0.1), np.log10(3.), n)
+    z = zbot * (z - z.min()) / (z.max() - z.min())
+    return z
+
 # -------------------------------------------------
 class depthmodel1D(object):
     """self.z = ztop !!!
@@ -248,6 +258,7 @@ class depthmodel1D(object):
 # -------------------------------------------------
 class depthmodel(object):
     def __init__(self, vp, vs, rh):
+        """initiate with 3 depthmodel1D objects, must have the same ztop values"""
         assert isinstance(vp, depthmodel1D)
         assert isinstance(vs, depthmodel1D)
         assert isinstance(rh, depthmodel1D)
@@ -315,12 +326,10 @@ class depthmodel(object):
 
     # -------------------------------------------------
     def __str__(self):
-        return packmod96(self.z, self.vp.values, self.vs.values, self.rh.values)
+        return packmod96(self.vp.z, self.vp.values, self.vs.values, self.rh.values)
 
     # -------------------------------------------------
-    def write96(self, filename, overwrite=False):
-        if not overwrite and os.path.exists(filename):
-            raise Exception('%s already exists' % filename)
+    def write96(self, filename):
         with open(filename, 'w') as fid:
             fid.write(self.__str__())
 
@@ -365,6 +374,20 @@ class depthmodel(object):
         kwargs['color'] = "r"
         hdls.append(self.rh.show(ax, *args, **kwargs))
         return hdls
+
+# -------------------------------------------------
+class depthmodel_from_arrays(depthmodel):
+    def __init__(self, z, vp, vs, rh):
+        """initiate with arrays, skip verification for same depth array"""
+        assert len(z) == len(vp) == len(vs) == len(rh)
+        z, vp, vs, rh = [np.asarray(_, float) for _ in z, vp, vs, rh]
+        assert z[0] == 0
+        assert np.all(z[1:] > z[:-1])
+        assert np.all(vs > 0.)
+        assert np.all(rh > 0.)
+        assert np.all(vp / vs >= np.sqrt(4 / 3.))
+
+        self.vp, self.vs, self.rh = [depthmodel1D(z, _) for _ in vp, vs, rh]
 
 
 # -------------------------------------------------

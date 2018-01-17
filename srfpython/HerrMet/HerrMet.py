@@ -9,15 +9,16 @@ import numpy as np
 #tetedoeuf
 from tetedoeuf.multipro.multipro8 import Job, MapAsync, MapSync
 from tetedoeuf.utils.display import values2colors, makecolorbar, legendtext, chftsz
+from tetedoeuf.utils.asciifile import AsciiFile
 
 #srfpython
 from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm
 from srfpython.inversion.metropolis2 import LogGaussND, metropolis
-from srfpython.depthdisp.depthmodels import depthmodel, depthmodel1D, depthmodel_from_mod96
-from srfpython.depthdisp.dispcurves import Claw, surf96reader
+from srfpython.depthdisp.depthmodels import depthmodel, depthmodel1D, depthmodel_from_mod96, depthspace
+from srfpython.depthdisp.dispcurves import Claw, surf96reader, freqspace
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, plt, gcf, gca, showme, pause
-from srfpython.utils import depthspace, freqspace, readargv, minmax, tostr
+from srfpython.utils import readargv, minmax, tostr
 
 #local imports
 from files import write_default_paramfile, load_paramfile, read_runfile_1
@@ -25,21 +26,6 @@ from datacoders import makedatacoder, Datacoder_log
 from theory import Theory, overdisp
 from parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp
 #
-
-
-
-#from displininv import Parameterizer, resultdisplay, Datacoder_log, makedatacoder, Theory, surf96reader
-#from labex.ffmt.allfile import Allfile
-#from labex.graphictools.gutils import  plt, gcf, gca, showme, grapher, values2colors, makecolorbar, chftsz, legendtext
-#from labex.inversion.metropolis2 import LogGaussND, LogUniND, metropolis
-#from labex.processingtools.multipro7 import Job, MapAsync, MapSync
-#from labex.dispersion.depthmodels import depthmodel, depthmodel1D, depthmodel_from_mod96, dmstats1, depthspace
-#from labex.dispersion.displaws import Claw
-#from labex.tools.stdout import waitbar
-#from labex.signaltools.sutils import freqspace
-
-#from labex.dispersion.VOLMAX.srfdis17 import groupbywtm, igroupbywtm, srfdis17
-#from labex.dispersion.Herrmann0.dispersion import groupbywtm, igroupbywtm, dispersion as srfdis17
 
 
 # -------------------------------------
@@ -51,7 +37,7 @@ default_top = 100
 default_topstep = 1
 default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRzRHz']
 default_parameterization = default_parameterization_list[0]
-mapkwargs = {} #keyword arguments for every parallelized process
+mapkwargs = {"Nworkers" : 4, "Taskset" : "0-3"} #keyword arguments for every parallelized process
 # -------------------------------------
 autorizedkeys = \
     ["w", "taskset", "agg", "lowprio",
@@ -65,54 +51,62 @@ autorizedkeys = \
      "test"]
 # -------------------------------------
 help = '''HerrMet V{version}
-# --------------------------
--w                     change number of virtual workers for all parallelized processes
--taskset               change job affinity for all parallelized processes, e.g. "0-4"
--agg                   use agg backend (no display)
--lowprio               run processes with low priority
-# --------------------------
---help, -h             display this help message, and quit
---example, -e          display an example of script, and quit
---param      int float generate a template parameter file to custom, need the number of layers and bottom depth in km
-    -basedon filename  build parametrization based on an existing mod96 file, if not specified, I take fixed values
-    -t       typename  parameterization type to use ({default_parameterization_list}), default {default_parameterization}
-                       mZVSPRRH = parameterize with depth interface, 
-                                  VS in each layer, VP/VS in each layer, Density in each layer
-                       mZVSVPRH = parameterize with depth interface,   
-                                  VP in each layer, VP/VS in each layer, Density in each layer
-                       mZVSPRzRHvp = parameterize with depth interface, 
-                                  use fixed relations for VP/VS versus depth and Density versus VP
-                      mZVSPRzRHz = parameterize with depth interface, 
-                                  use fixed relations for VP/VS versus depth and Density versus depth 
-    -dvp     f f       add prior constraint on the vp offset between layers, provide minimum and maximum value, km/s
-    -dvs     f f       add prior constraint on the vs offset between layers, provide minimum and maximum value, km/s
-    -drh     f f       add prior constraint on the density offset between layers, provide minimum and maximum value, g/cm3
-    -dpr     f f       add prior constraint on the vp/vs offset between layers, provide minimum and maximum value
-    -growing           shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0.
-    -op                overwrite _HerrMet.param if exists
---target     filename  set the target dispersion curve from surf96
-    -resamp  f f i s   resample the dispersion curve, 
-                       needs fmin(Hz), fmax(Hz), nfreq, fscale(flin, plin or log)
-    -lunc    float     set constant uncertainty in log domain (value x lunc)
-    -unc     float     set constant uncertainty in linear domain 
-    -ot                overwrite _HerrMet.target if exists
---run        mode      start inversion, mode is append or restart
-    -nchain  int       number of chains to use, default {default_nchain}
-    -nkeep   int       number of models to keep per chain, default {default_nkeep}
-    -w                 see above, controls the max number of chains to be run simultaneously
---extract   [i] [i]    extract posterior distribution on the models, save them as mod96files
-                       first argument = number of best models to use/display, default {default_top}
-                       second argument = step between them, default {default_topstep}
---disp [i] [i]         display param, target, and run outputs if exists
-                       first argument = number of best models to use/display, default {default_top}
-                       second argument = step between them, default {default_topstep}
-    -best/-overdisp    show the best models on the figure, use overdisp instead of best to recompute dispersion curves with higher resolution
-    -range             compute and show the statistics for the selected models, use --extract for saving
-    -png               save figure as pngfile instead of displaying it on screen
-    -m96 file(s)       append depth model(s) to the plot from mod96 file(s)    
---test                 testing option
+# ----------------------------------------------------
+-w           int                 set the number of virtual workers to use for all parallelized processes, default {default_Nworkers}
+-taskset     string              change job affinity for all parallelized processes, default {default_Taskset}
+-agg                             use agg backend (no display) if mentioned
+-lowprio                         run processes with low priority if mentioned
+# ----------------------------------------------------
+--help, -h                       display this help message, and quit
+--example, -ex                   display an example of script, and quit
+--param      int float           generate a template parameter file to custom, need the number of layers and bottom depth in km
+    -basedon string              build parametrization based on an existing mod96 file, require a filename, 
+                                 if not specified, I take fixed values to build the parameter file
+    -t       string              parameterization type to use ({default_parameterization_list}), default {default_parameterization}
+                                 mZVSPRRH = parameterize with depth interface, 
+                                            VS in each layer, VP/VS in each layer, Density in each layer
+                                 mZVSVPRH = parameterize with depth interface,   
+                                            VP in each layer, VP/VS in each layer, Density in each layer
+                                 mZVSPRzRHvp = parameterize with depth interface, 
+                                            use fixed relations for VP/VS versus depth and Density versus VP
+                                 mZVSPRzRHz = parameterize with depth interface, 
+                                            use fixed relations for VP/VS versus depth and Density versus depth 
+    -dvp     float float         add prior constraint on the vp offset between layers, requires the extremal values, km/s
+    -dvs     float float         add prior constraint on the vs offset between layers, requires the extremal values, km/s
+    -drh     float float         add prior constraint on the density offset between layers, requires the extremal values, g/cm3
+    -dpr     float float         add prior constraint on the vp/vs offset between layers, requires the extremal values, no unit
+    -growing                     shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0.
+    -op                          force overwriting _HerrMet.param if exists
+--target     string              set the target dispersion curve from a surf96 file (not modified)
+                                 the data will be reproduced into a target file that can be customized manually
+                                 (to remove unwanted points, resample dispersion curves...) 
+    -resamp  float float int str resample the dispersion curve in the target file, 
+                                 requires fmin(Hz), fmax(Hz), nfreq, fscale (flin=linear in freq domain, plin=linear in period 
+                                 or log=logarithmic scaling)
+    -lunc    float               set constant uncertainties in log domain (uncertainty = value x lunc)
+    -unc     float               set constant uncertainty in linear domain (uncertainty = unc)
+    -ot                          force overwriting _HerrMet.target if exists
+--run        string              start inversion, requires a running mode 
+                                    append  : add new models to the exiting run file 
+                                    restart : overwrite the current run file if any
+    -nchain  int                 number of chains to use, default {default_nchain}
+    -nkeep   int                 number of models to keep per chain, default {default_nkeep}
+    -w       int                 see above, controls the max number of chains to run simultaneously
+--extract   [int] [int]          extract posterior distribution on the models, save them as mod96files
+                                 first argument = number of best models to use/display, default {default_top}
+                                 second argument = step between them, default {default_topstep}
+--disp [int] [int]               display param, target, and run outputs if exists
+                                 first argument = number of best models to use/display, default {default_top}
+                                 second argument = step between them, default {default_topstep}
+    -best/-overdisp              show the best models on the figure, use overdisp instead of best to recompute dispersion curves with higher resolution
+    -range                       compute and show the statistics for the selected models, use --extract for saving
+    -png                         save figure as pngfile instead of displaying it on screen
+    -m96 file(s)                 append depth model(s) to the plot from mod96 file(s)    
+--test                           testing option
 '''.format(
     version=version,
+    default_Nworkers=mapkwargs['Nworkers'],
+    default_Taskset=mapkwargs['Taskset'],
     default_top=default_top,
     default_nchain=default_nchain,
     default_nkeep=default_nkeep,
@@ -122,7 +116,12 @@ help = '''HerrMet V{version}
     )
 # -------------------------------------
 example="""
-# get target, resample it between 0.2-1.5 Hz with 15 samples spaced logarithmically in period domain
+# -------------
+# Example usage of HerrMet V{version}
+# -------------
+
+# 1/ Data
+# get the target dispersion curves, resample it between 0.2-1.5 Hz with 15 samples spaced logarithmically in period domain
 # adjust uncertainties to 0.1 in logaritmic domain, overwrite target if exists (_HerrMet.target) 
 # and display it
 HerrMet --target /path/to/my/data/file.surf96 \\
@@ -131,6 +130,10 @@ HerrMet --target /path/to/my/data/file.surf96 \\
             -ot \\
             --disp
 
+# >> you may edit _HerrMet.target and remove points that do not need to be inverted, check with  
+HerrMet --disp
+
+# 2/ Parameterization
 # build parameter file from existing depthmodel, use 7 layers, use parametrization mZVSPRRH, 
 # require vp, vs and density to be growing
 # overwrite paramfile if exists (_HerrMet.param) and display
@@ -141,13 +144,16 @@ HerrMet --param 7 \\
             -op \\
             --disp
 
-# >> now edit _HerrMet.param and custom it, check with HerrMet --disp
+# >> now edit _HerrMet.param and customize it, check with 
+HerrMet --disp
 
+# 3/ Inversion
 # run inversion with 12 chains, keep 1000 models each, run on 24 virtual threads
 HerrMet -w 24 \\
         --run restart \\
             -nchain 12 -nkeep 1000 
-        
+
+# 4/ Results
 # display best 1000 models, recompute the best disp curves with higher resolution
 # compute median and percentiles over these 1000 models
 # save as png file, use a non display backend 
@@ -156,7 +162,7 @@ HerrMet -agg \\
             -overdisp \\
             -range \\
             -png
-"""
+""".format(version=version)
 
 
 # -------------------------------------
@@ -187,7 +193,7 @@ if __name__ == "__main__":
         print help
         sys.exit()
     # -------------------------------------
-    if "e" in argv.keys() or "example" in argv.keys():
+    if "ex" in argv.keys() or "example" in argv.keys():
         print example
         sys.exit()
     # -------------------------------------
@@ -511,7 +517,7 @@ if __name__ == "__main__":
             print "call option --param to see prior depth boundaries"
 
         # --------------------
-        if "m96" in argv.keys():  # plot personal data on top
+        if "m96" in argv.keys():  # plot user data on top
             for m96 in argv['m96']:
                 try:
                     dm = depthmodel_from_mod96(m96)
@@ -554,107 +560,8 @@ if __name__ == "__main__":
                 rd.set_plim((0.8 / d.freqs.max(), 1.2 / d.freqs.min()))
         rd.tick()
         rd.grid()
-        chftsz(rd.fig, 16)
+        chftsz(rd.fig, 12)
         if "png" in argv.keys():
             rd.fig.savefig('_HerrMet.png')
         else:
             showme()
-
-    # # -------------------------------------
-    # if "top" in argv.keys() or "pdf" in argv.keys():
-    #     # assume called after param, target and run
-    #
-    #     # ------
-    #     if os.path.exists("_HerrMet.target"):
-    #         rd = DepthDispDisplay(targetfile="_HerrMet.target")
-    #         d = makedatacoder("./_HerrMet.target", which=Datacoder_log)  # datacoder based on observations
-    #         dobs, _ = d.target()
-    #     else:
-    #         rd = DepthDispDisplay()
-    #         print "call option --target to see the target dispersion curves"
-    #
-    #     # ------
-    #     if os.path.exists('_HerrMet.param'):
-    #         p = Parameterizer_mZVSPRRH('_HerrMet.param')
-    #         rd.plotmodel(alpha=1.0, color="r", linewidth=3, *p.inv(p.MINF))
-    #         rd.plotmodel(alpha=1.0, color="r", linewidth=3, *p.inv(p.MSUP))
-    #         zmax = 1.1 * p.inv(p.MINF)[0][-1]
-    #         rd.set_zlim(np.array([0, zmax]))
-    #     else:
-    #         print "call option --param to see prior depth boundaries"
-    #     # ------
-    #     if os.path.exists('_HerrMet.run'):
-    #         if "top" in argv.keys():
-    #             top = int(argv['top'][0]) if argv['top'] is not None else default_top
-    #             topstep = int(argv['top'][1]) if argv['top'] is not None and len(argv['top']) >= 2 else default_topstep
-    #
-    #             chainids, weights, llks, ms, ds = read_runfile_1('_HerrMet.run', top=top, topstep=topstep)
-    #             vmin, vmax, cmap = llks.min(), llks.max(), tej()  # plt.cm.hot#
-    #             colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=cmap)
-    #             for i in range(len(llks))[::-1]:
-    #                 rd.plotmodel(color=colors[i], alpha=1.0, *ms[i])
-    #                 rd.plotdisp(color=colors[i], alpha=1.0, *ds[i])
-    #
-    #             cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
-    #             cax = rd.fig.add_axes((0.78, 0.1, 0.005, 0.3))
-    #             rd.fig.colorbar(cb, cax=cax, label="log likelyhood")
-    #
-    #         if "pdf" in argv.keys():
-    #             dms, weights = [], []
-    #             for chainid, weight, llk, (ztop, vp, vs, rh), (waves, types, modes, freqs, values) in readHerrmetout(
-    #                     "_HerrMet.run"):
-    #                 dm = depthmodel(depthmodel1D(ztop, vp),
-    #                                 depthmodel1D(ztop, vs),
-    #                                 depthmodel1D(ztop, rh))
-    #                 dms.append(dm)
-    #                 weights.append(weight)
-    #
-    #             for p, (vppc, vspc, rhpc, prpc) in dmstats1(dms, percentiles=[0.16, 0.5, 0.84], Ndepth=100, Nvalue=100,
-    #                                                         weights=weights):
-    #                 try:
-    #                     vppc.show(rd.axvp, color="k", linewidth=2)
-    #                     vspc.show(rd.axvs, color="k", linewidth=2)
-    #                     rhpc.show(rd.axrh, color="k", linewidth=2)
-    #                     prpc.show(rd.axpr, color="k", linewidth=2)
-    #
-    #                     dmout = depthmodel(vppc, vspc, rhpc)
-    #                     dmout.write96('_HerrMet.p%.2f.mod96' % p, overwrite=True)
-    #                 except KeyboardInterrupt:
-    #                     raise
-    #                 except Exception as e:
-    #                     print e
-    #
-    #         rd.tick()
-    #
-    #     else:
-    #         print "call option --run to start inversion"
-    #
-    #     # --------------------
-    #     if "sltz" in argv.keys():  # plot personal data on top
-    #         dm = depthmodel_from_mod96('/home/max/progdat/CPiS/EarthModel/Soultz.rho.mod')
-    #         dm.vp.show(rd.axvp, "g", linewidth=3)
-    #         dm.vs.show(rd.axvs, "g", linewidth=3)
-    #         dm.rh.show(rd.axrh, "g", linewidth=3)
-    #         dm.pr().show(rd.axpr, "g", linewidth=3)
-    #     # -------------------- #plot personal data on top
-    #     if "ritt" in argv.keys():
-    #         A = Allfile("/home/max/data/puits/GRT1/GRT1.logsonic")
-    #         A.read()
-    #         rd.axvp.plot(A.data['VP'], A.data['TVD'] / 1000., color="k", alpha=0.5)
-    #         rd.axvs.plot(A.data['VS'], A.data['TVD'] / 1000., color="k", alpha=0.5)
-    #         rd.axpr.plot(A.data['VP'] / A.data['VS'], A.data['TVD'] / 1000., color="k", alpha=0.5)
-    #
-    #     # ------
-    #     if os.path.exists("_HerrMet.target"):
-    #         # plot data on top
-    #         rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs), dvalues=d.dvalues, alpha=0.8, color="k",
-    #                     linewidth=2)
-    #         rd.set_plim((0.8 / d.freqs.max(), 1.2 / d.freqs.min()))
-    #         rd.set_vlim((0.8 * d.values.min(), 1.2 * d.values.max()))
-    #         rd.tick()
-    #
-    #     rd.grid()
-    #     if "png" in argv.keys():
-    #         rd.fig.savefig('_HerrMet.png')
-    #     else:
-    #         showme()

@@ -2,8 +2,7 @@ from tetedoeuf.multipro.multipro8 import Job, MapAsync
 from tetedoeuf.utils.asciifile import AsciiFile
 from priorpdf import DefaultLogRhoM, LogRhoM_DVS, LogRhoM_DVPDVSDRH, LogRhoM_DVPDVSDRHDPR
 from parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHvp, Parameterizer_mZVSPRzRHz
-from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
-from srfpython.utils import depthspace
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthspace
 import numpy as np
 
 
@@ -385,7 +384,7 @@ def read_runfile_2(f, **mapkwargs):
     # -------------------
     ZTOP[0, :], VP[0, :], VS[0, :], RH[0,:], WEIGHTS[0], LLKS[0] = ztop, vp, vs, rh, weight, llk
     # -------------------
-    for n, (chainid, weight, llk, (ztop, vp, vs, rh), _) in enumerate(readHerrmetout(f)):
+    for n, (chainid, weight, llk, (ztop, vp, vs, rh), _) in enumerate(read_runfile(f, **mapkwargs)):
         ZTOP[n+1, :], \
         VP[n+1, :], \
         VS[n+1, :], \
