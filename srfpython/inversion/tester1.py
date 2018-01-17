@@ -1,4 +1,4 @@
-from tetedoeuf.display import *
+from tetedenoeud.display import *
 import numpy as np
 from metropolis2 import *
 

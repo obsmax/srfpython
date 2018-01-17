@@ -1,5 +1,5 @@
-from tetedoeuf.display import *
-from tetedoeuf.multipro.multipro8 import *
+from tetedenoeud.display import *
+from tetedenoeud.multipro.multipro8 import *
 from metropolis2 import *
 import numpy as np
 

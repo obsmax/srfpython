@@ -1,4 +1,4 @@
-from tetedoeuf.display import *
+from tetedenoeud.display import *
 from metropolis2 import *
 
 

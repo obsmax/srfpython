@@ -1,5 +1,5 @@
-from tetedoeuf.multipro.multipro8 import Job, MapSync
-from tetedoeuf.utils.stdout import waitbar
+from tetedenoeud.multipro.multipro8 import Job, MapSync
+from tetedenoeud.utils.stdout import waitbar
 from srfpython.Herrmann.Herrmann import dispersion
 from parameterizers import Parameterizer
 from datacoders import Datacoder

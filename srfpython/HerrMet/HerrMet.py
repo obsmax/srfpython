@@ -6,10 +6,10 @@ if "-agg" in sys.argv[1:] or "--agg" in sys.argv[1:]: matplotlib.use('agg')
 import os, imp
 import numpy as np
 
-#tetedoeuf
-from tetedoeuf.multipro.multipro8 import Job, MapAsync, MapSync
-from tetedoeuf.utils.display import values2colors, makecolorbar, legendtext, chftsz
-from tetedoeuf.utils.asciifile import AsciiFile
+#tetedenoeud
+from tetedenoeud.multipro.multipro8 import Job, MapAsync, MapSync
+from tetedenoeud.utils.display import values2colors, makecolorbar, legendtext, chftsz
+from tetedenoeud.utils.asciifile import AsciiFile
 
 #srfpython
 from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm

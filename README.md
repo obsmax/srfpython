@@ -1,15 +1,17 @@
 # srfpython
   
 - programs for surface wave dispersion curves in python
+- compute, display, invert 1D depth models
+- based on Herrmann codes Computer Program in seismology
 
 install
 
-install tetedoeuf (required)
+install tetedenoeud (required)
 > move to the installation path : e.g. `cd ~/git`
 >
-> `git clone http://github.com/obsmax/tetedoeuf.git`
+> `git clone http://github.com/obsmax/tetedenoeud.git`
 >
-> follow instructions in tetedoeuf/README.md
+> follow instructions in tetedenoeud/README.md
 
 install srfpython
 
@@ -17,9 +19,9 @@ install srfpython
 >  
 > `git clone http://github.com/obsmax/srfpython.git`
 >
-> activate the virtual environment created for tetedoeuf
+> activate the virtual environment created for tetedenoeud
 >
-> `source activate tetedoeuf`   
+> `source activate tetedenoeud`   
 > 
 > enter the srfpython directory : e.g. `cd ~/git/srfpython`
 >   

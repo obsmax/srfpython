@@ -17,7 +17,7 @@ if __name__ == "__main__":
         print help
         sys.exit()
 
-    from tetedoeuf.utils.display import gcf, gca, showme, pause, plt, logtick
+    from tetedenoeud.utils.display import gcf, gca, showme, pause, plt, logtick
     from dispcurves import surf96reader, Claw, freqspace
     from srfpython.utils import readargv
     import numpy as np
