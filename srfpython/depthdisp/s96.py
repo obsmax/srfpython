@@ -6,6 +6,7 @@ help = '''s96
 --resamp          list of surf96files to resample
     -fspace       new frequency array in Hz, fstart, fend, nfreq, fscale
     -sfx          file suffix to append, use "" to overwrite input files
+-lock             replace showme by plt.show (e.g. for jupyter)
 #surf96 format 
 SURF96 {wave} {type} {flag} {mode} {period} {value} {dvalue}
 '''
@@ -18,15 +19,19 @@ if __name__ == "__main__":
         sys.exit()
 
     from tetedenoeud.utils.display import gcf, gca, showme, pause, plt, logtick
-    from dispcurves import surf96reader, Claw, freqspace
+    from srfpython.depthdisp.dispcurves import surf96reader, Claw, freqspace
     from srfpython.utils import readargv
     import numpy as np
 
     argv = readargv()
     # -----------------------------------
+    if "lock" in argv.keys():
+        showme = plt.show
+
+    # -----------------------------------
     if "help" in argv.keys() or "h" in argv.keys():
         print help
-        exit()
+        sys.exit()
 
     # -----------------------------------
     elif "show" in argv.keys():
@@ -47,7 +52,7 @@ if __name__ == "__main__":
         else:                         gca().set_xlim(1. / pmax, 1. / pmin)
         gca().grid(True)
         showme()
-        exit()
+        sys.exit()
 
     # -----------------------------------
     elif "resamp" in argv.keys():

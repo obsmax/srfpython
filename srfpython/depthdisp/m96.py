@@ -17,6 +17,7 @@ help = '''m96
     -thck         thickness of the sublayers in km
     -sfx          suffix to add before file extension (default split)
     -o            ignore suffix and overwrite input file    
+-lock             replace showme by plt.show (e.g. for jupyter)
 '''
 
 # ---------------------------------------------
@@ -29,16 +30,22 @@ if __name__ == "__main__":
     from tetedenoeud.utils.display import gcf, gca, showme, pause, plt, logtick
     from srfpython.utils import readargv
     from srfpython.Herrmann.Herrmann import dispersion_1
-    from dispcurves import surf96reader, Claw, freqspace
-    from depthmodels import depthmodel_from_mod96
+    from srfpython.depthdisp.dispcurves import surf96reader, Claw, freqspace
+    from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
+
+
 
     import numpy as np
     argv = readargv()
 
     # -----------------------------------
+    if "lock" in argv.keys():
+        showme = plt.show
+
+    # -----------------------------------
     if "help" in argv.keys() or "h" in argv.keys():
         print help
-        exit()
+        sys.exit()
     
     # -----------------------------------
     elif "split" in argv.keys():
@@ -56,7 +63,7 @@ if __name__ == "__main__":
                 assert not os.path.exists(fout)
             print (f, ">", fout)
             dm.write96(fout, overwrite = "o" in argv.keys())
-        exit()
+        sys.exit()
 
     # -----------------------------------
     elif "addlayer" in argv.keys():
@@ -96,14 +103,11 @@ if __name__ == "__main__":
             rh.show(axrh)
 
         showme()
+        sys.exit()
 
     # -----------------------------------
     elif "disp" in argv.keys():
-        axvp  = gcf().add_subplot(1, 5, 1)
-        axvs  = gcf().add_subplot(1, 5, 2, sharey = axvp)
-        axpr  = gcf().add_subplot(1, 5, 3, sharey = axvp)
-        axrh  = gcf().add_subplot(1, 5, 4, sharey = axvp)
-        axdsp = gcf().add_subplot(2, 5, 5)
+
 
         for m in argv['disp']:
             dm = depthmodel_from_mod96(m)
@@ -111,10 +115,6 @@ if __name__ == "__main__":
             vp   = dm.vp.values
             vs   = dm.vs.values
             rh   = dm.rh.values
-            dm.vp.show(axvp)
-            dm.vs.show(axvs)
-            dm.pr().show(axpr)
-            dm.rh.show(axrh)
 
             Waves, Types, Modes, Freqs = [], [], [], []
             for k in argv.keys():
@@ -139,15 +139,25 @@ if __name__ == "__main__":
                 assert s96out.endswith('.surf96') or s96out.endswith('.s96')
                 with open(s96out, 'w') as fid:
                     for w, t, m, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs, h=0.0005, dcl=0.00005, dcr=0.00005):
-                        axdsp.loglog(1. / F, V, label = "%s%s%d" % (w, t, m))
                         for FF, VV in zip(F, V):
                             fid.write('SURF96 %s %s T %d %f %f 0.1\n' % (w, t, m, 1. / FF, VV))
             else:
+                axvp = gcf().add_subplot(1, 5, 1)
+                axvs = gcf().add_subplot(1, 5, 2, sharey=axvp)
+                axpr = gcf().add_subplot(1, 5, 3, sharey=axvp)
+                axrh = gcf().add_subplot(1, 5, 4, sharey=axvp)
+                axdsp = gcf().add_subplot(2, 5, 5)
+                dm.vp.show(axvp)
+                dm.vs.show(axvs)
+                dm.pr().show(axpr)
+                dm.rh.show(axrh)
+
                 for w, t, m, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs):
                     axdsp.loglog(1. / F, V, label = "%s%s%d" % (w, t, m))
 
-        logtick(axdsp, "xy")
-        showme()
+                logtick(axdsp, "xy")
+                showme()
+        sys.exit()
 
 
 

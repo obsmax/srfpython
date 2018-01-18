@@ -330,35 +330,43 @@ def dispersion_1(ztop, vp, vs, rh, \
 if __name__ == "__main__":
     """ DEMO """
     import matplotlib.pyplot as plt
+    from tetedenoeud.utils.display import logtick
 
-    ###depth model
+    # depth model
     ztop = [0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80] #km, top layer depth
     vp   = [1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80] #km/s
     vs   = [0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31] #km/s
     rh   = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63] #g/cm3
 
-    ###dipsersion parameters
+    # dipsersion parameters
     def f(): return np.logspace(np.log10(0.2), np.log10(3.5), 35)
-    Waves = ['R', 'R', 'R', 'R', 'L', 'L', 'L', 'L']
-    Types = ['U', 'U', 'C', 'C', 'U', 'U', 'C', 'C']
-    Modes = [ 0 ,  1,   0,   1,   0,   1,   0,   1 ]
-    Freqs = [ f(), f(), f(), f(), f(), f(), f(), f()]
+    curves = [('R', 'U', 0, f()),
+              ('R', 'U', 1, f()),
+              ('R', 'C', 0, f()),
+              ('R', 'C', 1, f()),
+              ('L', 'U', 0, f()),
+              ('L', 'U', 1, f()),
+              ('L', 'C', 0, f()),
+              ('L', 'C', 1, f())]
 
-    ###compute dispersion curves
+    # reorganize inputs for dispersion_1
+    Waves, Types, Modes, Freqs = zip(*curves)
+
+    # compute dispersion curves
     with Timer('dispersion'):
         out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
 
-    ###display results
+    # display results
     ax = plt.gca()
     for w, t, m, fs, us in out:
         ax.loglog(1. / fs, us, '+-', label = "%s%s%d" % (w, t, m))
     ax.set_xlabel('period (s)')
     ax.set_ylabel('velocity (km/s)')    
     ax.grid(True, which = "major")
-    ax.grid(True, which = "minor")    
+    ax.grid(True, which = "minor")
+    logtick(ax, "xy")
     plt.legend()
-    ax.figure.show()
-    raw_input('pause')
+    plt.show()
 
 
     
