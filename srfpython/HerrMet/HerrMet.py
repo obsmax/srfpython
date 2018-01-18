@@ -21,7 +21,7 @@ from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, plt, gcf, gca
 from srfpython.utils import readargv, minmax, tostr
 
 #local imports
-from srfpython.HerrMet.files import write_default_paramfile, load_paramfile, read_runfile_1
+from srfpython.HerrMet.files import write_default_paramfile, load_paramfile, read_runfile_1, RunFile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import Theory, overdisp
 from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp
@@ -186,6 +186,7 @@ if __name__ == "__main__":
         print help
         sys.exit()
     argv = readargv()
+    verbose = True
     # nworkers = int(argv['w'][0]) if "w" in argv.keys() else default_nworkers
     # -------------------------------------
     # prevent typos in arguments, keep the autorizedkeys list up to date
@@ -208,7 +209,6 @@ if __name__ == "__main__":
         showme = plt.show
     # -------------------------------------
     if "verbose" in argv.keys():
-        verbose = True
         if argv['verbose'][0].lower() in ['off', 'false']:
             verbose = False
     # -------------------------------------
@@ -382,6 +382,74 @@ if __name__ == "__main__":
                                tostr(values, "%4f")))
 
         # sys.exit()
+
+    # -------------------------------------
+    if "test" in argv.keys():
+        mode = argv['test'][0]
+        assert mode in ['append', 'restart']
+
+        Nchain = int(argv['nchain'][0]) if "nchain" in argv.keys() else default_nchain
+        Nkeep  = int(argv['nkeep'][0]) if "nkeep" in argv.keys() else default_nkeep
+
+        # ------
+        p, logRHOM = load_paramfile('_HerrMet.param')
+        # ------
+        d = makedatacoder("_HerrMet.target", which=Datacoder_log)  # datacoder based on observations
+        dobs, CDinv = d.target()
+        duncs = CDinv ** -.5
+        ND = len(dobs)
+        dinfs = d(0.1 * np.ones_like(d.values))
+        dsups = d(3.5 * np.ones_like(d.values))
+        logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
+        # ------
+        G = Theory(parameterizer=p, datacoder=d)
+        # ---------------------------------
+        if mode == "restart":
+            with RunFile('_HerrMet.run', create=mode == "restart") as rundb:
+                rundb.drop()
+                rundb.reset(p.NLAYER, d.waves, d.types, d.modes, d.freqs)
+        else:
+            raise NotImplementedError('')
+
+        # ---------------------------------
+        def gen():
+            for nchain in xrange(Nchain):
+                M0 = np.random.rand(len(p.MINF)) * (p.MSUP - p.MINF) + p.MINF
+                MSTD = p.MSTD
+                yield Job(nchain, M0, MSTD, nkeep=Nkeep)
+
+
+        def fun(worker, chainid, M0, MSTD, nkeep):
+            models, datas, weights, llks = metropolis(M0, MSTD, G, ND, logRHOD, logRHOM,
+                  nkeep=nkeep,
+                  normallaw=worker.randn,
+                  unilaw=worker.rand,
+                  chainid=chainid,
+                  HL=10,
+                  IK0=0.25,
+                  MPMIN=1.e-6,
+                  MPMAX=1e6,
+                  adjustspeed=0.3,
+                  nofail=True,
+                  debug=False,
+                  verbose=verbose)
+
+            I = np.any(~np.isnan(datas), axis=1)
+            models, datas, weights, llks = models[I, :], datas[I, :], weights[I], llks[I]
+
+            return chainid, models, datas, weights, llks
+        # ---------------------------------
+        with MapAsync(fun, gen(), **mapkwargs) as ma, RunFile("_HerrMet.run") as rundb:
+            rundb.begintransaction()
+
+            try:
+                for jobid, (chainid, models, datas, weights, llks), _, _ in ma:
+                    rundb.insert(models, datas, weights, llks, p, d)
+                    rundb.savepoint()
+                rundb.commit()
+            except:
+                rundb.rollback(crash=True)
+
 
     # -------------------------------------
     if "extract" in  argv.keys():
@@ -558,26 +626,7 @@ if __name__ == "__main__":
                 except Exception as e:
                     print 'could not read or display %s (reason %s)' % (m96, str(e))
                 rd.axvp.legend(loc=3)
-        # # --------------------
-        # if "sltz" in argv.keys():  # plot personal data on top (private option)
-        #     dm = depthmodel_from_mod96('/home/max/progdat/CPiS/EarthModel/Soultz.rho.mod')
-        #     dm.vp.show(rd.axvp, "c", linewidth=3)
-        #     dm.vs.show(rd.axvs, "c", linewidth=3)
-        #     dm.rh.show(rd.axrh, "c", linewidth=3)
-        #     dm.pr().show(rd.axpr, "c", linewidth=3)
-        # # --------------------
-        # if "ritt" in argv.keys(): # plot personal data on top (private option)
-        #     A = AsciiFile("/home/max/data/puits/GRT1/GRT1.logsonic")
-        #     rd.axvp.plot(A.data['VP'], A.data['TVD'] / 1000., color="m", alpha=0.4)
-        #     rd.axvs.plot(A.data['VS'], A.data['TVD'] / 1000., color="m", alpha=0.4)
-        #     rd.axpr.plot(A.data['VP'] / A.data['VS'], A.data['TVD'] / 1000., color="m", alpha=0.4)
-        #     dm = depthmodel_from_mod96('/home/max/progdat/CPiS/EarthModel/GRT1.Maurer2016.rho.mod')
-        #     dm.vp.show(rd.axvp, "m", linewidth=3)
-        #     dm.vs.show(rd.axvs, "m", linewidth=3)
-        #     dm.rh.show(rd.axrh, "m", linewidth=3)
-        #     dm.pr().show(rd.axpr, "m", linewidth=3)
-
-        # ------
+        # --------------------
         if os.path.exists("_HerrMet.target"):
             # plot data on top
             rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs), dvalues=d.dvalues, alpha=0.8, color="g",linewidth=3)

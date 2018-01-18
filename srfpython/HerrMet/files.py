@@ -1,3 +1,4 @@
+from tetedenoeud.database.database import Database
 from tetedenoeud.multipro.multipro8 import Job, MapAsync
 from tetedenoeud.utils.asciifile import AsciiFile
 from priorpdf import DefaultLogRhoM, LogRhoM_DVS, LogRhoM_DVPDVSDRH, LogRhoM_DVPDVSDRHDPR
@@ -395,6 +396,179 @@ def read_runfile_2(f, **mapkwargs):
     return ZTOP, VP, VS, RH, WEIGHTS, LLKS
 
 
+# -------------------------------------
+# run file : based on sqlite
+# -------------------------------------
+class RunFile(Database):
+    def drop(self):
+        """erase existing tables and recreate them"""
+
+        self.cursor.execute('drop table if exists PARAMVALUES')
+        self.cursor.execute('drop table if exists DISPVALUES')
+        self.cursor.execute('drop table if exists PARAMETERS')
+        self.cursor.execute('drop table if exists DISPPOINTS')
+        self.cursor.execute('drop table if exists MODELS')
+        self.cursor.execute('drop table if exists CHAINS')
+
+        self.cursor.execute('''create table DISPPOINTS (
+            POINTID      integer primary key autoincrement,
+            WAVE         varchar not null, --R/L
+            TYPE         varchar not null, --C/U
+            MODE         int not null,  
+            FREQ         real not null, --Hz
+            UNIT         varchar not null, --velocity
+            constraint U unique (WAVE, TYPE, MODE, FREQ),
+            constraint W check  (WAVE='R' or WAVE='L'), 
+            constraint T check  (TYPE='C' or TYPE='U'),
+            constraint M check  (MODE >= 0),
+            constraint F check  (FREQ > 0))
+            ''')
+
+        self.cursor.execute('''create table PARAMETERS (
+            PARAMID      integer primary key autoincrement,
+            NAME         varchar(10) unique not null,
+            UNIT         varchar)            
+            ''')
+
+        self.cursor.execute('''create table CHAINS (
+            CHAINID       integer unique primary key)''')
+
+        self.cursor.execute('''create table MODELS (
+            MODELID       integer primary key autoincrement,
+            CHAINID       int not null references CHAINS(CHAINID),
+            WEIGHT        int not null default 1, --weight of the model in the posterior pdf
+            NLAYER        int not null, --number of layers including halfspace
+            LLK           real not null ) --log likelyhood of the model
+            ''')
+
+        self.cursor.execute('''create table PARAMVALUES (
+            MODELID       integer references MODELS(MODELID),
+            PARAMID       integer references PARAMETERS(PARAMID),
+            PARAMVAL      real)
+            ''')
+
+        self.cursor.execute('''create table DISPVALUES (
+            MODELID       integer references MODELS(MODELID),
+            POINTID       integer references DISPPOINTS(POINTID),
+            DISPVAL       real)
+            ''')
+
+    # -------------------
+    def reset(self, nlayer, waves, types, modes, freqs):
+        """populate the parameter and disppoints tables"""
+        assert np.all([len(waves) == len(_) for _ in types, modes, freqs])
+
+        if self.select('select * from PARAMETERS') is not None:
+            raise Exception('PARAMETERS table is not empty')
+
+        if self.select('select * from DISPPOINTS') is not None:
+            raise Exception('DISPPOINTS table is not empty')
+
+        self.begintransaction()
+        try:
+            for n in xrange( nlayer):
+                if n:
+                    self.cursor.execute('insert into PARAMETERS (NAME, UNIT) values (?, ?)', ("Z%d" % n, "KM"))
+                self.cursor.execute('insert into PARAMETERS (NAME, UNIT) values (?, ?)', ("VP%d" % n, "KM/S"))
+                self.cursor.execute('insert into PARAMETERS (NAME, UNIT) values (?, ?)', ("VS%d" % n, "KM/S"))
+                self.cursor.execute('insert into PARAMETERS (NAME, UNIT) values (?, ?)', ("RH%d" % n, "G/CM3"))
+
+            for w, t, m, f in zip(waves, types, modes,  np.round(freqs, 8)):
+                self.cursor.execute('''insert into DISPPOINTS (WAVE, TYPE, MODE, FREQ, UNIT) 
+                    values (?, ?, ?, ?, "KM/S")''', (w, t, m, f))
+            self.commit()
+        except:
+            self.rollback(crash=True)
+
+    # -------------------
+    def insert(self, models, datas, weights, llks, parameterizer, datacoder):
+        # assume transaction
+
+        # -------------------
+        # give a number to this insertion
+        s = self.select('select max(CHAINID) from CHAINS').next()[0]
+        if s is None:
+            chainid = 0
+        else:
+            chainid = s + 1
+
+        # ------------------
+        # determine the parameter ids and point ids
+        mdl = models[0]
+        ztop, vp, vs, rh = parameterizer.inv(mdl)
+        nlayer = len(vs)
+        paramids = [] #paramids corresponding to np.concatenate((ztop[1:], vp, vs, rh))
+        pointids = [] #pointids corresponding to values
+
+        for i in xrange(1, nlayer):
+            paramids.append(self.cursor.execute(
+                'select PARAMID from PARAMETERS where NAME = "Z%d"' % i).fetchall()[0][0])
+        for i in xrange(nlayer):
+            paramids.append(self.cursor.execute(
+                'select PARAMID from PARAMETERS where NAME = "VP%d"' % i).fetchall()[0][0])
+        for i in xrange(nlayer):
+            paramids.append(self.cursor.execute(
+                'select PARAMID from PARAMETERS where NAME = "VS%d"' % i).fetchall()[0][0])
+        for i in xrange(nlayer):
+            paramids.append(self.cursor.execute(
+                'select PARAMID from PARAMETERS where NAME = "RH%d"' % i).fetchall()[0][0])
+
+        for w, t, m, f in zip(datacoder.waves, datacoder.types, datacoder.modes,
+                              np.round(datacoder.freqs, 8)):
+            pointids.append(self.cursor.execute(
+                 '''select POINTID from DISPPOINTS where WAVE=? and TYPE=? and MODE=? and FREQ=?''',
+                 (w, t, m, f)).fetchall()[0][0])
+        # ------------------
+        # create the chain
+        self.cursor.execute('insert into CHAINS (CHAINID) values (?)', (chainid, ))
+
+        # create the chain
+        for mdl, dat, wgt, llk in zip(models, datas, weights, llks):
+            ztop, vp, vs, rh = parameterizer.inv(mdl)
+            paramvals = np.concatenate((ztop[1:], vp, vs, rh))
+            dispvals = datacoder.inv(dat)
+            nlayer = len(vs)
+            self.cursor.execute('''insert into MODELS (CHAINID, WEIGHT, NLAYER, LLK)
+                values (?, ?, ?, ?)''', (chainid, wgt, nlayer, llk))
+            modelid = self.cursor.lastrowid
+
+            self.cursor.executemany('''
+                insert into PARAMVALUES (MODELID, PARAMID, PARAMVAL)
+                    values(?, ?, ?)
+                ''', [(modelid, paramid, paramval)
+                      for paramid, paramval in zip(paramids, paramvals)])
+
+            self.cursor.executemany('''
+                insert into DISPVALUES (MODELID, POINTID, DISPVAL)
+                    values(?, ?, ?)
+                ''', [(modelid, pointid, dispval)
+                      for pointid, dispval in zip(pointids, dispvals)])
+
+    def get(self):
+        sql= """
+        select * from
+             (select MODELID, WEIGHT, LLK, group_concat(NAME) , group_concat(PARAMVAL) from 
+                 (select * from MODELS where LLK > -0.5)
+             join 
+               (select MODELID, PARAMID, PARAMVAL from PARAMVALUES) using (MODELID)
+             join PARAMETERS using (PARAMID)	
+                group by MODELID)
+                
+             join
+              
+             (select MODELID,  group_concat(WAVE), group_concat(TYPE), 
+                    group_concat(MODE), group_concat(FREQ), group_concat(DISPVAL) from 
+                 (select MODELID from MODELS where LLK > -0.5)
+             join 
+                 (select MODELID, POINTID, DISPVAL from DISPVALUES) using (MODELID)
+             join DISPPOINTS using (POINTID)	
+             group by MODELID)
+             using (MODELID)
+             order by LLK DESC
+        """
+
+
+
 # --------------------
 if __name__ == "__main__":
     write_default_paramfile(nlayer=7, zbot=3,
@@ -402,3 +576,4 @@ if __name__ == "__main__":
                             dvp=None, dvs=None, drh=None, dpr=None)
     A = load_paramfile("_HerrMet.param")
     print A
+
