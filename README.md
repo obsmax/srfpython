@@ -61,4 +61,9 @@ add the bin directory to the path (recommended)
 > export PATH=$PATH:"~/git/srfpython/srfpython/bin"
 > ```
 
+try the tutorial
 
+> ```
+> cd ~/git/srfpython/srfpython/tutorial
+> jupyter notebook 
+> ```
