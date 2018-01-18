@@ -56,7 +56,7 @@ class Theory(object):
 
 
 # -------------------------------------
-def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, **mapkwargs):
+def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **mapkwargs):
     """extrapolate dispersion curves"""
     def fun(mms):
         ztop, vp, vs, rh = mms
@@ -77,11 +77,11 @@ def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, **mapkwargs):
         return mms, overvalues
 
     with MapSync(fun, (Job(mms) for mms in ms), **mapkwargs) as ma:
-        wb = waitbar('overdisp')
+        if verbose: wb = waitbar('overdisp')
         Njobs = len(ms) - 1.
         for jobid, (mms, overvalues), _, _ in ma:
-            wb.refresh(jobid / Njobs)
+            if verbose: wb.refresh(jobid / Njobs)
             dds = (overwaves, overtypes, overmodes, overfreqs, overvalues)
             yield mms, dds
-        wb.close()
+        if verbose: wb.close()
     print

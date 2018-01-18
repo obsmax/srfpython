@@ -45,7 +45,7 @@ autorizedkeys = \
      "example", "ex",
      "param", "basedon", "t", "dvp", "dvs", "drh", "growing", "op",
      "target", "resamp", "lunc", "unc", "ot",
-     "run", "nchain", "nkeep",
+     "run", "nchain", "nkeep", "verbose",
      "extract",
      "disp", "best", "overdisp", "range", "png", "m96",
      "test"]
@@ -59,6 +59,7 @@ help = '''HerrMet V{version}
 -agg                 use agg backend (no display) if mentioned
 -lowprio             run processes with low priority if mentioned
 -inline              replace showme by plt.show (e.g. jupyter)
+-verbose off         turn verbose mode off
 # ----------------------------------------------------
 --help, -h           display this help message, and quit
 --example, -ex       display an example of script, and quit
@@ -206,6 +207,11 @@ if __name__ == "__main__":
     if "inline" in argv.keys():
         showme = plt.show
     # -------------------------------------
+    if "verbose" in argv.keys():
+        verbose = True
+        if argv['verbose'][0].lower() in ['off', 'false']:
+            verbose = False
+    # -------------------------------------
     if "h" in argv.keys() or "help" in argv.keys():
         print help
         sys.exit()
@@ -348,7 +354,8 @@ if __name__ == "__main__":
                   MPMAX=1e6,
                   adjustspeed=0.3,
                   nofail=True,
-                  debug=False)
+                  debug=False,
+                  verbose=verbose)
 
             I = np.any(~np.isnan(datas), axis=1)
             models, datas, weights, llks = models[I, :], datas[I, :], weights[I], llks[I]
@@ -397,7 +404,7 @@ if __name__ == "__main__":
                 weights=wgts, **mapkwargs):
             try:
                 dmout = depthmodel(vppc, vspc, rhpc)
-                dmout.write96('_HerrMet.p%.2f.mod96' % p, overwrite=True)
+                dmout.write96('_HerrMet.p%.2f.mod96' % p)#, overwrite=True)
             except KeyboardInterrupt: raise
             except Exception as e:
                 print "Error", str(e)
@@ -435,7 +442,7 @@ if __name__ == "__main__":
                     rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
 
                 cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
-                cax = rd.fig.add_axes((0.78, 0.1, 0.005, 0.3))
+                cax = rd.fig.add_axes((0.68, 0.1, 0.005, 0.3))
                 rd.fig.colorbar(cb, cax=cax, label="log likelyhood")
 
             elif "overdisp" in argv.keys():
@@ -446,7 +453,8 @@ if __name__ == "__main__":
                 overwaves, overtypes, overmodes, _, _ = zip(*list(groupbywtm(waves, types, modes, freqs, np.arange(len(freqs)), None, True)))
                 overfreqs = [freqspace(0.6 * min(freqs), 1.4 * max(freqs), 100, "plog") for _ in xrange(len(overwaves))]
                 overwaves, overtypes, overmodes, overfreqs = igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
-                for clr, (mms, dds) in zip(colors[::-1], overdisp(ms[::-1], overwaves, overtypes, overmodes, overfreqs, **mapkwargs)):
+                for clr, (mms, dds) in zip(colors[::-1], overdisp(ms[::-1], overwaves, overtypes, overmodes, overfreqs,
+                                                                  verbose=verbose, **mapkwargs)):
                     rd.plotmodel(color=clr, alpha=1.0, linewidth=3, *mms)
                     try:
                         rd.plotdisp(color=clr, alpha=1.0, linewidth=3, *dds)
@@ -455,8 +463,10 @@ if __name__ == "__main__":
                         print "Error : could not plot dispersion curve (%s)" % str(e)
 
                 cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
-                cax = rd.fig.add_axes((0.78, 0.1, 0.005, 0.3))
-                rd.fig.colorbar(cb, cax=cax, label="log likelyhood")
+                pos = rd.axdisp[-1].get_position()
+                cax = rd.fig.add_axes((pos.x0, 0.1, pos.width, 0.01))
+                rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+                cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
             if "range" in argv.keys():
                 dms, wgts = [], []
@@ -547,7 +557,7 @@ if __name__ == "__main__":
                 except KeyboardInterrupt: raise
                 except Exception as e:
                     print 'could not read or display %s (reason %s)' % (m96, str(e))
-                rd.axvp.legend()
+                rd.axvp.legend(loc=3)
         # # --------------------
         # if "sltz" in argv.keys():  # plot personal data on top (private option)
         #     dm = depthmodel_from_mod96('/home/max/progdat/CPiS/EarthModel/Soultz.rho.mod')
@@ -580,7 +590,7 @@ if __name__ == "__main__":
                 rd.set_plim((0.8 / d.freqs.max(), 1.2 / d.freqs.min()))
         rd.tick()
         rd.grid()
-        chftsz(rd.fig, 12)
+        chftsz(rd.fig, 10)
         if "png" in argv.keys():
             rd.fig.savefig('_HerrMet.png')
         else:
