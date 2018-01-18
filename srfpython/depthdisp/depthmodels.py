@@ -368,11 +368,12 @@ class depthmodel(object):
 
         hdls = []
         kwargs['color'] = "b"
-        hdls.append(self.vp.show(ax, *args, **kwargs))
+        hdls.append(self.vp.show(ax, label="$ V_p (km/s) $", *args, **kwargs))
         kwargs['color'] = "g"
-        hdls.append(self.vs.show(ax, *args, **kwargs))
+        hdls.append(self.vs.show(ax, label="$ V_s (km/s) $", *args, **kwargs))
         kwargs['color'] = "r"
-        hdls.append(self.rh.show(ax, *args, **kwargs))
+        hdls.append(self.rh.show(ax, label=r"$ \rho (g/cm^3) $", *args, **kwargs))
+        ax.set_ylabel('$ depth (km) $')
         return hdls
 
 # -------------------------------------------------

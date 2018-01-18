@@ -58,7 +58,7 @@ add the bin directory to the path (recommended)
 > your .bashrc or .bash_path (linux) or .profile (mac)
 >
 > ```
-> export PATH=$PATH:"~/git/srfpython/srfpython/bin
+> export PATH=$PATH:"~/git/srfpython/srfpython/bin"
 > ```
 
 
