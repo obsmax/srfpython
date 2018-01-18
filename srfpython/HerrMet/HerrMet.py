@@ -21,10 +21,10 @@ from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, plt, gcf, gca
 from srfpython.utils import readargv, minmax, tostr
 
 #local imports
-from files import write_default_paramfile, load_paramfile, read_runfile_1
-from datacoders import makedatacoder, Datacoder_log
-from theory import Theory, overdisp
-from parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp
+from srfpython.HerrMet.files import write_default_paramfile, load_paramfile, read_runfile_1
+from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
+from srfpython.HerrMet.theory import Theory, overdisp
+from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp
 #
 
 
@@ -40,7 +40,7 @@ default_parameterization = default_parameterization_list[0]
 mapkwargs = {"Nworkers" : 4, "Taskset" : "0-3"} #keyword arguments for every parallelized process
 # -------------------------------------
 autorizedkeys = \
-    ["w", "taskset", "agg", "lowprio",
+    ["w", "taskset", "agg", "lowprio", "inline",
      "help", "h",
      "example", "ex",
      "param", "basedon", "t", "dvp", "dvs", "drh", "growing", "op",
@@ -52,57 +52,65 @@ autorizedkeys = \
 # -------------------------------------
 help = '''HerrMet V{version}
 # ----------------------------------------------------
--w           int                 set the number of virtual workers to use for all parallelized processes, default {default_Nworkers}
--taskset     string              change job affinity for all parallelized processes, default {default_Taskset}
--agg                             use agg backend (no display) if mentioned
--lowprio                         run processes with low priority if mentioned
+-w           i       set the number of virtual workers to use for all parallelized
+                     processes, default {default_Nworkers}
+-taskset     s       change job affinity for all parallelized processes, 
+                     default {default_Taskset}
+-agg                 use agg backend (no display) if mentioned
+-lowprio             run processes with low priority if mentioned
+-inline              replace showme by plt.show (e.g. jupyter)
 # ----------------------------------------------------
---help, -h                       display this help message, and quit
---example, -ex                   display an example of script, and quit
---param      int float           generate a template parameter file to custom, need the number of layers and bottom depth in km
-    -basedon string              build parametrization based on an existing mod96 file, require a filename, 
-                                 if not specified, I take fixed values to build the parameter file
-    -t       string              parameterization type to use ({default_parameterization_list}), default {default_parameterization}
-                                 mZVSPRRH = parameterize with depth interface, 
-                                            VS in each layer, VP/VS in each layer, Density in each layer
-                                 mZVSVPRH = parameterize with depth interface,   
-                                            VP in each layer, VP/VS in each layer, Density in each layer
-                                 mZVSPRzRHvp = parameterize with depth interface, 
-                                            use fixed relations for VP/VS versus depth and Density versus VP
-                                 mZVSPRzRHz = parameterize with depth interface, 
-                                            use fixed relations for VP/VS versus depth and Density versus depth 
-    -dvp     float float         add prior constraint on the vp offset between layers, requires the extremal values, km/s
-    -dvs     float float         add prior constraint on the vs offset between layers, requires the extremal values, km/s
-    -drh     float float         add prior constraint on the density offset between layers, requires the extremal values, g/cm3
-    -dpr     float float         add prior constraint on the vp/vs offset between layers, requires the extremal values, no unit
-    -growing                     shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0.
-    -op                          force overwriting _HerrMet.param if exists
---target     string              set the target dispersion curve from a surf96 file (not modified)
-                                 the data will be reproduced into a target file that can be customized manually
-                                 (to remove unwanted points, resample dispersion curves...) 
-    -resamp  float float int str resample the dispersion curve in the target file, 
-                                 requires fmin(Hz), fmax(Hz), nfreq, fscale (flin=linear in freq domain, plin=linear in period 
-                                 or log=logarithmic scaling)
-    -lunc    float               set constant uncertainties in log domain (uncertainty = value x lunc)
-    -unc     float               set constant uncertainty in linear domain (uncertainty = unc)
-    -ot                          force overwriting _HerrMet.target if exists
---run        string              start inversion, requires a running mode 
-                                    append  : add new models to the exiting run file 
-                                    restart : overwrite the current run file if any
-    -nchain  int                 number of chains to use, default {default_nchain}
-    -nkeep   int                 number of models to keep per chain, default {default_nkeep}
-    -w       int                 see above, controls the max number of chains to run simultaneously
---extract   [int] [int]          extract posterior distribution on the models, save them as mod96files
-                                 first argument = number of best models to use/display, default {default_top}
-                                 second argument = step between them, default {default_topstep}
---disp [int] [int]               display param, target, and run outputs if exists
-                                 first argument = number of best models to use/display, default {default_top}
-                                 second argument = step between them, default {default_topstep}
-    -best/-overdisp              show the best models on the figure, use overdisp instead of best to recompute dispersion curves with higher resolution
-    -range                       compute and show the statistics for the selected models, use --extract for saving
-    -png                         save figure as pngfile instead of displaying it on screen
-    -m96 file(s)                 append depth model(s) to the plot from mod96 file(s)    
---test                           testing option
+--help, -h           display this help message, and quit
+--example, -ex       display an example of script, and quit
+--param      i f     generate a template parameter file to custom, need the number of layers 
+                     and bottom depth in km
+    -basedon s       build parametrization based on an existing mod96 file, require a filename, 
+                     if not specified, I take fixed values to build the parameter file
+    -t       s       parameterization type to use ({default_parameterization_list}), 
+                     default {default_parameterization}
+                     mZVSPRRH = parameterize with depth interface, 
+                                VS in each layer, VP/VS in each layer, Density in each layer
+                     mZVSVPRH = parameterize with depth interface,   
+                                VP in each layer, VP/VS in each layer, Density in each layer
+                     mZVSPRzRHvp = parameterize with depth interface, 
+                                use fixed relations for VP/VS versus depth and Density versus VP
+                     mZVSPRzRHz = parameterize with depth interface, 
+                                use fixed relations for VP/VS versus depth and Density versus depth 
+    -dvp     f f     add prior constraint on the vp offset between layers, 
+                     requires the extremal values, km/s
+    -dvs     f f     add prior constraint on the vs offset between layers, idem
+    -drh     f f     add prior constraint on the density offset between layers, idem, g/cm3
+    -dpr     f f     add prior constraint on the vp/vs offset between layers, idem, no unit
+    -growing         shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0.
+    -op              force overwriting _HerrMet.param if exists
+--target     s       set the target dispersion curve from a surf96 file (not modified)
+                     the data will be reproduced into a target file that can be customized manually
+                     (to remove unwanted points, resample dispersion curves...) 
+    -resamp  f f i s resample the dispersion curve in the target file, 
+                     requires fmin(Hz), fmax(Hz), nfreq, fscale 
+                     (flin=linear in freq domain, plin=linear in period or log=logarithmic scaling)
+    -lunc    f       set constant uncertainties in log domain (uncertainty = value x lunc)
+    -unc     f       set constant uncertainty in linear domain (uncertainty = unc)
+    -ot              force overwriting _HerrMet.target if exists
+--run        s       start inversion, requires a running mode 
+                     append  : add new models to the exiting run file 
+                     restart : overwrite the current run file if any
+    -nchain  i       number of chains to use, default {default_nchain}
+    -nkeep   i       number of models to keep per chain, default {default_nkeep}
+    -w       i       see above, controls the max number of chains to run simultaneously
+--extract   [i] [i]  extract posterior distribution on the models, save them as mod96files
+                     first argument = number of best models to use/display, default {default_top}
+                     second argument = step between them, default {default_topstep}
+--disp [i] [i]       display param, target, and run outputs if exists
+                     first argument = number of best models to use/display, default {default_top}
+                     second argument = step between them, default {default_topstep}
+    -best/-overdisp  show the best models on the figure, use overdisp instead of best 
+                     to recompute dispersion curves with higher resolution
+    -range           compute and show the statistics for the selected models, 
+                     use --extract for saving
+    -png             save figure as pngfile instead of displaying it on screen
+    -m96 file(s)     append depth model(s) to the plot from mod96 file(s)    
+--test               testing option
 '''.format(
     version=version,
     default_Nworkers=mapkwargs['Nworkers'],
@@ -121,8 +129,10 @@ example="""
 # -------------
 
 # 1/ Data
-# get the target dispersion curves, resample it between 0.2-1.5 Hz with 15 samples spaced logarithmically in period domain
-# adjust uncertainties to 0.1 in logaritmic domain, overwrite target if exists (_HerrMet.target) 
+# get the target dispersion curves, resample it between 0.2-1.5 Hz 
+# with 15 samples spaced logarithmically in period domain
+# adjust uncertainties to 0.1 in logaritmic domain, 
+# overwrite target if exists (_HerrMet.target) 
 # and display it
 HerrMet --target /path/to/my/data/file.surf96 \\
             -resamp 0.2 1.5 15 plog \\
@@ -130,14 +140,16 @@ HerrMet --target /path/to/my/data/file.surf96 \\
             -ot \\
             --disp
 
-# >> you may edit _HerrMet.target and remove points that do not need to be inverted, check with  
+# >> you may edit _HerrMet.target and remove points that 
+#    do not need to be inverted, check with  
 HerrMet --disp
 
 # 2/ Parameterization
-# build parameter file from existing depthmodel, use 7 layers, use parametrization mZVSPRRH, 
+# build parameter file from existing depthmodel,
+# use 7 layers, use parametrization mZVSPRRH, 
 # require vp, vs and density to be growing
 # overwrite paramfile if exists (_HerrMet.param) and display
-HerrMet --param 7 \\
+HerrMet --param 7 3. \\
             -basedon /path/to/my/depthmodel.mod96 \\
             -t  mZVSPRRH \\
             -growing \\
@@ -148,13 +160,15 @@ HerrMet --param 7 \\
 HerrMet --disp
 
 # 3/ Inversion
-# run inversion with 12 chains, keep 1000 models each, run on 24 virtual threads
+# run inversion with 12 chains, keep 1000 models each, 
+# run on 24 virtual threads
 HerrMet -w 24 \\
         --run restart \\
             -nchain 12 -nkeep 1000 
 
 # 4/ Results
-# display best 1000 models, recompute the best disp curves with higher resolution
+# display best 1000 models,
+# recompute the best disp curves with higher resolution
 # compute median and percentiles over these 1000 models
 # save as png file, use a non display backend 
 HerrMet -agg \\
@@ -188,6 +202,9 @@ if __name__ == "__main__":
     # -------------------------------------
     if "lowprio" in argv.keys():
         mapkwargs["LowPriority"] = True
+    # -------------------------------------
+    if "inline" in argv.keys():
+        showme = plt.show
     # -------------------------------------
     if "h" in argv.keys() or "help" in argv.keys():
         print help
@@ -245,14 +262,14 @@ if __name__ == "__main__":
         # -------------------
         if "resamp" in argv.keys():
             news = s.copy()
-            news.accept(np.zeros(len(news), bool)) #clear all entries
+            news.clear() #clear all entries
             newf = freqspace(freqmin=float(argv["resamp"][0]),
                              freqmax=float(argv["resamp"][1]),
                              nfreq=int(argv["resamp"][2]),
                              scale=argv["resamp"][3])
             for law in s.get_all():
                 law.set_extrapolationmode(1)
-                stdlaw = Claw(freq = law.freq, value = law.dvalue, extrapolationmode = 0)
+                stdlaw = Claw(freq=law.freq, value=law.dvalue, extrapolationmode=0)
 
                 newvalues = law(newf)
                 newdvalues = stdlaw(newf)
@@ -262,12 +279,14 @@ if __name__ == "__main__":
                     N = I.sum()
                     news.data['WAVE'] = np.concatenate((news.data['WAVE'], np.array([law.wave]).repeat(N)))
                     news.data['TYPE'] = np.concatenate((news.data['TYPE'], np.array([law.type]).repeat(N)))
+                    news.data['FLAG'] = np.concatenate((news.data['FLAG'], np.array([law.flag]).repeat(N)))
                     news.data['MODE'] = np.concatenate((news.data['MODE'], np.array([law.mode]).repeat(N)))
                     news.data['PERIOD'] = np.concatenate((news.data['PERIOD'], 1. / newf[I]))
                     news.data['VALUE'] = np.concatenate((news.data['VALUE'], newvalues[I]))
                     news.data['DVALUE'] = np.concatenate((news.data['DVALUE'], newdvalues[I]))
+
             s = news
-            print news
+            # print news
         # -------------------
         if "lunc" in argv.keys():
             # set uncertainties to constant in log domain
@@ -521,13 +540,14 @@ if __name__ == "__main__":
             for m96 in argv['m96']:
                 try:
                     dm = depthmodel_from_mod96(m96)
-                    dm.vp.show(rd.axvp, "g", linewidth=3)
-                    dm.vs.show(rd.axvs, "g", linewidth=3)
-                    dm.rh.show(rd.axrh, "g", linewidth=3)
-                    dm.pr().show(rd.axpr, "g", linewidth=3)
+                    dm.vp.show(rd.axvp, "m", linewidth=3, label=m96)
+                    dm.vs.show(rd.axvs, "m", linewidth=3)
+                    dm.rh.show(rd.axrh, "m", linewidth=3)
+                    dm.pr().show(rd.axpr, "m", linewidth=3)
                 except KeyboardInterrupt: raise
                 except Exception as e:
                     print 'could not read or display %s (reason %s)' % (m96, str(e))
+                rd.axvp.legend()
         # # --------------------
         # if "sltz" in argv.keys():  # plot personal data on top (private option)
         #     dm = depthmodel_from_mod96('/home/max/progdat/CPiS/EarthModel/Soultz.rho.mod')

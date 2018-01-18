@@ -278,9 +278,25 @@ class nanUlaw(Ulaw):
 # -------------------------------------------------
 class surf96reader_from_surf96string(object):
     def __init__(self, surf96string):
-        self.data = {}
-        self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], self.data['MODE'], self.data['PERIOD'], \
+        self.clear()
+        self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], \
+            self.data['MODE'], self.data['PERIOD'], \
             self.data['VALUE'], self.data['DVALUE'], _, _, _, _ = unpacksurf96(surf96string)
+
+    # ---------------------------------------------
+    def clear(self):
+        if hasattr(self, "data"):
+            del self.data
+        self.data = {}
+        self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], \
+        self.data['MODE'], self.data['PERIOD'], \
+        self.data['VALUE'], self.data['DVALUE'] = \
+            [np.array([], dtype=dtype) for dtype in \
+             ['|S1','|S1', '|S1', int, float, float, float]]
+
+    # ---------------------------------------------
+    def copy(self):
+        return copy.deepcopy(self)
 
     # ---------------------------------------------
     def get_all(self):
@@ -359,8 +375,11 @@ class surf96reader_from_surf96string(object):
 
     # ---------------------------------------------
     def __str__(self):
-        return packsurf96(self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], self.data['MODE'],
-                          self.data['PERIOD'], self.data['VALUE'], self.data['DVALUE'])
+
+        return packsurf96(self.data['WAVE'], self.data['TYPE'],
+                          self.data['FLAG'], self.data['MODE'],
+                          self.data['PERIOD'], self.data['VALUE'],
+                          self.data['DVALUE'])
 
     # -------------------------------------------------
     def write96(self, filename):

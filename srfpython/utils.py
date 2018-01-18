@@ -67,7 +67,7 @@ def minmax(X):
 def discrete_time_primitive(x, u, area=False):
     if len(x) - len(u):
         raise Exception('shape mismatch')
-    if (x[1:] <= x[:-1]).any():
+    if (x[1:] < x[:-1]).any():
         raise Exception('x must be sorted asc')
 
     v = np.zeros(len(u), u.dtype)

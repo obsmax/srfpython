@@ -23,7 +23,7 @@ def unpacksurf96(string):
         elif WAVE[n] == "R":
             if   TYPE[n] == "C": NRC += 1
             elif TYPE[n] == "U": NRU += 1
-        else: raise
+        else: raise Exception('')
     return WAVE, TYPE, FLAG, MODE, PERIOD, VALUE, DVALUE, NLC, NLU, NRC, NRU
 
 

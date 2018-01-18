@@ -17,7 +17,7 @@ help = '''m96
     -thck         thickness of the sublayers in km
     -sfx          suffix to add before file extension (default split)
     -o            ignore suffix and overwrite input file    
--lock             replace showme by plt.show (e.g. for jupyter)
+-inline           replace showme by plt.show (e.g. for jupyter)
 '''
 
 # ---------------------------------------------
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     argv = readargv()
 
     # -----------------------------------
-    if "lock" in argv.keys():
+    if "inline" in argv.keys():
         showme = plt.show
 
     # -----------------------------------
@@ -153,9 +153,10 @@ if __name__ == "__main__":
                 dm.rh.show(axrh)
 
                 for w, t, m, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs):
-                    axdsp.loglog(1. / F, V, label = "%s%s%d" % (w, t, m))
+                    axdsp.loglog(1. / F, V, label="%s%s%d" % (w, t, m))
 
                 logtick(axdsp, "xy")
+                plt.legend()
                 showme()
         sys.exit()
 

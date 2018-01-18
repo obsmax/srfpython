@@ -1,7 +1,12 @@
-*.pyc
-Herrmann/bin/max_srfdis96
-Herrmann/bin/max_srfpre96
 .idea
 .idea/*
 *._*
 .ipynb_checkpoints
+*.pyc
+srfpython/Herrmann/bin/max_srfdis96
+srfpython/Herrmann/bin/max_srfpre96
+srfpython/tutorial/dmtuto.mod96
+srfpython/tutorial/dmtuto.surf96
+srfpython/tutorial/_HerrMet.param
+srfpython/tutorial/_HerrMet.run
+srfpython/tutorial/_HerrMet.target

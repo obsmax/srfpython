@@ -242,33 +242,43 @@ def dispersion(ztop, vp, vs, rh, \
     waves, types, modes, freqs,
     h=0.005, dcl=0.005, dcr=0.005):
 
-    """dispersion : compute dispersion curves from a depth model for desired wave (R or L) types (C or U for phase or group) and frequencies (Hz)
-                  based on a modified version of the codes from Herrmann and Ammon 2002
+    """compute surface wave dispersion curves from a 1-D depth model
+    based on a modified version of the codes from Herrmann and Ammon 2002
+
+    *) a dispersion curve is given by 4 attributes
+        wave : string, "R" for Rayleigh, "L" for Love
+        type : string, "C" for Phase velocity, "U" for Group-velocity
+        mode : integer, a mode number, 0 means fundamental
+        freq : array, frequencies in Hz
+
+    *) a 1-D depth model is given by 4 attributes
+        ztop : list or array, sorted, positive, top layer depth in km, ztop[0] must be 0 !!!
+        vp   : list or array, P wave velocity in km/s
+        vs   : list or array, S wave velocity in km/s
+        rh   : list or array, density in g.cm^-3
 
     input: 
         -> depth model
-        ztop  : list or array, sorted, positive, top layer depth in km, ztop[0] must be 0 !!!
-        vp    : list or array, P wave velocity in km/s
-        vs    : list or array, S wave velocity in km/s
-        rh    : list or array, density in g.cm^-3
-                note that these four parameters must have the same length
+        ztop, vp, vs, rh = depth model, 4 iterables with same length
 
-        -> required dispersion points
-        waves : list or array, like ['L', 'L', 'L', 'R', 'R', 'R', 'R', 'R'] (L = Love, R = Rayleigh)
-        types : list or array, like ['U', 'U', 'U', 'C', 'C', 'C', 'C', 'C'] (U = groupe, C = phase)
-        modes : list or array, like [ 0,   0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ] (mode number, 0 = fundamental)
-        freqs : list or array, like [ 1.,  2.,  3.,  1.,  2.,  3.,  4.,  5.] (frequency in Hz)
-                note that these four parameters must have the same length
+        -> dispersion points
+        waves, types, modes, freqs = dispersion curves, 4 iterables with same length
+        example :
+            waves = ['L', 'L', 'L', 'R', 'R', 'R', 'R', 'R']
+            types = ['U', 'U', 'U', 'C', 'C', 'C', 'C', 'C']
+            modes = [ 0,   0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ]
+            freqs = [ 1.,  2.,  3.,  1.,  2.,  3.,  4.,  5.]
 
         -> Herrmann's parameters, see CPS documentation
-        h = period increment for phase to group conversion (0.005 is reasonable)
-        dcl, dcr = phase velocity increment for love and rayleigh root searches respectively, see Herrmann doc
+        h = float, period increment for phase to group conversion (0.005 is reasonable)
+        dcl, dcr = 2 floats, phase velocity increment for love and rayleigh root searches respectively, see Herrmann doc
 
     output:
-        values : list or array, dispersion values for each wave, type, mode, possibly nan (cut-off period)
+        values : list or array, dispersion values for each wave, type, mode, possibly nan (above cut-off period)
                  note : use groupbywtm to group outputs by wave, type, and mode
     see also :
         dispersion_1
+        dispersion_2
         groupbywtm
         igroupbywtm
     """
@@ -304,18 +314,37 @@ def dispersion_1(ztop, vp, vs, rh, \
     Waves, Types, Modes, Freqs,
     h = 0.005, dcl = 0.005, dcr = 0.005, keepnans = False):
 
-    """same as dispersion with slightely more convenient input and output (no need to repeat wave, type and mode)
+    """same as dispersion with slightly more convenient inputs and outputs
+    (no need to repeat wave, type and mode)
 
-    Waves is like ['L', 'L', 'R']
-    Types is like ['C', 'C', 'U']
-    Modes is like [ 0,   1,   0 ]
-    Freqs is like [fLC0, fLC1, fRU0] where f??? are frequency numpy arrays or lists
+    input:
+        -> depth model
+        ztop, vp, vs, rh = depth model, 4 iterables with same length
 
-    output is like
-        'L', 'C', 0, fLC0, LC0(fLC0)
-        'L', 'C', 1, fLC1, LC1(fLC1)
-        'R', 'U', 0, fRU0, RU0(fRU0)
+        -> dispersion points
+        Waves, Types, Modes, Freqs = dispersion curves, 4 iterables with same length
+        example :
+            Waves = ['L', 'L', 'R']
+            Types = ['C', 'C', 'U']
+            Modes = [ 0,   1,   0 ]
+            Freqs = [fLC0, fLC1, fRU0] where f??? are frequency numpy arrays or lists
 
+        -> Herrmann's parameters, see dispersion
+
+    output :
+        a generator of tuples
+        each tuple correspond to one dispersion curve
+        (wave(str,"R"/"L"), type(str,"C"/"U"), mode(int), frequency(array,Hz), velocity(array,km/s))
+        example
+            ("L", "C", 0, fLC0, VLC0)
+            ("L", "C", 1, fLC1, VLC1)
+            ("R", "U", 0, fRU0, VRU0)
+
+    see also :
+        dispersion
+        dispersion_2
+        groupbywtm
+        igroupbywtm
     """
     waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
     values = dispersion(ztop, vp, vs, rh, \
@@ -323,6 +352,43 @@ def dispersion_1(ztop, vp, vs, rh, \
                 h = h, dcl = dcl, dcr = dcr)
 
     for w, t, m, F, V in groupbywtm(waves, types, modes, freqs, values, keepnans = keepnans):
+        yield w, t, m, F, V
+
+
+# _____________________________________
+def dispersion_2(ztop, vp, vs, rh, Curves,
+    h=0.005, dcl=0.005, dcr=0.005, keepnans=False):
+
+    """same as dispersion with slightly more convenient inputs and outputs
+    (inputs are grouped by dispersion curves)
+
+    input:
+        -> depth model
+        ztop, vp, vs, rh = depth model, 4 iterables with same length
+
+        -> dispersion curves
+        Curves = list of tuples like (wave(str,"R"/"L"), type(str,"C"/"U"), mode(int), frequency(array,Hz))
+        example :
+            Curves = [('L', 'C', 0, fLC0),
+                      ('L', 'C', 1, fLC1),
+                      ('R', 'U', 0, fRU0)]
+
+        -> Herrmann's parameters, see dispersion
+
+    output :
+        see dispersion_1
+
+    see also :
+        dispersion
+        dispersion_1
+        groupbywtm
+        igroupbywtm
+    """
+    Waves, Types, Modes, Freqs = zip(*Curves)
+    for w, t, m, F, V in dispersion_1(\
+            ztop, vp, vs, rh,
+            Waves, Types, Modes, Freqs,
+            h=h, dcl=dcl, dcr=dcr, keepnans=keepnans):
         yield w, t, m, F, V
 
 
@@ -359,11 +425,11 @@ if __name__ == "__main__":
     # display results
     ax = plt.gca()
     for w, t, m, fs, us in out:
-        ax.loglog(1. / fs, us, '+-', label = "%s%s%d" % (w, t, m))
+        ax.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
     ax.set_xlabel('period (s)')
     ax.set_ylabel('velocity (km/s)')    
-    ax.grid(True, which = "major")
-    ax.grid(True, which = "minor")
+    ax.grid(True, which="major")
+    ax.grid(True, which="minor")
     logtick(ax, "xy")
     plt.legend()
     plt.show()

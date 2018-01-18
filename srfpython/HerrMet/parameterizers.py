@@ -113,8 +113,6 @@ class Parameterizer_mZVSPRRH(Parameterizer):
         """the lower model is not necessarily obtained when all parameters reach their lowest boundary"""
         Ztopsup, VPlow, VSlow, RHlow = self.inv(self.MINF)
         Ztopinf, VPhgh, VShgh, RHhgh = self.inv(self.MSUP)
-        print Ztopinf
-        print Ztopsup
         z = np.sort(np.unique(np.concatenate((Ztopinf, Ztopsup))))
         PRlow = VPlow / VSlow #because it is the way it has been defined in self.inv
         PRhgh = VPhgh / VShgh

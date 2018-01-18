@@ -6,9 +6,9 @@ help = '''s96
 --resamp          list of surf96files to resample
     -fspace       new frequency array in Hz, fstart, fend, nfreq, fscale
     -sfx          file suffix to append, use "" to overwrite input files
--lock             replace showme by plt.show (e.g. for jupyter)
+-inline             replace showme by plt.show (e.g. for jupyter)
 #surf96 format 
-SURF96 {wave} {type} {flag} {mode} {period} {value} {dvalue}
+SURF96 {wave} {type} {flag} {mode} {period(s)} {value(km/s)} {dvalue(km/s)}
 '''
 
 # ---------------------------------------------
@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     argv = readargv()
     # -----------------------------------
-    if "lock" in argv.keys():
+    if "inline" in argv.keys():
         showme = plt.show
 
     # -----------------------------------
@@ -41,7 +41,7 @@ if __name__ == "__main__":
             print f
             for law in s.get_all():
                 print "    %s" % str(law)
-                law.show(gca(), period= not "freq" in argv.keys(), alpha = 0.5, color = "r" if law.mode else "k")
+                law.show(gca(), period= not "freq" in argv.keys(), label="%s%s%d" % (law.wave, law.type, law.mode))#alpha = 0.5, color = "r" if law.mode else "k")
                 pmin = min([pmin, 1. / law.freq.max()])
                 pmax = max([pmax, 1. / law.freq.min()])
 
@@ -51,6 +51,9 @@ if __name__ == "__main__":
         if not "freq" in argv.keys(): gca().set_xlim(pmin, pmax)
         else:                         gca().set_xlim(1. / pmax, 1. / pmin)
         gca().grid(True)
+        gca().set_xlabel("period (s)")
+        gca().set_ylabel("velocity (km/s)")
+        plt.legend()
         showme()
         sys.exit()
 
