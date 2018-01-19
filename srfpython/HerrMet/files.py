@@ -3,9 +3,10 @@ from tetedenoeud.multipro.multipro8 import Job, MapAsync
 from tetedenoeud.utils.asciifile import AsciiFile
 from priorpdf import DefaultLogRhoM, LogRhoM_DVS, LogRhoM_DVPDVSDRH, LogRhoM_DVPDVSDRHDPR
 from parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHvp, Parameterizer_mZVSPRzRHz
-from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthspace
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthspace
+from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
 import numpy as np
-
+import time
 
 # -------------------------------------
 # param file
@@ -400,6 +401,8 @@ def read_runfile_2(f, **mapkwargs):
 # run file : based on sqlite
 # -------------------------------------
 class RunFile(Database):
+
+    # ----------------------------
     def drop(self):
         """erase existing tables and recreate them"""
 
@@ -426,8 +429,10 @@ class RunFile(Database):
 
         self.cursor.execute('''create table PARAMETERS (
             PARAMID      integer primary key autoincrement,
-            NAME         varchar(10) unique not null,
-            UNIT         varchar)            
+            TYPE         varchar(10) not null,
+            LAYER        integer not null,
+            UNIT         varchar, 
+            constraint U unique (TYPE, LAYER))            
             ''')
 
         self.cursor.execute('''create table CHAINS (
@@ -444,13 +449,13 @@ class RunFile(Database):
         self.cursor.execute('''create table PARAMVALUES (
             MODELID       integer references MODELS(MODELID),
             PARAMID       integer references PARAMETERS(PARAMID),
-            PARAMVAL      real)
+            PARAMVAL      real not null)
             ''')
 
         self.cursor.execute('''create table DISPVALUES (
             MODELID       integer references MODELS(MODELID),
             POINTID       integer references DISPPOINTS(POINTID),
-            DISPVAL       real)
+            DISPVAL       real not null) --null leads to issues when grouping, insert -1.0 instead
             ''')
 
     # -------------------
@@ -468,10 +473,10 @@ class RunFile(Database):
         try:
             for n in xrange( nlayer):
                 if n:
-                    self.cursor.execute('insert into PARAMETERS (NAME, UNIT) values (?, ?)', ("Z%d" % n, "KM"))
-                self.cursor.execute('insert into PARAMETERS (NAME, UNIT) values (?, ?)', ("VP%d" % n, "KM/S"))
-                self.cursor.execute('insert into PARAMETERS (NAME, UNIT) values (?, ?)', ("VS%d" % n, "KM/S"))
-                self.cursor.execute('insert into PARAMETERS (NAME, UNIT) values (?, ?)', ("RH%d" % n, "G/CM3"))
+                    self.cursor.execute('insert into PARAMETERS (TYPE, LAYER, UNIT) values (?, ?, ?)', ("Z", n, "KM"))
+                self.cursor.execute('insert into PARAMETERS (TYPE, LAYER, UNIT) values (?, ?, ?)', ("VP", n, "KM/S"))
+                self.cursor.execute('insert into PARAMETERS (TYPE, LAYER, UNIT) values (?, ?, ?)', ("VS", n, "KM/S"))
+                self.cursor.execute('insert into PARAMETERS (TYPE, LAYER, UNIT) values (?, ?, ?)', ("RH", n, "G/CM3"))
 
             for w, t, m, f in zip(waves, types, modes,  np.round(freqs, 8)):
                 self.cursor.execute('''insert into DISPPOINTS (WAVE, TYPE, MODE, FREQ, UNIT) 
@@ -482,7 +487,8 @@ class RunFile(Database):
 
     # -------------------
     def insert(self, models, datas, weights, llks, parameterizer, datacoder):
-        # assume transaction
+        """insert the result of 1 chain"""
+        # assume transaction open
 
         # -------------------
         # give a number to this insertion
@@ -502,21 +508,22 @@ class RunFile(Database):
 
         for i in xrange(1, nlayer):
             paramids.append(self.cursor.execute(
-                'select PARAMID from PARAMETERS where NAME = "Z%d"' % i).fetchall()[0][0])
+                'select PARAMID from PARAMETERS where TYPE = "Z" and LAYER = ?', (i, )).fetchall()[0][0])
         for i in xrange(nlayer):
             paramids.append(self.cursor.execute(
-                'select PARAMID from PARAMETERS where NAME = "VP%d"' % i).fetchall()[0][0])
+                'select PARAMID from PARAMETERS where TYPE = "VP" and LAYER = ?', (i, )).fetchall()[0][0])
         for i in xrange(nlayer):
             paramids.append(self.cursor.execute(
-                'select PARAMID from PARAMETERS where NAME = "VS%d"' % i).fetchall()[0][0])
+                'select PARAMID from PARAMETERS where TYPE = "VS" and LAYER = ?', (i, )).fetchall()[0][0])
         for i in xrange(nlayer):
             paramids.append(self.cursor.execute(
-                'select PARAMID from PARAMETERS where NAME = "RH%d"' % i).fetchall()[0][0])
+                'select PARAMID from PARAMETERS where TYPE = "RH" and LAYER = ?', (i, )).fetchall()[0][0])
 
         for w, t, m, f in zip(datacoder.waves, datacoder.types, datacoder.modes,
                               np.round(datacoder.freqs, 8)):
             pointids.append(self.cursor.execute(
-                 '''select POINTID from DISPPOINTS where WAVE=? and TYPE=? and MODE=? and FREQ=?''',
+                 '''select POINTID from DISPPOINTS where 
+                        WAVE=? and TYPE=? and MODE=? and FREQ=?''',
                  (w, t, m, f)).fetchall()[0][0])
         # ------------------
         # create the chain
@@ -527,6 +534,10 @@ class RunFile(Database):
             ztop, vp, vs, rh = parameterizer.inv(mdl)
             paramvals = np.concatenate((ztop[1:], vp, vs, rh))
             dispvals = datacoder.inv(dat)
+
+
+            dispvals[np.isnan(dispvals)] = -1.0 # convention for nan
+
             nlayer = len(vs)
             self.cursor.execute('''insert into MODELS (CHAINID, WEIGHT, NLAYER, LLK)
                 values (?, ?, ?, ?)''', (chainid, wgt, nlayer, llk))
@@ -544,29 +555,115 @@ class RunFile(Database):
                 ''', [(modelid, pointid, dispval)
                       for pointid, dispval in zip(pointids, dispvals)])
 
-    def get(self):
-        sql= """
-        select * from
-             (select MODELID, WEIGHT, LLK, group_concat(NAME) , group_concat(PARAMVAL) from 
-                 (select * from MODELS where LLK > -0.5)
-             join 
-               (select MODELID, PARAMID, PARAMVAL from PARAMVALUES) using (MODELID)
-             join PARAMETERS using (PARAMID)	
-                group by MODELID)
-                
-             join
-              
-             (select MODELID,  group_concat(WAVE), group_concat(TYPE), 
-                    group_concat(MODE), group_concat(FREQ), group_concat(DISPVAL) from 
-                 (select MODELID from MODELS where LLK > -0.5)
-             join 
-                 (select MODELID, POINTID, DISPVAL from DISPVALUES) using (MODELID)
-             join DISPPOINTS using (POINTID)	
-             group by MODELID)
-             using (MODELID)
-             order by LLK DESC
+    # ----------------------------
+    def get(self, llkmin=None, limit=None):
+        """
+        get models from the database, ordered by decreasing likelyhood
+        input :
+            llkmin = None or float < 0, lowest accepted log-likelihood
+            limit = None or int, max number of distinct models to return
+        output (generator):
+            item = (MODELID, WEIGHT, LLK, NLAYER, (ztop, vp, vs, rh), (waves, types, modes, freqs, values))
+                where
+                MODELID = int, model number
+                WEIGHT = int, weight of the model in the markov chain
+                LLK = float, log-likelihood of the model
+                NLAYER = int, number of layers in the model
+                (ztop, vp, vs, rh) = arrays, depth model
+                (waves, types, modes, freqs, values) = arrays with same lengths, dispersion curves
         """
 
+        llksql = "where llk > %f" % llkmin if llkmin is not None else ""
+        limitsql = "limit %d" % limit if limit is not None else ""
+        sql= """
+        select MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT,PL, PV, W, T, M, F, DV from
+            -- models
+                (select MODELID, CHAINID, WEIGHT, LLK, NLAYER, 
+                   group_concat(TYPE) as PT,
+                   group_concat(LAYER) as PL, 
+                   group_concat(PARAMVAL) as PV
+                from 
+                    (select * from MODELS {llksql})
+                join 
+                  (select MODELID, PARAMID, PARAMVAL from PARAMVALUES) using (MODELID)
+                join PARAMETERS using (PARAMID)	
+                   group by MODELID)
+               
+            join
+            -- data
+                (select MODELID,  
+                   group_concat(WAVE) as W, 
+                   group_concat(TYPE) as T, 
+                   group_concat(MODE) as M, 
+                   group_concat(FREQ) as F, 
+                   group_concat(DISPVAL) as DV 
+                from 
+                    (select MODELID from MODELS {llksql})
+                join 
+                    (select MODELID, POINTID, DISPVAL from DISPVALUES) using (MODELID)
+                join DISPPOINTS using (POINTID)	
+                group by MODELID)
+            
+            using (MODELID)
+            order by LLK DESC
+            {limitsql}
+
+        """.format(llksql=llksql,
+                   limitsql=limitsql)
+
+        # -----------------
+        s = self.select(sql)
+        if s is None: return
+
+        # -----------------
+        for MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT,PL, PV, W, T, M, F, DV in s:
+            PT = np.asarray(PT.split(','), '|S2')  # parameter type
+            PL = np.asarray(PL.split(','), int)    # parameter layer
+            PV = np.asarray(PV.split(','), float)  # parameter value
+            Z, VP, VS, RH = [np.zeros(NLAYER, float) for _ in xrange(4)]  # do not rename variables!!
+            for pt, pl, pv in zip(PT, PL, PV):
+                #_ = eval(pt)  # Z, VP, VS or RH
+                #_[pl] = pv
+                eval(pt)[pl] = pv
+
+            W = np.asarray(W.split(','), '|S1')  # waves
+            T = np.asarray(T.split(','), '|S1')  # types
+            M = np.asarray(M.split(','), int)    # modes
+            F = np.asarray(F.split(','), float)  # frequency
+            DV = np.asarray(DV.split(','), float)  # dispersion value
+            DV[DV == -1.0] = np.nan #convention
+
+            yield MODELID, CHAINID, WEIGHT, LLK, NLAYER, (Z, VP, VS, RH), (W, T, M, F, DV)
+
+    # ----------------------------
+    def like_read_run_1(self, top=None, topstep=1):
+        """mimics behaviour of (obsolet) function read_run_1"""
+        start = time.time()
+        out = list(self.get(llkmin=None, limit=top))[::topstep]
+        print "retrieved %d models in %.6fs " % (len(out), time.time() - start)
+        _, chainids, weights, llks, _, ms, ds = zip(*out)
+
+        return np.asarray(chainids, int), \
+            np.asarray(weights, float), \
+            np.asarray(llks, float), ms, ds
+
+    # ----------------------------
+    def getpack(self, *args, **kwargs):
+        """
+        same as get except that
+            - depth model are packed into a depthmodel object
+            - dispersion curves are packed into a surf96reader object
+        output :
+            item = (MODELID, WEIGHT, LLK, NLAYER, dm, sr)
+            dm = depthmodel
+            sr = surf96reader
+        """
+        for MODELID, CHAINID, WEIGHT, LLK, NLAYER, (Z, VP, VS, RH), (W, T, M, F, DV) in \
+            self.get(*args, **kwargs):
+
+            dm = depthmodel_from_arrays(Z, VP, VS, RH)
+            sr = surf96reader_from_arrays(W, T, M, F, DV, None)
+            yield MODELID, CHAINID, WEIGHT, LLK, NLAYER, dm, sr
 
 
 # --------------------

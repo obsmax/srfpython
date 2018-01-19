@@ -59,7 +59,7 @@ help = '''HerrMet V{version}
 -agg                 use agg backend (no display) if mentioned
 -lowprio             run processes with low priority if mentioned
 -inline              replace showme by plt.show (e.g. jupyter)
--verbose off         turn verbose mode off
+-verbose off         reduce verbosity
 # ----------------------------------------------------
 --help, -h           display this help message, and quit
 --example, -ex       display an example of script, and quit
@@ -308,85 +308,16 @@ if __name__ == "__main__":
         print "please only datapoints to invert in _HerrMet.target"
         print "use option --disp to see the target data"
         # sys.exit()
+
     # -------------------------------------
     if "run" in argv.keys():
         mode = argv['run'][0]
         assert mode in ['append', 'restart']
 
-        Nchain = int(argv['nchain'][0]) if "nchain" in argv.keys() else default_nchain
-        Nkeep  = int(argv['nkeep'][0]) if "nkeep" in argv.keys() else default_nkeep
-
-        # ------
-        p, logRHOM = load_paramfile('_HerrMet.param')
-        # ------
-        d = makedatacoder("_HerrMet.target", which=Datacoder_log)  # datacoder based on observations
-        dobs, CDinv = d.target()
-        duncs = CDinv ** -.5
-        ND = len(dobs)
-        dinfs = d(0.1 * np.ones_like(d.values))
-        dsups = d(3.5 * np.ones_like(d.values))
-        logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
-        # ------
-        G = Theory(parameterizer=p, datacoder=d)
-        # ------
-        # rd = DepthDispDisplay(targetfile="_HerrMet.target")
-        # rd.plotmodel(alpha = 1.0, color = "r", linewidth = 3, *p.inv(p.MINF))
-        # rd.plotmodel(alpha = 1.0, color="r", linewidth=3, *p.inv(p.MSUP))
-        # rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs), dvalues = d.dvalues, alpha = 1.0, color="k", linewidth=3)
-        # showme(False)
-        # ---------------------------------
-        def gen():
-            for nchain in xrange(Nchain):
-                M0 = np.random.rand(len(p.MINF)) * (p.MSUP - p.MINF) + p.MINF
-                MSTD = p.MSTD
-                yield Job(nchain, M0, MSTD, nkeep=Nkeep)
-
-
-        def fun(worker, chainid, M0, MSTD, nkeep):
-            models, datas, weights, llks = metropolis(M0, MSTD, G, ND, logRHOD, logRHOM,
-                  nkeep=nkeep,
-                  normallaw=worker.randn,
-                  unilaw=worker.rand,
-                  chainid=chainid,
-                  HL=10,
-                  IK0=0.25,
-                  MPMIN=1.e-6,
-                  MPMAX=1e6,
-                  adjustspeed=0.3,
-                  nofail=True,
-                  debug=False,
-                  verbose=verbose)
-
-            I = np.any(~np.isnan(datas), axis=1)
-            models, datas, weights, llks = models[I, :], datas[I, :], weights[I], llks[I]
-
-            return chainid, models, datas, weights, llks
-        # ---------------------------------
-        with MapAsync(fun, gen(), **mapkwargs) as ma, open('_HerrMet.run', 'w' if mode == "restart" else "a") as fid:
-            fid.write('#CHAINID WEIGHT NLAYER LLK ZTOP[1:] VP VS RH WAVES TYPES MODES FREQS VALUES\n')
-            for jobid, (chainid, models, datas, weights, llks), _, _ in ma:
-                for mdl, dat, wgt, llk in zip(models, datas, weights, llks):
-                    ztop, vp, vs, rh = p.inv(mdl)
-                    values = d.inv(dat)
-                    nlayer = len(ztop)
-                    fid.write("%d %d %d %f %s %s %s %s %s %s %s %s %s\n" %
-                              (chainid, wgt, nlayer, llk,
-                               tostr(ztop[1:], "%.4f"),
-                               tostr(vp, "%.3f"),
-                               tostr(vs, "%.3f"),
-                               tostr(rh, "%.3f"),
-                               tostr(d.waves, "%s"),
-                               tostr(d.types, "%s"),
-                               tostr(d.modes, "%d"),
-                               tostr(d.freqs, "%.4f"),
-                               tostr(values, "%4f")))
-
-        # sys.exit()
-
-    # -------------------------------------
-    if "test" in argv.keys():
-        mode = argv['test'][0]
-        assert mode in ['append', 'restart']
+        if mode == "append" and not os.path.exists("_HerrMet.run"):
+            mode = "restart"
+        elif mode == "restart" and os.path.exists("_HerrMet.run"):
+            os.remove("_HerrMet.run")
 
         Nchain = int(argv['nchain'][0]) if "nchain" in argv.keys() else default_nchain
         Nkeep  = int(argv['nkeep'][0]) if "nkeep" in argv.keys() else default_nkeep
@@ -405,11 +336,11 @@ if __name__ == "__main__":
         G = Theory(parameterizer=p, datacoder=d)
         # ---------------------------------
         if mode == "restart":
-            with RunFile('_HerrMet.run', create=mode == "restart") as rundb:
+            with RunFile('_HerrMet.run', create=True) as rundb:
                 rundb.drop()
                 rundb.reset(p.NLAYER, d.waves, d.types, d.modes, d.freqs)
-        else:
-            raise NotImplementedError('')
+        elif mode == "append":
+            pass
 
         # ---------------------------------
         def gen():
@@ -449,15 +380,98 @@ if __name__ == "__main__":
                 rundb.commit()
             except:
                 rundb.rollback(crash=True)
-
+    # -------------------------------------
 
     # -------------------------------------
-    if "extract" in  argv.keys():
+    if "runold" in argv.keys():
+        mode = argv['run'][0]
+        assert mode in ['append', 'restart']
+
+        Nchain = int(argv['nchain'][0]) if "nchain" in argv.keys() else default_nchain
+        Nkeep = int(argv['nkeep'][0]) if "nkeep" in argv.keys() else default_nkeep
+
+        # ------
+        p, logRHOM = load_paramfile('_HerrMet.param')
+        # ------
+        d = makedatacoder("_HerrMet.target", which=Datacoder_log)  # datacoder based on observations
+        dobs, CDinv = d.target()
+        duncs = CDinv ** -.5
+        ND = len(dobs)
+        dinfs = d(0.1 * np.ones_like(d.values))
+        dsups = d(3.5 * np.ones_like(d.values))
+        logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
+        # ------
+        G = Theory(parameterizer=p, datacoder=d)
+
+
+        # ------
+        # rd = DepthDispDisplay(targetfile="_HerrMet.target")
+        # rd.plotmodel(alpha = 1.0, color = "r", linewidth = 3, *p.inv(p.MINF))
+        # rd.plotmodel(alpha = 1.0, color="r", linewidth=3, *p.inv(p.MSUP))
+        # rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs), dvalues = d.dvalues, alpha = 1.0, color="k", linewidth=3)
+        # showme(False)
+        # ---------------------------------
+        def gen():
+            for nchain in xrange(Nchain):
+                M0 = np.random.rand(len(p.MINF)) * (p.MSUP - p.MINF) + p.MINF
+                MSTD = p.MSTD
+                yield Job(nchain, M0, MSTD, nkeep=Nkeep)
+
+
+        def fun(worker, chainid, M0, MSTD, nkeep):
+            models, datas, weights, llks = metropolis(M0, MSTD, G, ND, logRHOD, logRHOM,
+                                                      nkeep=nkeep,
+                                                      normallaw=worker.randn,
+                                                      unilaw=worker.rand,
+                                                      chainid=chainid,
+                                                      HL=10,
+                                                      IK0=0.25,
+                                                      MPMIN=1.e-6,
+                                                      MPMAX=1e6,
+                                                      adjustspeed=0.3,
+                                                      nofail=True,
+                                                      debug=False,
+                                                      verbose=verbose)
+
+            I = np.any(~np.isnan(datas), axis=1)
+            models, datas, weights, llks = models[I, :], datas[I, :], weights[I], llks[I]
+
+            return chainid, models, datas, weights, llks
+
+
+        # ---------------------------------
+        with MapAsync(fun, gen(), **mapkwargs) as ma, open('_HerrMet.run',
+                                                           'w' if mode == "restart" else "a") as fid:
+            fid.write('#CHAINID WEIGHT NLAYER LLK ZTOP[1:] VP VS RH WAVES TYPES MODES FREQS VALUES\n')
+            for jobid, (chainid, models, datas, weights, llks), _, _ in ma:
+                for mdl, dat, wgt, llk in zip(models, datas, weights, llks):
+                    ztop, vp, vs, rh = p.inv(mdl)
+                    values = d.inv(dat)
+                    nlayer = len(ztop)
+                    fid.write("%d %d %d %f %s %s %s %s %s %s %s %s %s\n" %
+                              (chainid, wgt, nlayer, llk,
+                               tostr(ztop[1:], "%.4f"),
+                               tostr(vp, "%.3f"),
+                               tostr(vs, "%.3f"),
+                               tostr(rh, "%.3f"),
+                               tostr(d.waves, "%s"),
+                               tostr(d.types, "%s"),
+                               tostr(d.modes, "%d"),
+                               tostr(d.freqs, "%.4f"),
+                               tostr(values, "%4f")))
+
+                    # sys.exit()
+
+    # -------------------------------------
+    if "extract" in argv.keys():
 
         top = int(argv['extract'][0]) if argv['extract'] is not None else default_top
         topstep = int(argv['extract'][1]) if argv['extract'] is not None and len(argv['extract']) >= 2 else default_topstep
 
-        chainids, weights, llks, ms, ds = read_runfile_1('_HerrMet.run', top=top, topstep=topstep)
+        #chainids, weights, llks, ms, ds = read_runfile_1('_HerrMet.run', top=top, topstep=topstep)
+        with RunFile('_HerrMet.run') as rundb:
+            chainids, weights, llks, ms, ds = rundb.like_read_run_1(top=top, topstep=topstep)
+
         dms, wgts = [], []
         for weight, (ztop, vp, vs, rh) in zip(weights, ms):  # readHerrmetout("_HerrMet.run"):
             dm = depthmodel(depthmodel1D(ztop, vp),
@@ -495,7 +509,10 @@ if __name__ == "__main__":
         # ------ Display run results if exist
         if ("best" in argv.keys() or "range" in argv.keys() or "overdisp" in argv.keys()) and os.path.exists('_HerrMet.run'):
 
-            chainids, weights, llks, ms, ds = read_runfile_1('_HerrMet.run', top=top, topstep=topstep)
+            #chainids, weights, llks, ms, ds = read_runfile_1('_HerrMet.run', top=top, topstep=topstep)
+            with RunFile('_HerrMet.run') as rundb:
+                chainids, weights, llks, ms, ds = rundb.like_read_run_1(top=top, topstep=topstep)
+
             vmin, vmax, cmap = llks.min(), llks.max(), plt.cm.gray  #plt.cm.jet# plt.cm.gray #
             colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=cmap)
 
@@ -506,12 +523,16 @@ if __name__ == "__main__":
                                     depthmodel1D(ztop, vs),
                                     depthmodel1D(ztop, rh))
                     # dm.write96('M%010.0f.mod' % i, overwrite = True)
+                    #print [len(_) for _ in ds[i]]
                     rd.plotmodel(color=colors[i], alpha=1.0, linewidth=3, *ms[i])
                     rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
 
+
                 cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
-                cax = rd.fig.add_axes((0.68, 0.1, 0.005, 0.3))
-                rd.fig.colorbar(cb, cax=cax, label="log likelyhood")
+                pos = rd.axdisp[-1].get_position()
+                cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
+                rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+                cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
             elif "overdisp" in argv.keys():
                 """note : recomputing dispersion with another frequency array might
@@ -532,7 +553,7 @@ if __name__ == "__main__":
 
                 cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
                 pos = rd.axdisp[-1].get_position()
-                cax = rd.fig.add_axes((pos.x0, 0.1, pos.width, 0.01))
+                cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
                 rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
                 cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 

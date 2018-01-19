@@ -394,16 +394,46 @@ class surf96reader(surf96reader_from_surf96string):
             surf96reader_from_surf96string.__init__(self, "".join(fid.readlines()))
 
 
+# -------------------------------------------------
+class surf96reader_from_arrays(surf96reader_from_surf96string):
+    def __init__(self, waves, types, modes, freqs, values, dvalues=None, flags=None):
+        """
+        :param waves:   iterable, "R" or "L", Rayleigh or Love
+        :param types:   iterable, "C" or "U", phase or group
+        :param modes:   iterable, ints, mode numbers
+        :param freqs:   iterable, floats, frequencies, Hz
+        :param values:  iterable, floats, velocity values, km/s
+        :param dvalues: None or iterable, floats, uncertainties of values, km/s
+        :param flags: None or iterable, see Herrmann's doc
+        all arrays must be the same length
+        """
+        if dvalues is None :
+            dvalues = 0.1 * np.ones_like(values)
+        if flags is None:
+            flags = np.array(['T' for _ in xrange(len(values))], '|S1')
+        self.clear()
+        self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], \
+            self.data['MODE'], self.data['PERIOD'], \
+            self.data['VALUE'], self.data['DVALUE'] = \
+            waves, types, flags, modes, freqs, values, dvalues
+
+
 # _____________________________________
 def groupbywtm(waves, types, modes, freqs, values, dvalues=None, keepnans=True):
     """group outputs from dispersion by wave, type, modes
 
-    waves types modes freqs are the same length
+        :param waves:   iterable, "R" or "L", Rayleigh or Love
+        :param types:   iterable, "C" or "U", phase or group
+        :param modes:   iterable, ints, mode numbers
+        :param freqs:   iterable, floats, frequencies, Hz
+        :param values:  iterable, floats, velocity values, km/s
+        :param dvalues: None or iterable, floats, uncertainties of values, km/s
+        :param keepnans: bool, by default the nans are removed from the arrays
+                         (this occurs especially for overtones below the cut-off period)
+        all arrays must be the same length
+
     groupbywtm demultiplexes these arrays to produce, for each mode
     w (wave key, scalar), t (type key, scalar), m (mode number, scalar), freqs (array), values (array), dvalues (array)
-
-    keepnans : by default the nan are removed from the arrays (this occurs especially for overtones below the cut-off period)
-
     """
     freqs = np.array(freqs, float)
     types = np.array(list(types), "|S1")
@@ -463,7 +493,18 @@ def igroupbywtm(Waves, Types, Modes, Freqs):
 
 # -------------------------------------------------
 def mklaws(waves, types, modes, freqs, values, dvalues=None):
-    """values are from disperse"""
+    """convert lists of parameters into interpolable dispersion laws
+    input :
+        waves = iterable, "R" or "L", Rayleigh or Love
+        types = iterable, "C" or "U", phase or group
+        modes = iterable, ints, mode numbers
+        freqs = iterable, floats, frequencies, Hz
+        values = iterable, floats, velocity values, km/s
+        dvalues = None or iterable, floats, uncertainties of values, km/s
+        all arrays must be the same length
+    output :
+        laws = iterable of interpolable dispersion curves of type Claw, Ulaw, nanClaw or nanUlaw
+    """
     laws = []
     for tup in groupbywtm(waves, types, modes, freqs, values, dvalues=dvalues, keepnans=False):
         if dvalues is None:
