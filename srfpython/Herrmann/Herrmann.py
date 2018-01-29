@@ -12,17 +12,44 @@ from srfpython.depthdisp.dispcurves import groupbywtm, igroupbywtm
 program to compute surface wave dispersion curves, Maximilien Lehujeur, 01/11/2017
 see documentation in function dispersion
 use __main__ for demo
+
+WARNING : This module calls fortran programs, make sure they are compiled correctly before calling
 """
 
 _pathfile = os.path.realpath(__file__) #.../srfpyhon/HerrMann/dispersion.py
 _file     = _pathfile.split('/')[-1]
 srfpre96_exe = _pathfile.replace(_file, 'bin/max_srfpre96')
 srfdis96_exe = _pathfile.replace(_file, 'bin/max_srfdis96')
-if not os.path.exists(srfpre96_exe) or not os.path.exists(srfdis96_exe):
-    raise Exception('could not find %s and/or %s' % (srfpre96_exe, srfdis96_exe))
 
 
-###################################### MODIFIED HERRMANN'S CODES
+# #####################################
+def check_herrmann_codes():
+    "check successfull compilation"
+    if not os.path.exists(srfpre96_exe) or not os.path.exists(srfdis96_exe):
+        raise Exception('could not find %s and/or %s' % (srfpre96_exe, srfdis96_exe))
+    # depth model
+    ztop = [0.00, 1.00] #km, top layer depth
+    vp   = [2.00, 3.00] #km/s
+    vs   = [1.00, 2.00] #km/s
+    rh   = [2.67, 2.67] #g/cm3
+
+    # dipsersion parameters
+    curves = [('R', 'C', 0, np.array([1., 2.])),
+              ('L', 'C', 0, np.array([2., 3.]))]
+
+    g = dispersion_2(ztop, vp, vs, rh, curves)
+    try:
+        w, t, m, F, V = g.next()
+        assert (w, t, m) == ("L", "C", 0)
+        assert np.all(F == np.array([2., 3.]))
+        w, t, m, F, V = g.next()
+        assert (w, t, m) == ("R", "C", 0)
+        assert np.all(F == np.array([1., 2.]))
+    except AssertionError:
+        raise Exception('could not execute fortran codes, try to recompile them (see srfpython/README.md)')
+
+
+# ##################################### MODIFIED HERRMANN'S CODES
 def prep_srfpre96_1(h = 0.005, dcl = 0.005, dcr = 0.005):
     """prepare input for modified srfpre96 (max_srfpre96)
     dcl, dcr are root search increment for loev and rayleigh waves respectively
@@ -42,7 +69,7 @@ def prep_srfpre96_2(z, vp, vs, rh):
     if z[0]: raise CPiSDomainError('Z0 must be 0')#assert z[0] == 0.
     n = len(z)
 
-    if not (n == len(vp) == len(vs) == len(rh)): 
+    if not (n == len(vp) == len(vs) == len(rh)):
         raise CPiSDomainError('Z VP, VS, RH must be the same length')#    assert n == len(vp) == len(vs) == len(rh)
     z = np.asarray(z, float)
     if (np.isinf(z) | np.isnan(z)).any():
@@ -119,12 +146,12 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
     #A[:, 0] (itst) wave type 1 = Love, 2 = Rayleigh
     #A[:, 1] (iq-1) mode number, 0 = fundamental
     #A[:, 2] (t1a)  t1 if phase only else lower period = t1/(1+h), in s
-    #A[:, 3] (t1b)  0. if phase only else upper period = t1/(1-h), in s; 
-    #A[:, 4] (cc0)  phase velocity at t1 if phase only else at t1a, in km/s; 
-    #A[:, 5] (cc1)  phase velocity at t1 if phase only else at t1b, in km/s; 
+    #A[:, 3] (t1b)  0. if phase only else upper period = t1/(1-h), in s;
+    #A[:, 4] (cc0)  phase velocity at t1 if phase only else at t1a, in km/s;
+    #A[:, 5] (cc1)  phase velocity at t1 if phase only else at t1b, in km/s;
 
-    W = A[:, 0]       
-    M = A[:, 1]       
+    W = A[:, 0]
+    M = A[:, 1]
     I = A[:, 3] == 0. #True means phase only
     nI = ~I
     n = A.shape[0]
@@ -137,7 +164,7 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
         C[nI] = np.sqrt(A[nI,4] * A[nI,5]) #Jeffreys average #A[nI,4:6].mean(axis = 1)
         LnI = (log(A[nI,5]) - log(A[nI,4])) / (log(A[nI,2]) - log(A[nI,3]))
         U[nI] = C[nI] / (1. - LnI)
-    
+
     L, R = (W == 1), (W == 2)
     umodes = np.arange(max(modes) + 1)
     RMs = [R & (M == m) for m in umodes]
@@ -155,10 +182,10 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
         p  = 1. / f
         TS = T[S]
         iS = np.abs(TS - p).argmin()
-        per = TS[iS]        
+        per = TS[iS]
         if abs(per - p) / p > 0.01: continue
 
-        if   t == 'C': val = C[S][iS] 
+        if   t == 'C': val = C[S][iS]
         else         : val = U[S][iS] #elif t == "U"
         #else: raise ValueError('')
         #if val <= 0: #NON, je met une penalite dans la fonction cout
@@ -194,10 +221,10 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
     W   = np.asarray(A[::6],  int)-1  #wave type 0 = Love, 1 = Rayleigh
     M   = np.asarray(A[1::6], int)    #(iq-1) mode number, 0 = fundamental
     T1A = np.asarray(A[2::6], float)  #t1 if phase only else lower period = t1/(1+h), in s
-    T1B = np.asarray(A[3::6], float)  #0. if phase only else upper period = t1/(1-h), in s; 
-    CC0 = np.asarray(A[4::6], float)  #phase velocity at t1 if phase only else at t1a, in km/s; 
-    CC1 = np.asarray(A[5::6], float)  #phase velocity at t1 if phase only else at t1b, in km/s; 
-    n = len(W)    
+    T1B = np.asarray(A[3::6], float)  #0. if phase only else upper period = t1/(1-h), in s;
+    CC0 = np.asarray(A[4::6], float)  #phase velocity at t1 if phase only else at t1a, in km/s;
+    CC1 = np.asarray(A[5::6], float)  #phase velocity at t1 if phase only else at t1b, in km/s;
+    n = len(W)
     I = T1B == 0. #True means phase only
     L = W == 0    #True means Love
     R = ~L        #assume only R or L
@@ -227,7 +254,7 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
 
     # ---------------------------------
     values = np.zeros(len(waves), float) * np.nan
-    indexs  = np.arange(len(waves))  
+    indexs  = np.arange(len(waves))
     for w, t, m, P, I in groupbywtm(waves, types, modes, periods, indexs, dvalues = None, keepnans = True):
         #available data : period D[w][m]["T"]; value  D[w][m][t]
         #requested data : P
@@ -257,7 +284,7 @@ def dispersion(ztop, vp, vs, rh, \
         vs   : list or array, S wave velocity in km/s
         rh   : list or array, density in g.cm^-3
 
-    input: 
+    input:
         -> depth model
         ztop, vp, vs, rh = depth model, 4 iterables with same length
 
@@ -394,9 +421,13 @@ def dispersion_2(ztop, vp, vs, rh, Curves,
 
 # _____________________________________
 if __name__ == "__main__":
+
     """ DEMO """
+
     import matplotlib.pyplot as plt
     from tetedenoeud.utils.display import logtick
+    check_herrmann_codes()
+
 
     # depth model
     ztop = [0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80] #km, top layer depth
@@ -427,7 +458,7 @@ if __name__ == "__main__":
     for w, t, m, fs, us in out:
         ax.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
     ax.set_xlabel('period (s)')
-    ax.set_ylabel('velocity (km/s)')    
+    ax.set_ylabel('velocity (km/s)')
     ax.grid(True, which="major")
     ax.grid(True, which="minor")
     logtick(ax, "xy")
@@ -435,6 +466,6 @@ if __name__ == "__main__":
     plt.show()
 
 
-    
+
 
 

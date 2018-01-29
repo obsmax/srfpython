@@ -276,12 +276,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         icurrent = the position in array models of the last generated model
 
     """
-    summary = """chainid %5d, status %s
-        test %5d kept %5d fail %5d 
-        Average Keep ratio (AK) %.2f 
-        Master Proposal (MP)    %.2f 
-        Average speed (AS)      %.2f/s 
-        Final Likelihood (LI)   %f"""
+    summary = """chainid %5d, status %10s, test %5d kept %5d fail %5d, Av. Keep ratio (AK) %.2f, Master Proposal (MP) %.2f, Av. speed (AS) %.2f/s, Final Likelihood (LI) %f"""
     # ----
     nfail = 0
     # ----

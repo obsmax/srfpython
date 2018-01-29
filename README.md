@@ -43,7 +43,8 @@ install srfpython
 >
 > ```
 > cd ~/git/srfpython/srfpython/Herrmann/src90
-> ./clean.sh && ./compile.sh
+> ./clean.sh 
+> ./compile.sh
 > ```
 >
 > test fortran codes using

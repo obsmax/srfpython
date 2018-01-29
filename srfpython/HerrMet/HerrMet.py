@@ -9,10 +9,12 @@ import numpy as np
 #tetedenoeud
 from tetedenoeud.multipro.multipro8 import Job, MapAsync, MapSync
 from tetedenoeud.utils.display import values2colors, makecolorbar, legendtext, chftsz
-from tetedenoeud.utils.asciifile import AsciiFile
+from tetedenoeud.utils import cmaps
+from tetedenoeud.utils.cmaps import tej #to be evaluated
+# from tetedenoeud.utils.asciifile import AsciiFile
 
 #srfpython
-from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm
+from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm, check_herrmann_codes
 from srfpython.inversion.metropolis2 import LogGaussND, metropolis
 from srfpython.depthdisp.depthmodels import depthmodel, depthmodel1D, depthmodel_from_mod96, depthspace
 from srfpython.depthdisp.dispcurves import Claw, surf96reader, freqspace
@@ -27,20 +29,22 @@ from srfpython.HerrMet.theory import Theory, overdisp
 from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp
 #
 
-
+check_herrmann_codes()
 # -------------------------------------
-version = "5"
+version = "5.0"
 default_mode = "append"
 default_nchain = 12
 default_nkeep = 100
 default_top = 100
 default_topstep = 1
+default_cmap = "gray" # plt.cm.jet# plt.cm.gray #
 default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRzRHz']
 default_parameterization = default_parameterization_list[0]
 mapkwargs = {"Nworkers" : 4, "Taskset" : "0-3"} #keyword arguments for every parallelized process
 # -------------------------------------
 autorizedkeys = \
-    ["w", "taskset", "agg", "lowprio", "inline",
+    ["w", "taskset", "agg", "lowprio", "inline", "cmap",
+     "version", "v",
      "help", "h",
      "example", "ex",
      "param", "basedon", "t", "dvp", "dvs", "drh", "growing", "op",
@@ -60,7 +64,9 @@ help = '''HerrMet V{version}
 -lowprio             run processes with low priority if mentioned
 -inline              replace showme by plt.show (e.g. jupyter)
 -verbose off         reduce verbosity
+-cmap                colormap, default {default_cmap}
 # ----------------------------------------------------
+--version, -v        display version and quit
 --help, -h           display this help message, and quit
 --example, -ex       display an example of script, and quit
 --param      i f     generate a template parameter file to custom, need the number of layers 
@@ -116,6 +122,7 @@ help = '''HerrMet V{version}
     version=version,
     default_Nworkers=mapkwargs['Nworkers'],
     default_Taskset=mapkwargs['Taskset'],
+    default_cmap=default_cmap,
     default_top=default_top,
     default_nchain=default_nchain,
     default_nkeep=default_nkeep,
@@ -187,6 +194,7 @@ if __name__ == "__main__":
         sys.exit()
     argv = readargv()
     verbose = True
+    cmap = plt.get_cmap(default_cmap)
     # nworkers = int(argv['w'][0]) if "w" in argv.keys() else default_nworkers
     # -------------------------------------
     # prevent typos in arguments, keep the autorizedkeys list up to date
@@ -208,9 +216,22 @@ if __name__ == "__main__":
     if "inline" in argv.keys():
         showme = plt.show
     # -------------------------------------
+    if "cmap" in argv.keys():
+        try:
+            cmap = plt.get_cmap(argv['cmap'][0])
+        except ValueError:
+            try:
+                cmap = eval("cmaps.%s()" % argv['cmap'][0])
+            except:
+                raise Exception('could not find colormap %s neither in matplotlib neither in tetedenoeud.utils.cmaps' % argv['cmap'][0])
+    # -------------------------------------
     if "verbose" in argv.keys():
         if argv['verbose'][0].lower() in ['off', 'false']:
             verbose = False
+    # -------------------------------------
+    if "v" in argv.keys() or "version" in argv.keys():
+        print version
+        sys.exit()
     # -------------------------------------
     if "h" in argv.keys() or "help" in argv.keys():
         print help
@@ -513,7 +534,7 @@ if __name__ == "__main__":
             with RunFile('_HerrMet.run') as rundb:
                 chainids, weights, llks, ms, ds = rundb.like_read_run_1(top=top, topstep=topstep)
 
-            vmin, vmax, cmap = llks.min(), llks.max(), plt.cm.gray  #plt.cm.jet# plt.cm.gray #
+            vmin, vmax = llks.min(), llks.max()
             colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=cmap)
 
             if "best" in argv.keys():

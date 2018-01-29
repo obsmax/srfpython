@@ -160,10 +160,10 @@ def dmstats(dms, percentiles=[0.16, 0.5, 0.84], Ndepth=100, Nvalue=100, weights=
 class UserStacker(object):
     def __init__(self, zmax, Ndepth, vpmin, vpmax, vsmin, vsmax, rhmin, rhmax, prmin, prmax, Nvalue):
         zbins = np.linspace(0., zmax, Ndepth)
-        self.vspdf = depthpdf(z=zbins, v=np.linspace(vsmin, vsmax, Nvalue))
-        self.vppdf = depthpdf(z=zbins, v=np.linspace(vpmin, vpmax, Nvalue))
-        self.rhpdf = depthpdf(z=zbins, v=np.linspace(rhmin, rhmax, Nvalue))
-        self.prpdf = depthpdf(z=zbins, v=np.linspace(prmin, prmax, Nvalue))
+        self.vspdf = depthpdf(z=zbins, v=np.unique(np.linspace(vsmin, vsmax, Nvalue)))
+        self.vppdf = depthpdf(z=zbins, v=np.unique(np.linspace(vpmin, vpmax, Nvalue)))
+        self.rhpdf = depthpdf(z=zbins, v=np.unique(np.linspace(rhmin, rhmax, Nvalue)))
+        self.prpdf = depthpdf(z=zbins, v=np.unique(np.linspace(prmin, prmax, Nvalue)))
 
     def __call__(self, worker, weight, dm):
         self.vspdf.appendN(dm.vs, Ntimes=weight)

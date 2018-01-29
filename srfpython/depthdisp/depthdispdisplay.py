@@ -81,10 +81,10 @@ class DepthDispDisplay(object):
         self.axrh.set_xlim(rhlim)
 
     def grid(self):
-        for ax in self.axdisp:  ax.grid(True)
-        for ax in self.axdepth: ax.grid(True)
+        for ax in self.axdisp:  ax.grid(True, linestyle=":")
+        for ax in self.axdepth: ax.grid(True, linestyle=":")
         if self.axconv is not None:
-            self.axconv.grid(True)
+            self.axconv.grid(True, linestyle=":")
 
     def tick(self):
         for ax in self.axdisp:  logtick(ax, "xy")
