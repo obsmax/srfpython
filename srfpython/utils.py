@@ -5,7 +5,7 @@ import imp
 import os
 import sys
 import numpy as np
-from numpy import log10
+from numpy import log10, inf, nan #needed by eval
 
 
 class TimeOutError(Exception):

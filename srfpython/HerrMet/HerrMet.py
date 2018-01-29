@@ -16,14 +16,14 @@ from tetedenoeud.utils.cmaps import tej #to be evaluated
 #srfpython
 from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm, check_herrmann_codes
 from srfpython.inversion.metropolis2 import LogGaussND, metropolis
-from srfpython.depthdisp.depthmodels import depthmodel, depthmodel1D, depthmodel_from_mod96, depthspace
+from srfpython.depthdisp.depthmodels import depthmodel, depthmodel1D, depthmodel_from_mod96, depthmodel_from_arrays, depthspace
 from srfpython.depthdisp.dispcurves import Claw, surf96reader, freqspace
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, plt, gcf, gca, showme, pause
 from srfpython.utils import readargv, minmax, tostr
 
 #local imports
-from srfpython.HerrMet.files import write_default_paramfile, load_paramfile, read_runfile_1, RunFile
+from srfpython.HerrMet.files import write_default_paramfile, load_paramfile, RunFile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import Theory, overdisp
 from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp
@@ -35,8 +35,15 @@ version = "5.0"
 default_mode = "append"
 default_nchain = 12
 default_nkeep = 100
-default_top = 100
-default_topstep = 1
+default_top_llkmin = -1000.
+default_top_limit = 100
+default_top_step = 1
+default_pdf_llkmin = 0
+default_pdf_limit = 0
+default_pdf_step = 1
+default_extract_llkmin = 0
+default_extract_limit = 0
+default_extract_step = 1
 default_cmap = "gray" # plt.cm.jet# plt.cm.gray #
 default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRzRHz']
 default_parameterization = default_parameterization_list[0]
@@ -51,15 +58,13 @@ autorizedkeys = \
      "target", "resamp", "lunc", "unc", "ot",
      "run", "nchain", "nkeep", "verbose",
      "extract",
-     "disp", "best", "overdisp", "range", "png", "m96",
+     "display", "top", "overdisp", "pdf", "png", "m96",
      "test"]
 # -------------------------------------
 help = '''HerrMet V{version}
 # ----------------------------------------------------
--w           i       set the number of virtual workers to use for all parallelized
-                     processes, default {default_Nworkers}
--taskset     s       change job affinity for all parallelized processes, 
-                     default {default_Taskset}
+-w           i       set the number of virtual workers to use for all parallelized processes, default {default_Nworkers}
+-taskset     s       change job affinity for all parallelized processes, default {default_Taskset}
 -agg                 use agg backend (no display) if mentioned
 -lowprio             run processes with low priority if mentioned
 -inline              replace showme by plt.show (e.g. jupyter)
@@ -75,14 +80,14 @@ help = '''HerrMet V{version}
                      if not specified, I take fixed values to build the parameter file
     -t       s       parameterization type to use ({default_parameterization_list}), 
                      default {default_parameterization}
-                     mZVSPRRH = parameterize with depth interface, 
-                                VS in each layer, VP/VS in each layer, Density in each layer
-                     mZVSVPRH = parameterize with depth interface,   
-                                VP in each layer, VP/VS in each layer, Density in each layer
-                     mZVSPRzRHvp = parameterize with depth interface, 
-                                use fixed relations for VP/VS versus depth and Density versus VP
-                     mZVSPRzRHz = parameterize with depth interface, 
-                                use fixed relations for VP/VS versus depth and Density versus depth 
+                     mZVSPRRH = parameterize with depth interface, VS in each layer, 
+                                VP/VS in each layer, Density in each layer
+                     mZVSVPRH = parameterize with depth interface, VP in each layer, 
+                                VP/VS in each layer, Density in each layer
+                     mZVSPRzRHvp = parameterize with depth interface, use fixed 
+                                relations for VP/VS versus depth and Density versus VP
+                     mZVSPRzRHz = parameterize with depth interface, use fixed 
+                                relations for VP/VS versus depth and Density versus depth 
     -dvp     f f     add prior constraint on the vp offset between layers, 
                      requires the extremal values, km/s
     -dvs     f f     add prior constraint on the vs offset between layers, idem
@@ -105,28 +110,38 @@ help = '''HerrMet V{version}
     -nchain  i       number of chains to use, default {default_nchain}
     -nkeep   i       number of models to keep per chain, default {default_nkeep}
     -w       i       see above, controls the max number of chains to run simultaneously
---extract   [i] [i]  extract posterior distribution on the models, save them as mod96files
-                     first argument = number of best models to use/display, default {default_top}
-                     second argument = step between them, default {default_topstep}
---disp [i] [i]       display param, target, and run outputs if exists
-                     first argument = number of best models to use/display, default {default_top}
-                     second argument = step between them, default {default_topstep}
-    -best/-overdisp  show the best models on the figure, use overdisp instead of best 
-                     to recompute dispersion curves with higher resolution
-    -range           compute and show the statistics for the selected models, 
-                     use --extract for saving
+--extract   [f i i]  extract posterior distribution of the models, save them as mod96files
+                     first argument = lowest log likelyhood value to include (<=0.0, 0.0 means all)
+                     second argument = highest model number to include (>=0, 0 means all)
+                     third argument = include only one model over "step" (>=1)
+                     default {default_extract_llkmin}, {default_extract_limit}, {default_extract_step}
+--display            display param, target, and run outputs if exist
+    -top    [f i i]  show the best models on the figure, see --extract for arguments
+                     default {default_top_llkmin}, {default_top_limit}, {default_top_step}
+    -overdisp        recompute dispersion curves of the best models selected with higher resolution
+    -pdf    [f i i]  compute and show the statistics for the selected models, see --extract for arguments
+                     default {default_pdf_llkmin}, {default_pdf_limit}, {default_pdf_step} 
+                     use --extract to save pdf outputs (median 16% and 84% percentiles at mod96 format)
     -png             save figure as pngfile instead of displaying it on screen
-    -m96 file(s)     append depth model(s) to the plot from mod96 file(s)    
+    -m96    s [s...] append depth model(s) to the plot from mod96 file(s)    
 --test               testing option
 '''.format(
     version=version,
     default_Nworkers=mapkwargs['Nworkers'],
     default_Taskset=mapkwargs['Taskset'],
     default_cmap=default_cmap,
-    default_top=default_top,
+    default_top_llkmin=default_top_llkmin,
+    default_top_limit=default_top_limit,
+    default_top_step=default_top_step,
+    default_pdf_llkmin=default_pdf_llkmin,
+    default_pdf_limit=default_pdf_limit,
+    default_pdf_step=default_pdf_step,
+    default_extract_llkmin=default_extract_llkmin,
+    default_extract_limit=default_extract_limit,
+    default_extract_step=default_extract_step,
     default_nchain=default_nchain,
     default_nkeep=default_nkeep,
-    default_topstep=default_topstep,
+    default_topstep=default_top_step,
     default_parameterization_list=default_parameterization_list,
     default_parameterization=default_parameterization
     )
@@ -146,11 +161,11 @@ HerrMet --target /path/to/my/data/file.surf96 \\
             -resamp 0.2 1.5 15 plog \\
             -lunc 0.1 \\
             -ot \\
-            --disp
+            --display
 
 # >> you may edit _HerrMet.target and remove points that 
 #    do not need to be inverted, check with  
-HerrMet --disp
+HerrMet --display
 
 # 2/ Parameterization
 # build parameter file from existing depthmodel,
@@ -162,7 +177,7 @@ HerrMet --param 7 3. \\
             -t  mZVSPRRH \\
             -growing \\
             -op \\
-            --disp
+            --display
 
 # >> now edit _HerrMet.param and customize it, check with 
 HerrMet --disp
@@ -175,14 +190,15 @@ HerrMet -w 24 \\
             -nchain 12 -nkeep 1000 
 
 # 4/ Results
-# display best 1000 models,
+# display the best 10 models,
 # recompute the best disp curves with higher resolution
-# compute median and percentiles over these 1000 models
+# compute median and percentiles over the 1000 best models
 # save as png file, use a non display backend 
 HerrMet -agg \\
-        --disp 1000 \\
+        --display \\
+            -top 0.0 10 1 \\
             -overdisp \\
-            -range \\
+            -pdf 0.0 1000 1 \\
             -png
 """.format(version=version)
 
@@ -405,12 +421,15 @@ if __name__ == "__main__":
     # -------------------------------------
     if "extract" in argv.keys():
 
-        top = int(argv['extract'][0]) if argv['extract'] is not None else default_top
-        topstep = int(argv['extract'][1]) if argv['extract'] is not None and len(argv['extract']) >= 2 else default_topstep
+        assert argv["extract"] is None or len(argv["extract"]) == 3  # unexpected argument number
+        if argv["extract"] is None:
+            extract_llkmin, extract_limit, extract_step = default_extract_llkmin, default_extract_limit, default_extract_step
+        elif len(argv['extract']) == 3:
+            extract_llkmin, extract_limit, extract_step = argv['extract']
 
-        #chainids, weights, llks, ms, ds = read_runfile_1('_HerrMet.run', top=top, topstep=topstep)
         with RunFile('_HerrMet.run') as rundb:
-            chainids, weights, llks, ms, ds = rundb.like_read_run_1(top=top, topstep=topstep)
+            print "extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step),
+            chainids, weights, llks, ms, ds = rundb.like_read_run_1(llkmin=extract_llkmin, limit=extract_limit, step=extract_step)
 
         dms, wgts = [], []
         for weight, (ztop, vp, vs, rh) in zip(weights, ms):  # readHerrmetout("_HerrMet.run"):
@@ -432,13 +451,12 @@ if __name__ == "__main__":
                 print "Error", str(e)
 
     # -------------------------------------
-    if "disp" in argv.keys():
-        assert not ("best" in argv.keys() and "overdisp" in argv.keys()) #options are not compatible
+    if "display" in argv.keys():
+        # assert not ("best" in argv.keys() and "overdisp" in argv.keys()) #options are not compatible
+        # top = int(argv['disp'][0]) if argv['disp'] is not None else default_top
+        # topstep = int(argv['disp'][1]) if argv['disp'] is not None and len(argv['disp']) >= 2 else default_topstep
 
-        top = int(argv['disp'][0]) if argv['disp'] is not None else default_top
-        topstep = int(argv['disp'][1]) if argv['disp'] is not None and len(argv['disp']) >= 2 else default_topstep
-
-        # ------ Display the target data if exists
+        # ------ Initiate the displayer using the target data if exists
         if os.path.exists("_HerrMet.target"):
             rd = DepthDispDisplay(targetfile="_HerrMet.target")
             d = makedatacoder("./_HerrMet.target", which=Datacoder_log)  # datacoder based on observations
@@ -448,88 +466,96 @@ if __name__ == "__main__":
             print "call option --target to see the target dispersion curves"
 
         # ------ Display run results if exist
-        if ("best" in argv.keys() or "range" in argv.keys() or "overdisp" in argv.keys()) and os.path.exists('_HerrMet.run'):
+        if os.path.exists('_HerrMet.run') and ("top" in argv.keys() or "pdf" in argv.keys()):
 
-            #chainids, weights, llks, ms, ds = read_runfile_1('_HerrMet.run', top=top, topstep=topstep)
             with RunFile('_HerrMet.run') as rundb:
-                chainids, weights, llks, ms, ds = rundb.like_read_run_1(top=top, topstep=topstep)
 
-            vmin, vmax = llks.min(), llks.max()
-            colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=cmap)
+                # --- display best models
+                if "top" in argv.keys():
 
-            # ----
-            if "best" in argv.keys():
-                for i in range(len(llks))[::-1]:
-                    ztop, vp, vs, rh = ms[i]
-                    dm = depthmodel(depthmodel1D(ztop, vp),
-                                    depthmodel1D(ztop, vs),
-                                    depthmodel1D(ztop, rh))
-                    # dm.write96('M%010.0f.mod' % i, overwrite = True)
-                    #print [len(_) for _ in ds[i]]
-                    rd.plotmodel(color=colors[i], alpha=1.0, linewidth=3, *ms[i])
-                    rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
+                    assert argv["top"] is None or len(argv["top"]) == 3 # unexpected argument number
+                    if argv["top"] is None:
+                        top_llkmin, top_limit, top_step = default_top_llkmin, default_top_limit, default_top_step
+                    elif len(argv['top']) == 3:
+                        top_llkmin, top_limit, top_step = argv['top']
 
+                    print "top : llkmin %f, limit %d, step %d" % (top_llkmin, top_limit, top_step),
+                    chainids, weights, llks, ms, ds = rundb.like_read_run_1(llkmin=top_llkmin, limit=top_limit, step=top_step)
+                    vmin, vmax = llks.min(), llks.max()
+                    colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=cmap)
 
-                cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
-                pos = rd.axdisp[-1].get_position()
-                cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-                rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
-                cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
+                    if "overdisp" in argv.keys():
+                        """note : recomputing dispersion with another frequency array might
+                                  result in a completely different dispersion curve in case
+                                  of root search failure """
+                        waves, types, modes, freqs, _ = ds[0]
+                        overwaves, overtypes, overmodes, _, _ = zip(*list(groupbywtm(waves, types, modes, freqs, np.arange(len(freqs)), None, True)))
+                        overfreqs = [freqspace(0.6 * min(freqs), 1.4 * max(freqs), 100, "plog") for _ in xrange(len(overwaves))]
+                        overwaves, overtypes, overmodes, overfreqs = igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
+                        for clr, (mms, dds) in zip(colors[::-1],
+                                                   overdisp(ms[::-1],
+                                                            overwaves, overtypes, overmodes, overfreqs,
+                                                            verbose=verbose, **mapkwargs)):
+                            rd.plotmodel(color=clr, alpha=1.0, linewidth=3, *mms)
+                            try:
+                                rd.plotdisp(color=clr, alpha=1.0, linewidth=3, *dds)
+                            except KeyboardInterrupt: raise
+                            except Exception as e:
+                                print "Error : could not plot dispersion curve (%s)" % str(e)
 
-            # ----
-            elif "overdisp" in argv.keys():
-                """note : recomputing dispersion with another frequency array might
-                          result in a completely different dispersion curve in case
-                          of root search failure """
-                waves, types, modes, freqs, _ = ds[0]
-                overwaves, overtypes, overmodes, _, _ = zip(*list(groupbywtm(waves, types, modes, freqs, np.arange(len(freqs)), None, True)))
-                overfreqs = [freqspace(0.6 * min(freqs), 1.4 * max(freqs), 100, "plog") for _ in xrange(len(overwaves))]
-                overwaves, overtypes, overmodes, overfreqs = igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
-                for clr, (mms, dds) in zip(colors[::-1], overdisp(ms[::-1], overwaves, overtypes, overmodes, overfreqs,
-                                                                  verbose=verbose, **mapkwargs)):
-                    rd.plotmodel(color=clr, alpha=1.0, linewidth=3, *mms)
-                    try:
-                        rd.plotdisp(color=clr, alpha=1.0, linewidth=3, *dds)
-                    except KeyboardInterrupt: raise
-                    except Exception as e:
-                        print "Error : could not plot dispersion curve (%s)" % str(e)
+                        cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
+                        pos = rd.axdisp[-1].get_position()
+                        cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
+                        rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+                        cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
-                cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
-                pos = rd.axdisp[-1].get_position()
-                cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-                rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
-                cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
+                    else:
+                        "display the dispersion curves as stored in the database"
+                        for i in range(len(llks))[::-1]:
+                            rd.plotmodel(color=colors[i], alpha=1.0, linewidth=3, *ms[i])
+                            rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
 
-            # ----
-            if "range" in argv.keys():
-                dms, wgts = [], []
-                for weight, (ztop, vp, vs, rh) in zip(weights, ms):#readHerrmetout("_HerrMet.run"):
-                    dm = depthmodel(depthmodel1D(ztop, vp),
-                                    depthmodel1D(ztop, vs),
-                                    depthmodel1D(ztop, rh))
-                    dms.append(dm)
-                    wgts.append(weight)
-                for p, (vppc, vspc, rhpc, prpc) in dmstats1(dms,
-                            percentiles=[0.16, 0.5, 0.84],
-                            Ndepth=100,
-                            Nvalue=100,
-                            weights=wgts, **mapkwargs):
-                    # for _ in vppc, vspc, rhpc, prpc:
-                    #     _.blur(0.1)
-                    try:
-                        l = 3 if p == 0.5 else 1
-                        vppc.show(rd.axvp, color="b", linewidth=l)
-                        vspc.show(rd.axvs, color="b", linewidth=l)
-                        rhpc.show(rd.axrh, color="b", linewidth=l)
-                        prpc.show(rd.axpr, color="b", linewidth=l)
+                        cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
+                        pos = rd.axdisp[-1].get_position()
+                        cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
+                        rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+                        cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
-                        #dmout = depthmodel(vppc, vspc, rhpc) #use extract for saveing
-                        #dmout.write96('_HerrMet.p%.2f.mod96' % p, overwrite=True)#use extract for saveing
-                    except KeyboardInterrupt: raise
-                    except Exception as e:
-                        print "Error", str(e)
-        else:
-            print "call option --run to start inversion"
+                # ---- display posterior pdf
+                if "pdf" in argv.keys():
+
+                    assert argv["pdf"] is None or len(argv["pdf"]) == 3 # unexpected argument number
+                    if argv["pdf"] is None:
+                        pdf_llkmin, pdf_limit, pdf_step = default_pdf_llkmin, default_pdf_limit, default_pdf_step
+                    elif len(argv['pdf']) == 3:
+                        pdf_llkmin, pdf_limit, pdf_step = argv['pdf']
+
+                    print "pdf : llkmin %f, limit %d, step %d" % (pdf_llkmin, pdf_limit, pdf_step),
+                    chainids, weights, llks, ms, ds = rundb.like_read_run_1(llkmin=pdf_llkmin, limit=pdf_limit, step=pdf_step)
+
+                    dms, wgts = [], []
+                    for weight, (ztop, vp, vs, rh) in zip(weights, ms):#readHerrmetout("_HerrMet.run"):
+                        dm = depthmodel_from_arrays(ztop, vp, vs, rh)
+                        dms.append(dm)
+                        wgts.append(weight)
+                    for p, (vppc, vspc, rhpc, prpc) in \
+                            dmstats1(dms,
+                                     percentiles=[0.16, 0.5, 0.84],
+                                     Ndepth=100,
+                                     Nvalue=100,
+                                     weights=wgts, **mapkwargs):
+                        try:
+                            l = 3 if p == 0.5 else 1
+                            vppc.show(rd.axvp, color="b", linewidth=l)
+                            vspc.show(rd.axvs, color="b", linewidth=l)
+                            rhpc.show(rd.axrh, color="b", linewidth=l)
+                            prpc.show(rd.axpr, color="b", linewidth=l)
+
+                            #dmout = depthmodel(vppc, vspc, rhpc) #use extract for saveing
+                            #dmout.write96('_HerrMet.p%.2f.mod96' % p, overwrite=True)#use extract for saveing
+                        except KeyboardInterrupt: raise
+                        except Exception as e:
+                            print "Error", str(e)
 
         # ------
         if os.path.exists('_HerrMet.param'):

@@ -437,12 +437,13 @@ class RunFile(Database):
                       for pointid, dispval in zip(pointids, dispvals)])
 
     # ----------------------------
-    def get(self, llkmin=None, limit=None):
+    def get(self, llkmin=None, limit=None, step=None):
         """
         get models from the database, ordered by decreasing likelyhood
         input :
-            llkmin = None or float < 0, lowest accepted log-likelihood
-            limit = None or int, max number of distinct models to return
+            llkmin = None, 0 or float < 0, lowest accepted log-likelihood
+            limit = None, 0 or int, max number of distinct models to return
+            step = None or int >= 1, yield one model every "step" models
         output (generator):
             item = (MODELID, WEIGHT, LLK, NLAYER, (ztop, vp, vs, rh), (waves, types, modes, freqs, values))
                 where
@@ -454,8 +455,13 @@ class RunFile(Database):
                 (waves, types, modes, freqs, values) = arrays with same lengths, dispersion curves
         """
 
-        llksql = "where llk > %f" % llkmin if llkmin is not None else ""
-        limitsql = "limit %d" % limit if limit is not None else ""
+        if llkmin is None: llkmin = 0
+        if limit is None: limit = 0
+        if step is None: step = 1
+
+        llksql = "where llk > %f" % llkmin if llkmin != 0 else ""
+        limitsql = "limit %d" % limit if limit != 0 else ""
+
         sql= """
         select MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT,PL, PV, W, T, M, F, DV from
             -- models
@@ -497,7 +503,9 @@ class RunFile(Database):
         if s is None: return
 
         # -----------------
-        for MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT,PL, PV, W, T, M, F, DV in s:
+        for n, (MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT,PL, PV, W, T, M, F, DV) in enumerate(s):
+            if n % step: continue
+
             PT = np.asarray(PT.split(','), '|S2')  # parameter type
             PL = np.asarray(PL.split(','), int)    # parameter layer
             PV = np.asarray(PV.split(','), float)  # parameter value
@@ -517,10 +525,12 @@ class RunFile(Database):
             yield MODELID, CHAINID, WEIGHT, LLK, NLAYER, (Z, VP, VS, RH), (W, T, M, F, DV)
 
     # ----------------------------
-    def like_read_run_1(self, top=None, topstep=1):
-        """mimics behaviour of (obsolet) function read_run_1"""
+    def like_read_run_1(self, llkmin=None, limit=None, step=None):
+        """
+        zipped output from self.get
+        """
         start = time.time()
-        out = list(self.get(llkmin=None, limit=top))[::topstep]
+        out = list(self.get(llkmin=llkmin, limit=limit, step=step))
         print "retrieved %d models in %.6fs " % (len(out), time.time() - start)
         _, chainids, weights, llks, _, ms, ds = zip(*out)
 
