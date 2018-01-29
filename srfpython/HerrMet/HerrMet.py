@@ -180,7 +180,7 @@ HerrMet --param 7 3. \\
             --display
 
 # >> now edit _HerrMet.param and customize it, check with 
-HerrMet --disp
+HerrMet --display
 
 # 3/ Inversion
 # run inversion with 12 chains, keep 1000 models each, 
@@ -293,7 +293,7 @@ if __name__ == "__main__":
             raise Exception('please pick one type in %s' % str(default_parameterization_list))
         write_default_paramfile(nlayer, zbot, type=type, basedon=basedon, dvp=dvp, dvs=dvs, drh=drh, dpr=dpr)
         print "please customize _HerrMet.param, do not change line orders and metadata"
-        print "use option --disp to see the depth boudaries"
+        print "use option --display to see the depth boundaries"
         # sys.exit()
     # -------------------------------------
     if "target" in argv.keys():
@@ -343,7 +343,7 @@ if __name__ == "__main__":
         # -------------------
         s.write96('_HerrMet.target')
         print "please only datapoints to invert in _HerrMet.target"
-        print "use option --disp to see the target data"
+        print "use option --display to see the target data"
         # sys.exit()
 
     # -------------------------------------
