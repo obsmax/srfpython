@@ -401,87 +401,6 @@ if __name__ == "__main__":
                 rundb.commit()
             except:
                 rundb.rollback(crash=True)
-    # -------------------------------------
-
-    # -------------------------------------
-    if "runold" in argv.keys():
-        mode = argv['run'][0]
-        assert mode in ['append', 'restart']
-
-        Nchain = int(argv['nchain'][0]) if "nchain" in argv.keys() else default_nchain
-        Nkeep = int(argv['nkeep'][0]) if "nkeep" in argv.keys() else default_nkeep
-
-        # ------
-        p, logRHOM = load_paramfile('_HerrMet.param')
-        # ------
-        d = makedatacoder("_HerrMet.target", which=Datacoder_log)  # datacoder based on observations
-        dobs, CDinv = d.target()
-        duncs = CDinv ** -.5
-        ND = len(dobs)
-        dinfs = d(0.1 * np.ones_like(d.values))
-        dsups = d(3.5 * np.ones_like(d.values))
-        logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
-        # ------
-        G = Theory(parameterizer=p, datacoder=d)
-
-
-        # ------
-        # rd = DepthDispDisplay(targetfile="_HerrMet.target")
-        # rd.plotmodel(alpha = 1.0, color = "r", linewidth = 3, *p.inv(p.MINF))
-        # rd.plotmodel(alpha = 1.0, color="r", linewidth=3, *p.inv(p.MSUP))
-        # rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs), dvalues = d.dvalues, alpha = 1.0, color="k", linewidth=3)
-        # showme(False)
-        # ---------------------------------
-        def gen():
-            for nchain in xrange(Nchain):
-                M0 = np.random.rand(len(p.MINF)) * (p.MSUP - p.MINF) + p.MINF
-                MSTD = p.MSTD
-                yield Job(nchain, M0, MSTD, nkeep=Nkeep)
-
-
-        def fun(worker, chainid, M0, MSTD, nkeep):
-            models, datas, weights, llks = metropolis(M0, MSTD, G, ND, logRHOD, logRHOM,
-                                                      nkeep=nkeep,
-                                                      normallaw=worker.randn,
-                                                      unilaw=worker.rand,
-                                                      chainid=chainid,
-                                                      HL=10,
-                                                      IK0=0.25,
-                                                      MPMIN=1.e-6,
-                                                      MPMAX=1e6,
-                                                      adjustspeed=0.3,
-                                                      nofail=True,
-                                                      debug=False,
-                                                      verbose=verbose)
-
-            I = np.any(~np.isnan(datas), axis=1)
-            models, datas, weights, llks = models[I, :], datas[I, :], weights[I], llks[I]
-
-            return chainid, models, datas, weights, llks
-
-
-        # ---------------------------------
-        with MapAsync(fun, gen(), **mapkwargs) as ma, open('_HerrMet.run',
-                                                           'w' if mode == "restart" else "a") as fid:
-            fid.write('#CHAINID WEIGHT NLAYER LLK ZTOP[1:] VP VS RH WAVES TYPES MODES FREQS VALUES\n')
-            for jobid, (chainid, models, datas, weights, llks), _, _ in ma:
-                for mdl, dat, wgt, llk in zip(models, datas, weights, llks):
-                    ztop, vp, vs, rh = p.inv(mdl)
-                    values = d.inv(dat)
-                    nlayer = len(ztop)
-                    fid.write("%d %d %d %f %s %s %s %s %s %s %s %s %s\n" %
-                              (chainid, wgt, nlayer, llk,
-                               tostr(ztop[1:], "%.4f"),
-                               tostr(vp, "%.3f"),
-                               tostr(vs, "%.3f"),
-                               tostr(rh, "%.3f"),
-                               tostr(d.waves, "%s"),
-                               tostr(d.types, "%s"),
-                               tostr(d.modes, "%d"),
-                               tostr(d.freqs, "%.4f"),
-                               tostr(values, "%4f")))
-
-                    # sys.exit()
 
     # -------------------------------------
     if "extract" in argv.keys():
@@ -511,6 +430,7 @@ if __name__ == "__main__":
             except KeyboardInterrupt: raise
             except Exception as e:
                 print "Error", str(e)
+
     # -------------------------------------
     if "disp" in argv.keys():
         assert not ("best" in argv.keys() and "overdisp" in argv.keys()) #options are not compatible
@@ -537,6 +457,7 @@ if __name__ == "__main__":
             vmin, vmax = llks.min(), llks.max()
             colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=cmap)
 
+            # ----
             if "best" in argv.keys():
                 for i in range(len(llks))[::-1]:
                     ztop, vp, vs, rh = ms[i]
@@ -555,6 +476,7 @@ if __name__ == "__main__":
                 rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
                 cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
+            # ----
             elif "overdisp" in argv.keys():
                 """note : recomputing dispersion with another frequency array might
                           result in a completely different dispersion curve in case
@@ -578,6 +500,7 @@ if __name__ == "__main__":
                 rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
                 cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
+            # ----
             if "range" in argv.keys():
                 dms, wgts = [], []
                 for weight, (ztop, vp, vs, rh) in zip(weights, ms):#readHerrmetout("_HerrMet.run"):
@@ -686,3 +609,86 @@ if __name__ == "__main__":
             rd.fig.savefig('_HerrMet.png')
         else:
             showme()
+    #
+    #
+    #
+    #
+    # # -------------------------------------
+    # if "runold" in argv.keys():
+    #     mode = argv['run'][0]
+    #     assert mode in ['append', 'restart']
+    #
+    #     Nchain = int(argv['nchain'][0]) if "nchain" in argv.keys() else default_nchain
+    #     Nkeep = int(argv['nkeep'][0]) if "nkeep" in argv.keys() else default_nkeep
+    #
+    #     # ------
+    #     p, logRHOM = load_paramfile('_HerrMet.param')
+    #     # ------
+    #     d = makedatacoder("_HerrMet.target", which=Datacoder_log)  # datacoder based on observations
+    #     dobs, CDinv = d.target()
+    #     duncs = CDinv ** -.5
+    #     ND = len(dobs)
+    #     dinfs = d(0.1 * np.ones_like(d.values))
+    #     dsups = d(3.5 * np.ones_like(d.values))
+    #     logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
+    #     # ------
+    #     G = Theory(parameterizer=p, datacoder=d)
+    #
+    #
+    #     # ------
+    #     # rd = DepthDispDisplay(targetfile="_HerrMet.target")
+    #     # rd.plotmodel(alpha = 1.0, color = "r", linewidth = 3, *p.inv(p.MINF))
+    #     # rd.plotmodel(alpha = 1.0, color="r", linewidth=3, *p.inv(p.MSUP))
+    #     # rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs), dvalues = d.dvalues, alpha = 1.0, color="k", linewidth=3)
+    #     # showme(False)
+    #     # ---------------------------------
+    #     def gen():
+    #         for nchain in xrange(Nchain):
+    #             M0 = np.random.rand(len(p.MINF)) * (p.MSUP - p.MINF) + p.MINF
+    #             MSTD = p.MSTD
+    #             yield Job(nchain, M0, MSTD, nkeep=Nkeep)
+    #
+    #
+    #     def fun(worker, chainid, M0, MSTD, nkeep):
+    #         models, datas, weights, llks = metropolis(M0, MSTD, G, ND, logRHOD, logRHOM,
+    #                                                   nkeep=nkeep,
+    #                                                   normallaw=worker.randn,
+    #                                                   unilaw=worker.rand,
+    #                                                   chainid=chainid,
+    #                                                   HL=10,
+    #                                                   IK0=0.25,
+    #                                                   MPMIN=1.e-6,
+    #                                                   MPMAX=1e6,
+    #                                                   adjustspeed=0.3,
+    #                                                   nofail=True,
+    #                                                   debug=False,
+    #                                                   verbose=verbose)
+    #
+    #         I = np.any(~np.isnan(datas), axis=1)
+    #         models, datas, weights, llks = models[I, :], datas[I, :], weights[I], llks[I]
+    #
+    #         return chainid, models, datas, weights, llks
+    #
+    #
+    #     # ---------------------------------
+    #     with MapAsync(fun, gen(), **mapkwargs) as ma, open('_HerrMet.run',
+    #                                                        'w' if mode == "restart" else "a") as fid:
+    #         fid.write('#CHAINID WEIGHT NLAYER LLK ZTOP[1:] VP VS RH WAVES TYPES MODES FREQS VALUES\n')
+    #         for jobid, (chainid, models, datas, weights, llks), _, _ in ma:
+    #             for mdl, dat, wgt, llk in zip(models, datas, weights, llks):
+    #                 ztop, vp, vs, rh = p.inv(mdl)
+    #                 values = d.inv(dat)
+    #                 nlayer = len(ztop)
+    #                 fid.write("%d %d %d %f %s %s %s %s %s %s %s %s %s\n" %
+    #                           (chainid, wgt, nlayer, llk,
+    #                            tostr(ztop[1:], "%.4f"),
+    #                            tostr(vp, "%.3f"),
+    #                            tostr(vs, "%.3f"),
+    #                            tostr(rh, "%.3f"),
+    #                            tostr(d.waves, "%s"),
+    #                            tostr(d.types, "%s"),
+    #                            tostr(d.modes, "%d"),
+    #                            tostr(d.freqs, "%.4f"),
+    #                            tostr(values, "%4f")))
+    #
+    #                 # sys.exit()

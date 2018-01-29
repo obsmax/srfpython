@@ -278,125 +278,6 @@ def load_paramfile(paramfile):
     print "prior type     : ", logRHOM.__class__.__name__
     return p, logRHOM
 
-
-# -------------------------------------
-# run file : crappy, to be optimized
-# -------------------------------------
-def read_runfile_serial(f):
-    with open(f, 'r') as fid:
-        nfield = None
-        while True:
-            l = fid.readline().strip()
-            if l == "": break
-            if l == "\n" or l.startswith("#"): continue
-            l = l.strip('\n').split()
-            if nfield is None: nfield = len(l)
-            elif not len(l) == nfield:
-                print l
-                break #line is not full, a run is probably in progress
-            chainid, weight, nlayer = np.asarray(l[:3], int)
-            llk = float(l[3])
-            lmod = np.concatenate(([0.], np.asarray(l[4:4 + 4 * nlayer - 1], float)))
-
-            ldat = l[4 + 4 * nlayer - 1:]
-            ndat = len(ldat) / 5
-
-            ztop = lmod[:nlayer]
-            vp = lmod[nlayer: 2 * nlayer]
-            vs = lmod[2 * nlayer: 3 * nlayer]
-            rh = lmod[3 * nlayer: 4 * nlayer]
-            waves = ldat[:ndat]
-            types = ldat[ndat:2 * ndat]
-            modes = np.array(ldat[2 * ndat:3 * ndat], int)
-            freqs = np.array(ldat[3 * ndat:4 * ndat], float)
-            values = np.array(ldat[4 * ndat:5 * ndat], float)
-            yield chainid, weight, llk, (ztop, vp, vs, rh), (waves, types, modes, freqs, values)
-
-
-# -------------------------------------
-def read_runfile(f, **mapkwargs):
-    def gen():
-        with open(f, 'r') as fid:
-            nfield = None
-            while True:
-                l = fid.readline().strip()
-                if l == "": break
-                if l == "\n" or l.startswith("#"): continue
-                l = l.strip('\n').split()
-                if nfield is None:
-                    nfield = len(l)
-                elif not len(l) == nfield:
-                    print l
-                    break  # line is not full, a run is probably in progress
-                yield Job(l)
-
-    def fun(l):
-        chainid, weight, nlayer = np.asarray(l[:3], int)
-        llk = float(l[3])
-        lmod = np.concatenate(([0.], np.asarray(l[4:4 + 4 * nlayer - 1], float)))
-
-        ldat = l[4 + 4 * nlayer - 1:]
-        ndat = len(ldat) / 5
-
-        ztop = lmod[:nlayer]
-        vp = lmod[nlayer: 2 * nlayer]
-        vs = lmod[2 * nlayer: 3 * nlayer]
-        rh = lmod[3 * nlayer: 4 * nlayer]
-        waves = ldat[:ndat]
-        types = ldat[ndat:2 * ndat]
-        modes = np.array(ldat[2 * ndat:3 * ndat], int)
-        freqs = np.array(ldat[3 * ndat:4 * ndat], float)
-        values = np.array(ldat[4 * ndat:5 * ndat], float)
-        return  chainid, weight, llk, (ztop, vp, vs, rh), (waves, types, modes, freqs, values)
-    with MapAsync(fun, gen(), **mapkwargs) as ma:
-        for _, ans, _, _ in ma:
-            #print (j[1] - j[0]) / (g[1] - g[0])
-            yield ans
-
-
-# -------------------------------------
-def read_runfile_1(f, top=None, topstep=1, **mapkwargs):
-    chainids, weights, llks, ms, ds = zip(*list(read_runfile(f, **mapkwargs)))
-    chainids, weights, llks = [np.asarray(_) for _ in chainids, weights, llks]
-    if top is not None:
-        I = np.argsort(llks)[::-1][:top][::topstep]
-    else: #means all data
-        I = np.argsort(llks)[::-1]
-    return chainids[I], weights[I], llks[I], [ms[i] for i in I], [ds[i] for i in I]
-
-
-# -------------------------------------
-def read_runfile_2(f, **mapkwargs):
-    with open(f, 'r') as fid:
-        nmodels = 1
-        while True:
-            l = fid.readline()
-            if l == "": break
-            if l.startswith('#'): continue
-            nmodels += 1
-    # -------------------
-    g = read_runfile(f, **mapkwargs)
-    chainid, weight, llk, (ztop, vp, vs, rh), (waves, types, modes, freqs, values) = g.next()
-    ZTOP = np.zeros((nmodels, len(ztop)), float) * np.nan
-    VP = np.zeros((nmodels, len(vp)), float) * np.nan
-    VS   = np.zeros((nmodels, len(vs)), float) * np.nan
-    RH = np.zeros((nmodels, len(rh)), float) * np.nan
-    WEIGHTS = np.zeros(nmodels, int)
-    LLKS = np.zeros(nmodels, int) * np.nan
-    # -------------------
-    ZTOP[0, :], VP[0, :], VS[0, :], RH[0,:], WEIGHTS[0], LLKS[0] = ztop, vp, vs, rh, weight, llk
-    # -------------------
-    for n, (chainid, weight, llk, (ztop, vp, vs, rh), _) in enumerate(read_runfile(f, **mapkwargs)):
-        ZTOP[n+1, :], \
-        VP[n+1, :], \
-        VS[n+1, :], \
-        RH[n+1, :], \
-        WEIGHTS[n+1],\
-        LLKS = ztop, vp, vs, rh, weight, llk
-    # -------------------
-    return ZTOP, VP, VS, RH, WEIGHTS, LLKS
-
-
 # -------------------------------------
 # run file : based on sqlite
 # -------------------------------------
@@ -674,3 +555,122 @@ if __name__ == "__main__":
     A = load_paramfile("_HerrMet.param")
     print A
 
+
+
+# # -------------------------------------
+# # run file : crappy, to be optimized
+# # -------------------------------------
+# def read_runfile_serial(f):
+#     with open(f, 'r') as fid:
+#         nfield = None
+#         while True:
+#             l = fid.readline().strip()
+#             if l == "": break
+#             if l == "\n" or l.startswith("#"): continue
+#             l = l.strip('\n').split()
+#             if nfield is None: nfield = len(l)
+#             elif not len(l) == nfield:
+#                 print l
+#                 break #line is not full, a run is probably in progress
+#             chainid, weight, nlayer = np.asarray(l[:3], int)
+#             llk = float(l[3])
+#             lmod = np.concatenate(([0.], np.asarray(l[4:4 + 4 * nlayer - 1], float)))
+#
+#             ldat = l[4 + 4 * nlayer - 1:]
+#             ndat = len(ldat) / 5
+#
+#             ztop = lmod[:nlayer]
+#             vp = lmod[nlayer: 2 * nlayer]
+#             vs = lmod[2 * nlayer: 3 * nlayer]
+#             rh = lmod[3 * nlayer: 4 * nlayer]
+#             waves = ldat[:ndat]
+#             types = ldat[ndat:2 * ndat]
+#             modes = np.array(ldat[2 * ndat:3 * ndat], int)
+#             freqs = np.array(ldat[3 * ndat:4 * ndat], float)
+#             values = np.array(ldat[4 * ndat:5 * ndat], float)
+#             yield chainid, weight, llk, (ztop, vp, vs, rh), (waves, types, modes, freqs, values)
+#
+#
+# # -------------------------------------
+# def read_runfile(f, **mapkwargs):
+#     def gen():
+#         with open(f, 'r') as fid:
+#             nfield = None
+#             while True:
+#                 l = fid.readline().strip()
+#                 if l == "": break
+#                 if l == "\n" or l.startswith("#"): continue
+#                 l = l.strip('\n').split()
+#                 if nfield is None:
+#                     nfield = len(l)
+#                 elif not len(l) == nfield:
+#                     print l
+#                     break  # line is not full, a run is probably in progress
+#                 yield Job(l)
+#
+#     def fun(l):
+#         chainid, weight, nlayer = np.asarray(l[:3], int)
+#         llk = float(l[3])
+#         lmod = np.concatenate(([0.], np.asarray(l[4:4 + 4 * nlayer - 1], float)))
+#
+#         ldat = l[4 + 4 * nlayer - 1:]
+#         ndat = len(ldat) / 5
+#
+#         ztop = lmod[:nlayer]
+#         vp = lmod[nlayer: 2 * nlayer]
+#         vs = lmod[2 * nlayer: 3 * nlayer]
+#         rh = lmod[3 * nlayer: 4 * nlayer]
+#         waves = ldat[:ndat]
+#         types = ldat[ndat:2 * ndat]
+#         modes = np.array(ldat[2 * ndat:3 * ndat], int)
+#         freqs = np.array(ldat[3 * ndat:4 * ndat], float)
+#         values = np.array(ldat[4 * ndat:5 * ndat], float)
+#         return  chainid, weight, llk, (ztop, vp, vs, rh), (waves, types, modes, freqs, values)
+#     with MapAsync(fun, gen(), **mapkwargs) as ma:
+#         for _, ans, _, _ in ma:
+#             #print (j[1] - j[0]) / (g[1] - g[0])
+#             yield ans
+#
+#
+# # -------------------------------------
+# def read_runfile_1(f, top=None, topstep=1, **mapkwargs):
+#     chainids, weights, llks, ms, ds = zip(*list(read_runfile(f, **mapkwargs)))
+#     chainids, weights, llks = [np.asarray(_) for _ in chainids, weights, llks]
+#     if top is not None:
+#         I = np.argsort(llks)[::-1][:top][::topstep]
+#     else: #means all data
+#         I = np.argsort(llks)[::-1]
+#     return chainids[I], weights[I], llks[I], [ms[i] for i in I], [ds[i] for i in I]
+#
+#
+# # -------------------------------------
+# def read_runfile_2(f, **mapkwargs):
+#     with open(f, 'r') as fid:
+#         nmodels = 1
+#         while True:
+#             l = fid.readline()
+#             if l == "": break
+#             if l.startswith('#'): continue
+#             nmodels += 1
+#     # -------------------
+#     g = read_runfile(f, **mapkwargs)
+#     chainid, weight, llk, (ztop, vp, vs, rh), (waves, types, modes, freqs, values) = g.next()
+#     ZTOP = np.zeros((nmodels, len(ztop)), float) * np.nan
+#     VP = np.zeros((nmodels, len(vp)), float) * np.nan
+#     VS   = np.zeros((nmodels, len(vs)), float) * np.nan
+#     RH = np.zeros((nmodels, len(rh)), float) * np.nan
+#     WEIGHTS = np.zeros(nmodels, int)
+#     LLKS = np.zeros(nmodels, int) * np.nan
+#     # -------------------
+#     ZTOP[0, :], VP[0, :], VS[0, :], RH[0,:], WEIGHTS[0], LLKS[0] = ztop, vp, vs, rh, weight, llk
+#     # -------------------
+#     for n, (chainid, weight, llk, (ztop, vp, vs, rh), _) in enumerate(read_runfile(f, **mapkwargs)):
+#         ZTOP[n+1, :], \
+#         VP[n+1, :], \
+#         VS[n+1, :], \
+#         RH[n+1, :], \
+#         WEIGHTS[n+1],\
+#         LLKS = ztop, vp, vs, rh, weight, llk
+#     # -------------------
+#     return ZTOP, VP, VS, RH, WEIGHTS, LLKS
+#
