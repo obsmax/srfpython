@@ -18,6 +18,7 @@ WARNING : This module calls fortran programs, make sure they are compiled correc
 
 _pathfile = os.path.realpath(__file__) #.../srfpyhon/HerrMann/dispersion.py
 _file     = _pathfile.split('/')[-1]
+_src      = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src90/"
 srfpre96_exe = _pathfile.replace(_file, 'bin/max_srfpre96')
 srfdis96_exe = _pathfile.replace(_file, 'bin/max_srfdis96')
 
@@ -25,8 +26,13 @@ srfdis96_exe = _pathfile.replace(_file, 'bin/max_srfdis96')
 # #####################################
 def check_herrmann_codes():
     "check successfull compilation"
-    if not os.path.exists(srfpre96_exe) or not os.path.exists(srfdis96_exe):
-        raise Exception('could not find %s and/or %s' % (srfpre96_exe, srfdis96_exe))
+    solution = "please recompile fortran codes using recompile_src90"
+    if not os.path.isdir(_src):
+        raise Exception('directory %s not found' % _src)
+    if not os.path.exists(srfpre96_exe):
+        raise Exception('could not find %s\n%s' % (srfpre96_exe, solution))
+    if not os.path.exists(srfdis96_exe):
+        raise Exception('could not find %s\n%s' % (srfdis96_exe, solution))
     # depth model
     ztop = [0.00, 1.00] #km, top layer depth
     vp   = [2.00, 3.00] #km/s
@@ -46,7 +52,21 @@ def check_herrmann_codes():
         assert (w, t, m) == ("R", "C", 0)
         assert np.all(F == np.array([1., 2.]))
     except AssertionError:
-        raise Exception('could not execute fortran codes, try to recompile them (see srfpython/README.md)')
+        raise Exception('could not execute fortran codes\n%s' % solution)
+
+
+# ------------
+def recompile_src90(yes=False):
+    script = """
+cd {_src}
+./clean.sh && ./compile.sh
+""".format(_src=_src)
+    if yes:
+        os.system(script)
+    else:
+        print(script)
+        if raw_input('run command?').lower() in ["y", "yes"]:
+            os.system(script)
 
 
 # ##################################### MODIFIED HERRMANN'S CODES

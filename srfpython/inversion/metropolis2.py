@@ -287,6 +287,13 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
             * use thread safe random functions, numpy onces are not thread safe
             * failure during call to G are treated as non fatal, if the theory fails to produce data, the likelyhood is penalyzed so that the chain should run
               away from that zones. If all models are failing, the chain will sample the prior pdf only (with very low llks)
+    notations :
+        IK = instantaneous keep ratio
+        AK = average keep ratio
+        IS = instantaneous speed
+        AS = average speed
+        MP = master proposal
+        LI = log likelyhood
     #-------------------
     variables:
         ntest    = number of tested models since chain start
@@ -296,7 +303,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         icurrent = the position in array models of the last generated model
 
     """
-    summary = """chainid %5d, status %10s, test %5d kept %5d fail %5d, Av. Keep ratio (AK) %.2f, Master Proposal (MP) %.2f, Av. speed (AS) %.2f/s, Final Likelihood (LI) %f"""
+    summary = """chain%5d %5s kept%5d/%5d fail%5d AK%5.2f MP%5.2f AS%7.2f/s LI %f"""
     # ----
     nfail = 0
 
@@ -364,7 +371,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         if nfail >= nkeep and nfail >= ntest and not nofail:
             #all attempts to call G failed, it might be due to a programming error...
             #if verbose: print ("chainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f, PRESUMED ERROR IN THEORY" % (chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
-            print (summary % (chainid, "PRESUMED ERROR IN THEORY", ntest, nkept, nfail, AK, MP, AS, LI))
+            print (summary % (chainid, "ERROR", nkept, ntest, nfail, AK, MP, AS, LI)) #PRESUMED ERROR IN THEORY
             while icurrent:
                 G(models[icurrent, :]) #run G to reproduce the error message
                 icurrent -= 1
@@ -374,7 +381,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         if nstay >= nkeep:
             #stuck signal
             #if verbose: print ("chainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f, STUCK" % (chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
-            print (summary % (chainid, "STUCK", ntest, nkept, nfail, AK, MP, AS, LI))
+            print (summary % (chainid, "STUCK", nkept, ntest, nfail, AK, MP, AS, LI))
             return models[:icurrent, :], datas[:icurrent, :], weights[:icurrent], llks[:icurrent]
 
         # ----------------------
@@ -423,7 +430,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
                 weights[icurrent] += 1
                 #yield True, MI, DI, LI #stay
     #if verbose:print ("chainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f, DONE" % (chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
-    print (summary % (chainid, "DONE", ntest, nkept, nfail, AK, MP, AS, LI))
+    print (summary % (chainid, "DONE", nkept, ntest, nfail, AK, MP, AS, LI))
     return models, datas, weights, llks
 
 
