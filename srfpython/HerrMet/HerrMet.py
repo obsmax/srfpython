@@ -54,6 +54,7 @@ autorizedkeys = \
      "version", "v",
      "help", "h",
      "example", "ex",
+     "clean",
      "param", "basedon", "t", "dvp", "dvs", "drh", "growing", "op",
      "target", "resamp", "lunc", "unc", "ot",
      "run", "nchain", "nkeep", "verbose",
@@ -342,7 +343,7 @@ if __name__ == "__main__":
             s.data['DVALUE'] = unc
         # -------------------
         s.write96('_HerrMet.target')
-        print "please only datapoints to invert in _HerrMet.target"
+        print "please keep only datapoints to invert in _HerrMet.target"
         print "use option --display to see the target data"
         # sys.exit()
 
@@ -373,7 +374,7 @@ if __name__ == "__main__":
         G = Theory(parameterizer=p, datacoder=d)
         # ---------------------------------
         if mode == "restart":
-            with RunFile('_HerrMet.run', create=True) as rundb:
+            with RunFile('_HerrMet.run', create=True, verbose=verbose) as rundb:
                 rundb.drop()
                 rundb.reset(p.NLAYER, d.waves, d.types, d.modes, d.freqs)
         elif mode == "append":
@@ -407,7 +408,7 @@ if __name__ == "__main__":
 
             return chainid, models, datas, weights, llks
         # ---------------------------------
-        with MapAsync(fun, gen(), **mapkwargs) as ma, RunFile("_HerrMet.run") as rundb:
+        with MapAsync(fun, gen(), **mapkwargs) as ma, RunFile("_HerrMet.run", verbose=verbose) as rundb:
             rundb.begintransaction()
 
             try:
@@ -427,7 +428,7 @@ if __name__ == "__main__":
         elif len(argv['extract']) == 3:
             extract_llkmin, extract_limit, extract_step = argv['extract']
 
-        with RunFile('_HerrMet.run') as rundb:
+        with RunFile('_HerrMet.run', verbose=verbose) as rundb:
             print "extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step),
             chainids, weights, llks, ms, ds = rundb.like_read_run_1(llkmin=extract_llkmin, limit=extract_limit, step=extract_step)
 
@@ -468,7 +469,7 @@ if __name__ == "__main__":
         # ------ Display run results if exist
         if os.path.exists('_HerrMet.run') and ("top" in argv.keys() or "pdf" in argv.keys()):
 
-            with RunFile('_HerrMet.run') as rundb:
+            with RunFile('_HerrMet.run', verbose=verbose) as rundb:
 
                 # --- display best models
                 if "top" in argv.keys():
