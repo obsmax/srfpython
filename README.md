@@ -65,6 +65,6 @@ add the bin directory to the path (recommended)
 try the tutorial
 
 > ```
-> cd ~/git/srfpython/srfpython/tutorial
+> cd ~/git/srfpython/tutorial
 > jupyter notebook 
 > ```
