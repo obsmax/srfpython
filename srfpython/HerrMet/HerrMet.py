@@ -81,14 +81,26 @@ help = '''HerrMet V{version}
                      if not specified, I take fixed values to build the parameter file
     -t       s       parameterization type to use ({default_parameterization_list}), 
                      default {default_parameterization}
-                     mZVSPRRH = parameterize with depth interface, VS in each layer, 
-                                VP/VS in each layer, Density in each layer
-                     mZVSVPRH = parameterize with depth interface, VP in each layer, 
-                                VP/VS in each layer, Density in each layer
-                     mZVSPRzRHvp = parameterize with depth interface, use fixed 
-                                relations for VP/VS versus depth and Density versus VP
-                     mZVSPRzRHz = parameterize with depth interface, use fixed 
-                                relations for VP/VS versus depth and Density versus depth 
+          mZVSPRRH = parameterize with 
+                     - depth interface (mZ1 = first interface, mZ2, ...), 
+                     - VS in each layer (VS0 = first layer, ...), 
+                     - VP/VS in each layer (PR0, PR1, ...), 
+                     - Density in each layer (RH0, RH1, ...)
+          mZVSVPRH = parameterize with depth interface, VP in each layer, 
+                     - depth interface (mZ1 = first interface, mZ2, ...), 
+                     - VS in each layer (VS0 = first layer, ...), 
+                     - VP in each layer (VP0, VP1, ...), 
+                     - Density in each layer (RH0, RH1, ...)
+       mZVSPRzRHvp = parameterize with depth interface, use fixed 
+                     - depth interface (mZ1 = first interface, mZ2, ...), 
+                     - VS in each layer (VS0 = first layer, ...), 
+                     - use a fixed relation between VP/VS = f(z)
+                     - use a fixed relation between RH = f(VP)
+        mZVSPRzRHz = parameterize with depth interface, use fixed 
+                     - depth interface (mZ1 = first interface, mZ2, ...), 
+                     - VS in each layer (VS0 = first layer, ...), 
+                     - use a fixed relation between VP/VS = f(z)
+                     - use a fixed relation between RH = f(z) 
     -dvp     f f     add prior constraint on the vp offset between layers, 
                      requires the extremal values, km/s
     -dvs     f f     add prior constraint on the vs offset between layers, idem
