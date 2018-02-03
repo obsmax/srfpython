@@ -34,11 +34,13 @@ class LogUni(object):
         assert vinf < vsup
         assert k > 1.
         self.vinf, self.vsup = vinf, vsup
+        self.k = float(k)
         self.vmean = 0.5 * (self.vinf + self.vsup)
-        self.std = (self.vsup - self.vinf) / float(k)
+        self.std = (self.vsup - self.vinf) / self.k
         self.nanbehavior = nanbehavior
+
         if self.nanbehavior == 0:
-            self.raiseifnan  = True
+            self.raiseifnan = True
 
         elif self.nanbehavior == 1:
             # case 1: return a constant penalty, for ND pdfs, the penalty will be proportionnal to the number of nans
@@ -50,6 +52,15 @@ class LogUni(object):
             self.raiseifnan = False
             self.nanpenalty = self.call1(self.vinf - 10000. * (self.vsup - self.vinf))  # take the pdf value away from the 0 area
         else: raise ValueError('no such nan behavior implemented')
+
+    # ------------------------------------------------------
+    def __str__(self):
+        return "{name}(vinf={vinf}, vsup={vsup}, k={k}, nanbehavior={nanbehavior})".format(
+            name=self.__class__.__name__,
+            vinf=self.vinf,
+            vsup=self.vsup,
+            k=self.k,
+            nanbehavior=self.nanbehavior)
 
     # ------------------------------------------------------
     def calln(self, v):
@@ -115,8 +126,20 @@ class LogGauss(object):
         assert vinf <= vmean <= vsup
         assert k > 0.
         self.vinf, self.vsup = vinf, vsup
+        self.k, self.nanbehavior = float(k), nanbehavior
         self.vmean, self.vunc = vmean, vunc
         self.luni = LogUni(vinf, vsup, k, nanbehavior)
+
+    # ------------------------------------------------------
+    def __str__(self):
+        return "{name}(vmean={vmean}, vunc={vunc}, vinf={vinf}, vsup={vsup}, k={k}, nanbehavior={nanbehavior})".format(
+            name=self.__class__.__name__,
+            vmean=self.vmean,
+            vunc=self.vunc,
+            vinf=self.vinf,
+            vsup=self.vsup,
+            k=self.k,
+            nanbehavior=self.nanbehavior)
 
     # ------------------------------------------------------
     def calln(self, v):
@@ -154,6 +177,17 @@ class LogUniND(object):
         assert len(vinfs) == len(vsups)
         self.N = len(vinfs)
         self.ls = [LogUni(vinf, vsup, k, nanbehavior) for vinf, vsup in zip(vinfs, vsups)]
+
+    # ------------------------------------------------------
+    def __str__(self):
+        return "{name}(vinfs={vinfs}, vsups={vsups}, k={k}, nanbehavior={nanbehavior})".format(
+            name=self.__class__.__name__,
+            vmean=self.vmean,
+            vunc=self.vunc,
+            vinf=self.vinf,
+            vsup=self.vsup,
+            k=self.k,
+            nanbehavior=self.nanbehavior)
 
     # ------------------------------------------------------
     def callpoints(self, points):
@@ -313,11 +347,11 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
             D = G(M)
             L = logRHOM(M) + logRHOD(D)
         except KeyboardInterrupt: raise
-        except Exception as e:
+        except Exception:
             if debug:
+                # helps user to understand why the theory fails
                 raise
-                #helps user to understand why the theory fails, still not raise an exception
-                print e
+
             #could not compute data array, still sample the prior pdf to converge toward successfull regions, add constant penalty
             nfail += 1
             D = np.zeros(ND, float) * np.nan
@@ -370,7 +404,6 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         # ----------------------
         if nfail >= nkeep and nfail >= ntest and not nofail:
             #all attempts to call G failed, it might be due to a programming error...
-            #if verbose: print ("chainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f, PRESUMED ERROR IN THEORY" % (chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
             print (summary % (chainid, "ERROR", nkept, ntest, nfail, AK, MP, AS, LI)) #PRESUMED ERROR IN THEORY
             while icurrent:
                 G(models[icurrent, :]) #run G to reproduce the error message
@@ -380,14 +413,16 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         # ----------------------
         if nstay >= nkeep:
             #stuck signal
-            #if verbose: print ("chainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f, STUCK" % (chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
             print (summary % (chainid, "STUCK", nkept, ntest, nfail, AK, MP, AS, LI))
             return models[:icurrent, :], datas[:icurrent, :], weights[:icurrent], llks[:icurrent]
 
         # ----------------------
         if not ntest % (10 * HL) and ntest: #True
             #report stats
-            if verbose: print ("chainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f" % (chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
+            if verbose:
+                print \
+                ("chainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f" % \
+                (chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
             #print (MP, " ".join(['%.4f' % _ for _ in MSTD / MSTD.max()]))
 
         # ----------------------
@@ -429,7 +464,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
                 Ikept[ntest % HL] = False
                 weights[icurrent] += 1
                 #yield True, MI, DI, LI #stay
-    #if verbose:print ("chainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f, DONE" % (chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
+
     print (summary % (chainid, "DONE", nkept, ntest, nfail, AK, MP, AS, LI))
     return models, datas, weights, llks
 

@@ -1,4 +1,4 @@
-from tetedenoeud.display import *
+from tetedenoeud.utils.display import *
 from tetedenoeud.multipro.multipro8 import *
 from metropolis2 import *
 import numpy as np
@@ -46,10 +46,10 @@ plt.colorbar()
 ax3 = gcf().add_subplot(122, sharex = ax2, sharey = ax2)
 
 def gen():
-    for nchain in xrange(16):
+    for nchain in xrange(1):
         M0   = np.random.randn(2)
         MSTD = np.asarray([0.05, 0.05])
-        yield Job(nchain, M0, MSTD, nkeep = 150000)
+        yield Job(nchain, M0, MSTD, nkeep = 15000)
 
 def fun(worker, chainid, M0, MSTD, nkeep):
     def G(model): return np.array([0.])
@@ -60,13 +60,14 @@ def fun(worker, chainid, M0, MSTD, nkeep):
                    nkeep = nkeep,
                    normallaw = worker.randn,
                    unilaw = worker.rand,
-                   chainid = chainid)
+                   chainid = chainid,
+                   verbose = True)
     models = models.repeat(weights, axis = 0)
 
     return models[:, 0], models[:, 1]
 
 X, Y = [], []
-with MapAsync(fun, gen(), Nworkers=4) as ma:
+with MapAsync(fun, gen(), Nworkers=4, Taskset="0-4") as ma:
     for _, (XX, YY), _, _ in ma:
         X = np.concatenate((X, XX))
         Y = np.concatenate((Y, YY))

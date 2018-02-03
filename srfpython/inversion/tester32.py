@@ -1,4 +1,4 @@
-from tetedenoeud.display import *
+from tetedenoeud.utils.display import *
 from tetedenoeud.multipro.multipro8 import *
 from metropolis2 import *
 import numpy as np
@@ -41,6 +41,7 @@ y = np.zeros_like(x)
 y[:12] = G([0.25, 0.15])[:12] + 0.05 * np.random.randn(len(x[:12]))
 y[12:] = G([0.75, 0.08])[12:] + 0.05 * np.random.randn(len(x[12:]))
 s = 0.3 * np.ones_like(x)
+s[12:] /= 2.
 plt.figure(figsize = (12, 6))
 ax1 = gcf().add_subplot(121, xlabel = "mean", ylabel = "std"); ax1 = gca()
 ax2 = gcf().add_subplot(122, xlabel = "x", ylabel = "y"); ax2 = gca()
@@ -71,10 +72,10 @@ if False:
     B = models[:, 1]
 else: #parallel
     def gen():
-        for nchain in xrange(12):
+        for nchain in xrange(48):
             M0 = np.array([np.random.rand() * (amax - amin) + amin, np.random.rand() * (bmax - bmin) + bmin])
             MSTD = np.array([0.1, 0.1])
-            nkeep = 100#00
+            nkeep = 1000#00
             yield Job(nchain, M0, MSTD, nkeep = nkeep)
 
     def fun(worker, chainid, M0, MSTD, nkeep):

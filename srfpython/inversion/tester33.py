@@ -1,4 +1,4 @@
-from tetedenoeud.display import *
+from tetedenoeud.utils.display import *
 from tetedenoeud.multipro.multipro8 import *
 from metropolis2 import *
 import numpy as np

@@ -1,4 +1,4 @@
-from tetedenoeud.display import *
+from tetedenoeud.utils.display import *
 import numpy as np
 from metropolis2 import *
 import time
