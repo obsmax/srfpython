@@ -31,7 +31,7 @@ from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameteriz
 
 check_herrmann_codes()
 # -------------------------------------
-version = "5.0"
+version = "6.0"
 default_mode = "append"
 default_nchain = 12
 default_nkeep = 100
@@ -75,6 +75,16 @@ help = '''HerrMet V{version}
 --version, -v        display version and quit
 --help, -h           display this help message, and quit
 --example, -ex       display an example of script, and quit
+--target     s [s..] set the target dispersion curve(s) from surf96 file(s) (not modified)
+                     for each target, I create a directory in . for temporary files
+                     the data will be reproduced into a target file that can be customized manually
+                     (to remove unwanted points, resample dispersion curves...) 
+    -resamp  f f i s resample the dispersion curve in the target file, 
+                     requires fmin(Hz), fmax(Hz), nfreq, fscale 
+                     (flin=linear in freq domain, plin=linear in period or log=logarithmic scaling)
+    -lunc    f       set constant uncertainties in log domain (uncertainty = value x lunc)
+    -unc     f       set constant uncertainty in linear domain (uncertainty = unc)
+    -ot              force overwriting _HerrMet.target if exists
 --param      i f     generate a template parameter file to custom, need the number of layers 
                      and bottom depth in km
     -basedon s       build parametrization based on an existing mod96 file, require a filename, 
@@ -108,15 +118,6 @@ help = '''HerrMet V{version}
     -dpr     f f     add prior constraint on the vp/vs offset between layers, idem, no unit
     -growing         shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0.
     -op              force overwriting _HerrMet.param if exists
---target     s       set the target dispersion curve from a surf96 file (not modified)
-                     the data will be reproduced into a target file that can be customized manually
-                     (to remove unwanted points, resample dispersion curves...) 
-    -resamp  f f i s resample the dispersion curve in the target file, 
-                     requires fmin(Hz), fmax(Hz), nfreq, fscale 
-                     (flin=linear in freq domain, plin=linear in period or log=logarithmic scaling)
-    -lunc    f       set constant uncertainties in log domain (uncertainty = value x lunc)
-    -unc     f       set constant uncertainty in linear domain (uncertainty = unc)
-    -ot              force overwriting _HerrMet.target if exists
 --run        s       start inversion, requires a running mode 
                      append  : add new models to the exiting run file 
                      restart : overwrite the current run file if any
@@ -275,10 +276,84 @@ if __name__ == "__main__":
         sys.exit()
     # -------------------------------------
     if "clean" in argv.keys():
+        raise NotImplementedError('')
         os.system('rm -f ./_HerrMet.param ./_HerrMet.target ./_HerrMet.run ./_HerrMet.p*.mod96')
         # sys.exit()
     # -------------------------------------
+    if "target" in argv.keys():
+
+        # determine root names from target filess
+        rootnames = []
+        for s96 in argv['target']:
+            rootname = "_HerrMet_" + s96.split('/')[-1].rstrip('.s96').rstrip('.surf96')
+            rootnames.append(rootname)
+        assert len(np.unique(rootnames)) == len(rootnames) # make sure all rootnames are distinct
+
+        # handle already existing files
+        if "ot" not in argv.keys():
+            for rootname in rootnames:
+                if os.path.exists('%s/_HerrMet.target' % rootname):
+                    raise Exception('file %s/_HerrMet.target exists already, use -ot to overwrite' % rootname)
+
+        # loop over targets
+        for rootname, s96 in zip(rootnames, argv['target']):
+
+            # create directory
+            if not os.path.isdir(rootname):
+                os.mkdir(rootname)
+                os.system('cp %s %s/%s.copy' % (s96, rootname, s96.split('/')[-1]))
+
+            s = surf96reader(s96)
+            # -------------------
+            if "resamp" in argv.keys():
+                news = s.copy()
+                news.clear() #clear all entries
+                newf = freqspace(freqmin=float(argv["resamp"][0]),
+                                 freqmax=float(argv["resamp"][1]),
+                                 nfreq=int(argv["resamp"][2]),
+                                 scale=argv["resamp"][3])
+                for law in s.get_all():
+                    law.set_extrapolationmode(1)
+                    stdlaw = Claw(freq=law.freq, value=law.dvalue, extrapolationmode=0)
+
+                    newvalues = law(newf)
+                    newdvalues = stdlaw(newf)
+
+                    I = ~np.isnan(newvalues)
+                    if I.any():
+                        N = I.sum()
+                        news.data['WAVE'] = np.concatenate((news.data['WAVE'], np.array([law.wave]).repeat(N)))
+                        news.data['TYPE'] = np.concatenate((news.data['TYPE'], np.array([law.type]).repeat(N)))
+                        news.data['FLAG'] = np.concatenate((news.data['FLAG'], np.array([law.flag]).repeat(N)))
+                        news.data['MODE'] = np.concatenate((news.data['MODE'], np.array([law.mode]).repeat(N)))
+                        news.data['PERIOD'] = np.concatenate((news.data['PERIOD'], 1. / newf[I]))
+                        news.data['VALUE'] = np.concatenate((news.data['VALUE'], newvalues[I]))
+                        news.data['DVALUE'] = np.concatenate((news.data['DVALUE'], newdvalues[I]))
+
+                s = news
+                # print news
+            # -------------------
+            if "lunc" in argv.keys():
+                # set uncertainties to constant in log domain
+                lunc = float(argv["lunc"][0])
+                s.data['DVALUE'] = s.data['VALUE'] * lunc
+            elif "unc" in argv.keys():
+                # set uncertainties to constant in lin domain
+                unc = float(argv["unc"][0])
+                s.data['DVALUE'] = unc
+            # -------------------
+            if verbose:
+                print "writing %s/_HerrMet.target" % rootname
+            s.write96('%s/_HerrMet.target' % rootname)
+
+        # -------------------
+        print "please keep only datapoints to invert in */_HerrMet.target"
+        print "use option --display to see the target data"
+        # sys.exit()
+
+    # -------------------------------------
     if "param" in argv.keys():
+        raise NotImplementedError('')
         if "op" not in argv.keys():
             assert not os.path.exists('_HerrMet.param')
 
@@ -308,59 +383,10 @@ if __name__ == "__main__":
         print "please customize _HerrMet.param, do not change line orders and metadata"
         print "use option --display to see the depth boundaries"
         # sys.exit()
-    # -------------------------------------
-    if "target" in argv.keys():
-        if "ot" not in argv.keys():
-            assert not os.path.exists('_HerrMet.target')
-
-        s96 = argv["target"][0]
-        s = surf96reader(s96)
-        # -------------------
-        if "resamp" in argv.keys():
-            news = s.copy()
-            news.clear() #clear all entries
-            newf = freqspace(freqmin=float(argv["resamp"][0]),
-                             freqmax=float(argv["resamp"][1]),
-                             nfreq=int(argv["resamp"][2]),
-                             scale=argv["resamp"][3])
-            for law in s.get_all():
-                law.set_extrapolationmode(1)
-                stdlaw = Claw(freq=law.freq, value=law.dvalue, extrapolationmode=0)
-
-                newvalues = law(newf)
-                newdvalues = stdlaw(newf)
-
-                I = ~np.isnan(newvalues)
-                if I.any():
-                    N = I.sum()
-                    news.data['WAVE'] = np.concatenate((news.data['WAVE'], np.array([law.wave]).repeat(N)))
-                    news.data['TYPE'] = np.concatenate((news.data['TYPE'], np.array([law.type]).repeat(N)))
-                    news.data['FLAG'] = np.concatenate((news.data['FLAG'], np.array([law.flag]).repeat(N)))
-                    news.data['MODE'] = np.concatenate((news.data['MODE'], np.array([law.mode]).repeat(N)))
-                    news.data['PERIOD'] = np.concatenate((news.data['PERIOD'], 1. / newf[I]))
-                    news.data['VALUE'] = np.concatenate((news.data['VALUE'], newvalues[I]))
-                    news.data['DVALUE'] = np.concatenate((news.data['DVALUE'], newdvalues[I]))
-
-            s = news
-            # print news
-        # -------------------
-        if "lunc" in argv.keys():
-            # set uncertainties to constant in log domain
-            lunc = float(argv["lunc"][0])
-            s.data['DVALUE'] = s.data['VALUE'] * lunc
-            s.write96('_HerrMet.target')
-        elif "unc" in argv.keys():
-            # set uncertainties to constant in lin domain
-            unc = float(argv["unc"][0])
-            s.data['DVALUE'] = unc
-        # -------------------
-        s.write96('_HerrMet.target')
-        print "please keep only datapoints to invert in _HerrMet.target"
-        print "use option --display to see the target data"
-        # sys.exit()
 
     # -------------------------------------
     if "run" in argv.keys():
+        raise NotImplementedError('')
         mode = argv['run'][0]
         assert mode in ['append', 'restart']
 
@@ -433,7 +459,7 @@ if __name__ == "__main__":
 
     # -------------------------------------
     if "extract" in argv.keys():
-
+        raise NotImplementedError('')
         assert argv["extract"] is None or len(argv["extract"]) == 3  # unexpected argument number
         if argv["extract"] is None:
             extract_llkmin, extract_limit, extract_step = default_extract_llkmin, default_extract_limit, default_extract_step
@@ -465,6 +491,7 @@ if __name__ == "__main__":
 
     # -------------------------------------
     if "display" in argv.keys():
+        raise NotImplementedError('')
         # assert not ("best" in argv.keys() and "overdisp" in argv.keys()) #options are not compatible
         # top = int(argv['disp'][0]) if argv['disp'] is not None else default_top
         # topstep = int(argv['disp'][1]) if argv['disp'] is not None and len(argv['disp']) >= 2 else default_topstep
