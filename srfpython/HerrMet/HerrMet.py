@@ -47,7 +47,7 @@ default_extract_step = 1
 default_cmap = "gray" # plt.cm.jet# plt.cm.gray #
 default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRzRHz']
 default_parameterization = default_parameterization_list[0]
-mapkwargs = {"Nworkers" : 4, "Taskset" : "0-3"} #keyword arguments for every parallelized process
+mapkwargs = {"Nworkers" : None, "Taskset" : None} #keyword arguments for every parallelized process
 # -------------------------------------
 autorizedkeys = \
     ["w", "taskset", "agg", "lowprio", "inline", "cmap",
