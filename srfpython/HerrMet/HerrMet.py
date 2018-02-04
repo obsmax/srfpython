@@ -67,7 +67,6 @@ help = '''HerrMet V{version}
 # ----------------------------------------------------
 -w           i       set the number of virtual workers to use for all parallelized processes, default {default_Nworkers}
 -taskset     s       change job affinity for all parallelized processes, default {default_Taskset}
--agg                 use agg backend (no display) if mentioned
 -lowprio             run processes with low priority if mentioned
 -inline              replace showme by plt.show (e.g. jupyter)
 -verbose off         reduce verbosity
