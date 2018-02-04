@@ -757,6 +757,117 @@ if __name__ == "__main__":
             run_function(rootname, mode=mode, Nchain=Nchain, Nkeep=Nkeep, argv=argv, verbose=verbose)
 
     # -------------------------------------
+    if "test" in argv.keys():
+        """objective : invert everythin together to optimize CPU usage
+        
+        1 job is 1 chain
+        for each rootname
+            - 1 target => one datacoder
+            - 1 parameterization => one paramfile
+            - several chains
+            => put results into the right runfile
+            
+            
+        
+        
+        """
+        mode = "append" if "append" in argv.keys() else "restart"
+        rootnames = argv['run']
+        if rootnames is None:
+            rootnames = glob.glob(default_rootnames)
+        assert len(rootnames)
+
+        # ------------------------
+        def gen():
+            for rootname in rootnames:
+                targetfile = "%s/_HerrMet.target" % rootname
+                paramfile = "%s/_HerrMet.param" % rootname
+                runfile = "%s/_HerrMet.run" % rootname
+
+                if mode == "append" and not os.path.exists(runfile):
+                    mode = "restart"
+                elif mode == "restart" and os.path.exists(runfile):
+                    os.remove(runfile)
+
+                # ------
+                p, logRHOM = load_paramfile(paramfile)
+                # ------
+                d = makedatacoder(targetfile, which=Datacoder_log)  # datacoder based on observations
+                dobs, CDinv = d.target()
+                duncs = CDinv ** -.5
+                ND = len(dobs)
+                dinfs = d(0.1 * np.ones_like(d.values))
+                dsups = d(3.5 * np.ones_like(d.values))
+                logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
+                # ------
+                G = Theory(parameterizer=p, datacoder=d)
+                # ---------------------------------
+                if mode == "restart":
+                    with RunFile(runfile, create=True, verbose=verbose) as rundb:
+                        rundb.drop()
+                        rundb.reset(p.NLAYER, d.waves, d.types, d.modes, d.freqs)
+                elif mode == "append":
+                    pass
+
+                # ---------------------------------
+                for chainid in xrange(Nchain):
+                    M0 = np.random.rand(len(p.MINF)) * (p.MSUP - p.MINF) + p.MINF
+                    MSTD = p.MSTD
+                    yield Job(rootname=rootname,
+                              targetfile=targetfile,
+                              paramfile=paramfile,
+                              runfile=runfile,
+                              chainid=chainid,
+                              M0=M0,
+                              MSTD=MSTD,
+                              G=G,
+                              ND=ND,
+                              logRHOD=logRHOD,
+                              logRHOM=logRHOM,
+                              nkeep=Nkeep,
+                              verbose=verbose)
+
+        # ---------------------------------
+        def fun(worker, rootname, targetfile, paramfile, runfile,
+                chainid, M0, MSTD, G, ND, logRHOD, logRHOM,
+                nkeep, verbose):
+
+            models, datas, weights, llks = metropolis(M0, MSTD, G, ND, logRHOD, logRHOM,
+                  nkeep=nkeep,
+                  normallaw=worker.randn,
+                  unilaw=worker.rand,
+                  chainid=chainid,
+                  HL=10,
+                  IK0=0.25,
+                  MPMIN=1.e-6,
+                  MPMAX=1e6,
+                  adjustspeed=0.3,
+                  nofail=True,
+                  debug=False,
+                  verbose=verbose)
+
+            I = np.any(~np.isnan(datas), axis=1)
+            models, datas, weights, llks = models[I, :], datas[I, :], weights[I], llks[I]
+
+            return rootname, targetfile, paramfile, runfile, chainid, models, datas, weights, llks
+
+        # ---------------------------------
+        with MapAsync(fun, gen(), **mapkwargs) as ma:
+            for jobid, answer, _, _ in ma:
+                rootname, targetfile, paramfile, runfile, chainid, models, datas, weights, llks = answer
+
+                with RunFile(runfile, verbose=verbose) as rundb:
+                    rundb.begintransaction()
+
+                    try:
+                        rundb.insert(models, datas, weights, llks, p, d)
+                        rundb.savepoint()
+                        rundb.commit()
+                    except:
+                        rundb.rollback(crash=True)
+
+
+    # -------------------------------------
     if "extract" in argv.keys():
         rootnames = argv['extract']
         if rootnames is None:
@@ -779,7 +890,7 @@ if __name__ == "__main__":
             for rootname in rootnames:
                 yield Job(rootname, extract_llkmin, extract_limit, extract_step, verbose)
 
-        with MapAsync(extract_function, gen()) as ma:
+        with MapAsync(extract_function, gen(), **mapkwargs) as ma:
             for _ in ma:
                 pass
 
@@ -813,6 +924,6 @@ if __name__ == "__main__":
                     for rootname in rootnames:
                         yield Job(rootname, argv, verbose=verbose)
 
-                with MapAsync(display_function, gen()) as ma:
+                with MapAsync(display_function, gen(), **mapkwargs) as ma:
                     for _ in ma:
                         pass
