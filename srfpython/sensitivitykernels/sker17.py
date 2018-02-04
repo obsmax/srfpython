@@ -1,6 +1,7 @@
 # from Herrmann.dispersion import *
 import numpy as np
-from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, Timer, groupbywtm, igroupbywtm, minmax
+from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, Timer, groupbywtm, igroupbywtm
+from srfpython.utils import minmax
 
 """
 srfker17, Maximilien Lehujeur, 01/11/2017
@@ -10,6 +11,7 @@ use __main__ for demo
 
 see also Herrmann.dispersion.dispersion
 """
+
 #_____________________________________
 def sker17(ztop, vp, vs, rh, \
     waves, types, modes, freqs,
