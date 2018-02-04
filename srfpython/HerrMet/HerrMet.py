@@ -615,7 +615,7 @@ if __name__ == "__main__":
         # determine root names from target filess
         rootnames = []
         for s96 in argv['target']:
-            rootname = "_HerrMet_" + s96.split('/')[-1].rstrip('.s96').rstrip('.surf96')
+            rootname = "_HerrMet_" + s96.split('/')[-1].split('.s96')[0].split('.surf96')[0]
             rootnames.append(rootname)
         assert len(np.unique(rootnames)) == len(rootnames) # make sure all rootnames are distinct
 
@@ -790,7 +790,7 @@ if __name__ == "__main__":
         rootnames = argv['display']
 
         # ----------- special case, just show the parameterization file from --param : ./_HerrMet.param
-        if rootnames == ['.']:
+        if len(rootnames) == 1 and rootnames[0] == '.':
             display_function(".", argv=argv, verbose=verbose)
 
         # ----------- general case
