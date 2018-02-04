@@ -274,8 +274,8 @@ def load_paramfile(paramfile):
         raise Exception('could not load %s (PRIORTYPE not recognized)' % paramfile)
 
     # ------------------------
-    print "parameter type : ", p.__class__.__name__
-    print "prior type     : ", logRHOM.__class__.__name__
+    # print "parameter type : ", p.__class__.__name__
+    # print "prior type     : ", logRHOM.__class__.__name__
     return p, logRHOM
 
 # -------------------------------------
