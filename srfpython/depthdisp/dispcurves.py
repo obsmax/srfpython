@@ -415,7 +415,7 @@ class surf96reader_from_arrays(surf96reader_from_surf96string):
         self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], \
             self.data['MODE'], self.data['PERIOD'], \
             self.data['VALUE'], self.data['DVALUE'] = \
-            waves, types, flags, modes, freqs, values, dvalues
+            waves, types, flags, modes, 1. / freqs, values, dvalues
 
 
 # _____________________________________

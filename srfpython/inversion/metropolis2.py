@@ -291,7 +291,7 @@ class LogGaussNDCov(LogUniND):
 def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
                normallaw = np.random.randn, unilaw = np.random.rand,
                chainid=1, HL = 100, IK0 = 0.25,
-               MPMIN = 1.e-6, MPMAX = 1e6, adjustspeed=0.01, nofail=False, debug=False, verbose=True):
+               MPMIN = 1.e-6, MPMAX = 1e6, adjustspeed=0.01, nofail=False, debug=False, verbose=True, head=""):
     """
     input :
         M0      = starting model, np.ndarray
@@ -308,6 +308,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         nofail  = if all call to G are failing, I will suspect a programming error in the theory, rather than unsuited models.
                   use nofail = True to avoid raising an exception
         debug   = if True, raise in case of theory failure, and display the error message
+        head    = string, a string to print to the front of verbose messages
     output :
         models  = 2D array, each line is a model retained, each model appears only once
         datas   = 2D array, corresponding data arrays, nans means theory failure
@@ -337,7 +338,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         icurrent = the position in array models of the last generated model
 
     """
-    summary = """chain%5d %5s kept%5d/%5d fail%5d AK%5.2f MP%5.2f AS%7.2f/s LI %f"""
+    summary = """%schain%5d %5s kept%5d/%5d fail%5d AK%5.2f MP%5.2f AS%7.2f/s LI %f"""
     # ----
     nfail = 0
 
@@ -404,7 +405,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         # ----------------------
         if nfail >= nkeep and nfail >= ntest and not nofail:
             #all attempts to call G failed, it might be due to a programming error...
-            print (summary % (chainid, "ERROR", nkept, ntest, nfail, AK, MP, AS, LI)) #PRESUMED ERROR IN THEORY
+            print (summary % (head, chainid, "ERROR", nkept, ntest, nfail, AK, MP, AS, LI)) #PRESUMED ERROR IN THEORY
             while icurrent:
                 G(models[icurrent, :]) #run G to reproduce the error message
                 icurrent -= 1
@@ -413,7 +414,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         # ----------------------
         if nstay >= nkeep:
             #stuck signal
-            print (summary % (chainid, "STUCK", nkept, ntest, nfail, AK, MP, AS, LI))
+            print (summary % (head, chainid, "STUCK", nkept, ntest, nfail, AK, MP, AS, LI))
             return models[:icurrent, :], datas[:icurrent, :], weights[:icurrent], llks[:icurrent]
 
         # ----------------------
@@ -421,9 +422,8 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
             #report stats
             if verbose:
                 print \
-                ("chainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f" % \
-                (chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
-            #print (MP, " ".join(['%.4f' % _ for _ in MSTD / MSTD.max()]))
+                ("%schainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f" % \
+                (head, chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
 
         # ----------------------
         MII = MI + MP * MSTD * normallaw(len(M0))
@@ -465,7 +465,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
                 weights[icurrent] += 1
                 #yield True, MI, DI, LI #stay
 
-    print (summary % (chainid, "DONE", nkept, ntest, nfail, AK, MP, AS, LI))
+    print (summary % (head, chainid, "DONE", nkept, ntest, nfail, AK, MP, AS, LI))
     return models, datas, weights, llks
 
 

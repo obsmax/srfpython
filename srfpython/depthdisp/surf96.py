@@ -39,6 +39,7 @@ def readsurf96(filename):
 def packsurf96(wave, type, flag, mode, period, value, dvalue):
     fmt = "SURF96 {wave} {type} {flag} {mode} {period} {value} {dvalue}"
     assert np.all([len(_) == len(wave) for _ in type, flag, mode, period, value, dvalue])
+    mode = np.asarray(mode, int)
 
     return "\n".join([fmt.format( \
         wave=w, type=t, mode=m, period=p,
