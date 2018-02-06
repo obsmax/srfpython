@@ -1,6 +1,6 @@
 from srfpython import *
 
-for i in xrange(10):
+for i in xrange(2):
     ztop = np.sort(np.unique(np.random.rand(10) * 3.))
     ztop[0] = 0.
 

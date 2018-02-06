@@ -77,6 +77,23 @@ def K(g, m, gm=None, locked=None, pertu=0.05, eps=1.e-6, method=1):
 # -----------------------------------
 class LinInv(object):
     def __init__(self, g, d, CDinv, mapr, CMinv, damping=1.0, locked=None, pertu=0.05, eps=1.e-6, method=1):
+        """
+        :param g: a callable that gets a data array (d) and returns a model array m
+        :param d: the target data array
+        :param CDinv: inverted covariance matrix(2D) on the data,
+            or inverse of the diagonal terms of the cov matrix (1D),
+            or inverse the covariance (scalar)
+        :param mapr: apriori model array
+        :param CMinv: inverted covariance matrix(2D) on the model,
+            or inverse of the diagonal terms of the cov matrix (1D),
+            or inverse the covariance (scalar)
+        :param damping: damping coefficient
+        :param locked: boolean array, use it to prevent prameters from beiing inverted
+        :param pertu: relative amplitude of the perturbation
+        :param eps: small number to avoid division by 0
+        :param method: 1 = we invert the difference between d and g(m)
+                       3 = we invert the relative difference (d - g(m)) / (g(m) + eps)
+        """
         self.g = g
         self.d = d
         self.mapr = mapr

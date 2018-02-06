@@ -3,7 +3,7 @@ import numpy as np
 from tetedenoeud.utils.display import value2color
 from tetedenoeud.utils.cmaps import tej
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, \
-    depthmodel_from_mod96string, depthmodel, depthmodel1D
+    depthmodel_from_mod96string, depthmodel, depthmodel1D, depthmodel_from_arrays
 from srfpython.depthdisp.dispcurves import surf96reader, \
     surf96reader_from_surf96string
 from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, plt, showme
@@ -80,35 +80,19 @@ class HerrLinFile(object):
     # -----------------------------------------------
     def __str__(self):
         s = ""
-        if self.target is None:
+        if not len(self.models):
             return s
         else:
-            targetfile, L = self.target
-            s += ">target %s\n%s\n" % (targetfile, L)
-            if not len(self.models):
-                return s
-            else:
-                for nmodel in xrange(len(self.models)):
-                    s += ">model.%03d %s\n%s\n" % (nmodel, "" if nmodel else self.init, self.models[nmodel])
-                    if len(self.forwards) > nmodel:
-                        s += ">forward.%03d\n%s\n" % (nmodel, self.forwards[nmodel])
-                        s += ">chi2red.%03d\n%f\n" % (nmodel, self.chi2reds[nmodel])
+            for nmodel in xrange(len(self.models)):
+                s += ">model.%03d %s\n%s\n" % (nmodel, "" if nmodel else self.init, self.models[nmodel])
+                if len(self.forwards) > nmodel:
+                    s += ">forward.%03d\n%s\n" % (nmodel, self.forwards[nmodel])
+                    s += ">chi2red.%03d\n%f\n" % (nmodel, self.chi2reds[nmodel])
         return s  # .strip('\n').strip()
 
     # -----------------------------------------------
-    def set_target(self, filename, data):
-        if self.target is not None:
-            raise Exception('%s has already a target' % self.hlf)
-
-        self.target = (filename, data)
-        with open(self.hlf, 'a') as fout:
-            fout.write('>target %s\n' % filename)
-            fout.write('%s\n' % data)
-
-    # -----------------------------------------------
     def set_init(self, m96):
-        if self.target is None:
-            raise Exception('%s has no target, please set it first' % self.hlf)
+        """m96 = file name at mod96 format or string with the content of a mod96 file"""
         if not len(self.models) == 0:
             raise Exception('%s has already an initial model' % self.hlf)
 
@@ -130,8 +114,6 @@ class HerrLinFile(object):
         """change half space parameters in init modeled
            must be called after set_init and before running inversion
         """
-        if self.target is None:
-            raise Exception('%s has no target, please set it first' % self.hlf)
         if len(self.models) == 0:
             raise Exception('%s has already no initial model, please set it first' % self.hlf)
         elif len(self.models) > 1:
@@ -158,10 +140,7 @@ class HerrLinFile(object):
             vp = np.concatenate((vp[:i], [VP]))
             vs = np.concatenate((vs[:i], [VS]))
             rh = np.concatenate((rh[:i], [RH]))
-        dm = depthmodel( \
-            depthmodel1D(ztop, vp),
-            depthmodel1D(ztop, vs),
-            depthmodel1D(ztop, rh))
+        dm = depthmodel_from_arrays(ztop, vp, vs, rh)
         self.models[0] = str(dm)
         self.init += "*"
 
@@ -171,10 +150,7 @@ class HerrLinFile(object):
     # -----------------------------------------------
     def addmodel(self, ZTOP, VP, VS, RH):
         assert len(self.chi2reds) == len(self.forwards) == len(self.models)
-        dm = depthmodel( \
-            depthmodel1D(ZTOP, VP),
-            depthmodel1D(ZTOP, VS),
-            depthmodel1D(ZTOP, RH))
+        dm = depthmodel_from_arrays(ZTOP, VP, VS, RH)
         self.models.append(dm.__str__().strip('\n').strip())
 
     # -----------------------------------------------
@@ -190,81 +166,81 @@ class HerrLinFile(object):
         self.chi2reds.append(chi2red)
         self.forwards.append(L)
 
-    # -----------------------------------------------
-    def show(self, rd=None, plim=None, vlim=None, zlim=None, vplim=None, vslim=None, rhlim=None, prlim=None, nstep=1,
-             cmap=tej()):
-        target = surf96reader_from_surf96string(self.target[1])
+    # # -----------------------------------------------
+    # def show(self, rd=None, plim=None, vlim=None, zlim=None, vplim=None, vslim=None, rhlim=None, prlim=None, nstep=1,
+    #          cmap=tej()):
+    #     target = surf96reader_from_surf96string(self.target[1])
+    #
+    #     if rd is None:
+    #         rd = DepthDispDisplay()
+    #
+    #     rd.plotdisp(color="k", linewidth=3, alpha=1., *target.wtmfvd())
+    #
+    #     N = len(self.forwards)
+    #     clrs = [value2color(n / float(N), cmap=cmap) for n in np.arange(N)]
+    #
+    #     def subshow(i, linewidth=1, alpha=1, linestyle="-"):
+    #         model = depthmodel_from_mod96string(self.models[i])
+    #         model = (model.vp.z, model.vp.values, model.vs.values, model.rh.values)
+    #         data = surf96reader_from_surf96string(self.forwards[i])
+    #         data = data.wtmfv()
+    #
+    #         rd.plotmodel(color=clrs[i], linewidth=linewidth, alpha=alpha, linestyle=linestyle, *model)
+    #         rd.plotdisp(color=clrs[i], linewidth=linewidth, alpha=alpha, linestyle=linestyle, *data)
+    #         rd.axconv.plot(np.arange(N)[i], self.chi2reds[i], 'o', color=clrs[i])
+    #
+    #     if nstep == -1:  # last model only
+    #         subshow(-1, linewidth=1, alpha=0.2)
+    #     elif nstep == 0:  # first model only
+    #         subshow(0, linewidth=1, alpha=0.2)
+    #     elif nstep == -2:  # first and last models only
+    #         subshow(0, linewidth=1, alpha=0.2)
+    #         subshow(-1, linewidth=1, alpha=0.2)
+    #     else:
+    #         subshow(0, linewidth=1, alpha=1)
+    #         # display intermediate steps
+    #         for i in np.arange(0, N, nstep)[1:-1]:
+    #             subshow(i, linewidth=1, alpha=0.4)
+    #         subshow(-1, linewidth=3, alpha=1)
+    #
+    #     if plim is not None: rd.set_plim(plim)
+    #     if vlim is not None: rd.set_vlim(vlim)
+    #     if zlim is not None: rd.set_zlim(zlim)
+    #
+    #     if vplim is not None: rd.axvp.set_xlim(vplim)
+    #     if vslim is not None: rd.axvs.set_xlim(vslim)
+    #     if prlim is not None: rd.axpr.set_xlim(prlim)
+    #     if rhlim is not None: rd.axrh.set_xlim(rhlim)
+    #
+    #     rd.grid()
+    #     rd.tick()
+    #     # rd.fig.suptitle(self.target[0])
+    #     rd.fig.suptitle(self.hlf)
 
-        if rd is None:
-            rd = DepthDispDisplay()
 
-        rd.plotdisp(color="k", linewidth=3, alpha=1., *target.wtmfvd())
-
-        N = len(self.forwards)
-        clrs = [value2color(n / float(N), cmap=cmap) for n in np.arange(N)]
-
-        def subshow(i, linewidth=1, alpha=1, linestyle="-"):
-            model = depthmodel_from_mod96string(self.models[i])
-            model = (model.vp.z, model.vp.values, model.vs.values, model.rh.values)
-            data = surf96reader_from_surf96string(self.forwards[i])
-            data = data.wtmfv()
-
-            rd.plotmodel(color=clrs[i], linewidth=linewidth, alpha=alpha, linestyle=linestyle, *model)
-            rd.plotdisp(color=clrs[i], linewidth=linewidth, alpha=alpha, linestyle=linestyle, *data)
-            rd.axconv.plot(np.arange(N)[i], self.chi2reds[i], 'o', color=clrs[i])
-
-        if nstep == -1:  # last model only
-            subshow(-1, linewidth=1, alpha=0.2)
-        elif nstep == 0:  # first model only
-            subshow(0, linewidth=1, alpha=0.2)
-        elif nstep == -2:  # first and last models only
-            subshow(0, linewidth=1, alpha=0.2)
-            subshow(-1, linewidth=1, alpha=0.2)
-        else:
-            subshow(0, linewidth=1, alpha=1)
-            # display intermediate steps
-            for i in np.arange(0, N, nstep)[1:-1]:
-                subshow(i, linewidth=1, alpha=0.4)
-            subshow(-1, linewidth=3, alpha=1)
-
-        if plim is not None: rd.set_plim(plim)
-        if vlim is not None: rd.set_vlim(vlim)
-        if zlim is not None: rd.set_zlim(zlim)
-
-        if vplim is not None: rd.axvp.set_xlim(vplim)
-        if vslim is not None: rd.axvs.set_xlim(vslim)
-        if prlim is not None: rd.axpr.set_xlim(prlim)
-        if rhlim is not None: rd.axrh.set_xlim(rhlim)
-
-        rd.grid()
-        rd.tick()
-        # rd.fig.suptitle(self.target[0])
-        rd.fig.suptitle(self.hlf)
-
-
-def readmstart(filename):
-    """read multiple start file
-    yields all depth model at mod96 format found in a single ascii file
-    starting signal = MODEL.01
-    ending   signal = layer with thickness 0
-    """
-    with open(filename, 'r') as fid:
-        l = fid.readline()
-        while True:
-            if l == "" : break
-            l = l.strip('\n').strip()
-            if l.startswith('MODEL.01'):
-                m = [l]
-                while True:
-                    l = fid.readline()
-                    if l == "" : break
-                    l = l.strip('\n').strip()
-                    m.append(l)
-                    if len(l.split()) == 10:
-                        try:
-                            H = float(l.split()[0])
-                            if H == 0. : break
-                        except KeyboardInterrupt: raise
-                        except: pass
-                yield "\n".join(m)
-            l = fid.readline()
+# def readmstart(filename):
+#     """read multiple start file
+#     yields all depth model at mod96 format found in a single ascii file
+#     starting signal = MODEL.01
+#     ending   signal = layer with thickness 0
+#     """
+#     with open(filename, 'r') as fid:
+#         l = fid.readline()
+#         while True:
+#             if l == "" : break
+#             l = l.strip('\n').strip()
+#             if l.startswith('MODEL.01'):
+#                 m = [l]
+#                 while True:
+#                     l = fid.readline()
+#                     if l == "" : break
+#                     l = l.strip('\n').strip()
+#                     m.append(l)
+#                     if len(l.split()) == 10:
+#                         try:
+#                             H = float(l.split()[0])
+#                             if H == 0. : break
+#                         except KeyboardInterrupt: raise
+#                         except: pass
+#                 yield "\n".join(m)
+#             l = fid.readline()

@@ -49,9 +49,11 @@ def init(argv, verbose, mapkwargs):
     # ---------------------
     for rootname in rootnames:
         hlffile = "%s/_HerrLin.hlf" % rootname
-        if os.path.exists(hlffile) and "-oi" not in argv.keys():
-            raise Exception('%s exists use -oi to overwrite' % hlffile)
-
+        if os.path.exists(hlffile):
+            if "-oi" not in argv.keys():
+                raise Exception('%s exists use -oi to overwrite' % hlffile)
+            else:
+                os.system('trash %s' % hlffile)
 
     # ---------------------
     if "-mean" in argv.keys():
@@ -64,12 +66,13 @@ def init(argv, verbose, mapkwargs):
             dm = depthmodel_from_arrays(ztop, vp, vs, rh)
 
             hlf = HerrLinFile(hlffile)
-
-
+            if verbose:
+                print "init > %s" % hlffile
+            hlf.set_init(dm.__str__())
 
     # ---------------------
     elif "-m96" in argv.keys():
-        raise NotImplementedError('')
+        raise NotImplementedError('problem : the model provided by the user must have at least the same number of layers than the parameterization file (--param --send)')
 
 
 
