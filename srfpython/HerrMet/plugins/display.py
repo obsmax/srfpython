@@ -26,7 +26,7 @@ default_cmap = "gray" # plt.cm.jet# plt.cm.gray #
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["display", "top", "overdisp", "pdf", "png", "m96", "cmap", "inline"]
+authorized_keys = ["-top", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-inline"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
@@ -87,26 +87,26 @@ def _display_function(rootname, argv, verbose, mapkwargs):
         rd = DepthDispDisplay()
 
     # ------ Display run results if exist
-    if os.path.exists(runfile) and ("top" in argv.keys() or "pdf" in argv.keys()):
+    if os.path.exists(runfile) and ("-top" in argv.keys() or "-pdf" in argv.keys()):
 
         with RunFile(runfile, verbose=verbose) as rundb:
 
             # --- display best models
-            if "top" in argv.keys():
+            if "-top" in argv.keys():
 
-                assert argv["top"] is None or len(argv["top"]) == 3  # unexpected argument number
-                if argv["top"] is None:
+                assert argv["-top"] == [] or len(argv["-top"]) == 3  # unexpected argument number
+                if argv["-top"] == []:
                     top_llkmin, top_limit, top_step = default_top_llkmin, default_top_limit, default_top_step
-                elif len(argv['top']) == 3:
-                    top_llkmin, top_limit, top_step = argv['top']
+                elif len(argv['-top']) == 3:
+                    top_llkmin, top_limit, top_step = argv['-top']
 
                 print "top : llkmin %f, limit %d, step %d" % (top_llkmin, top_limit, top_step),
                 chainids, weights, llks, ms, ds = rundb.like_read_run_1(llkmin=top_llkmin, limit=top_limit,
                                                                         step=top_step)
                 vmin, vmax = llks.min(), llks.max()
-                colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=argv['cmap'])
+                colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
 
-                if "overdisp" in argv.keys():
+                if "-overdisp" in argv.keys():
                     """note : recomputing dispersion with another frequency array might
                               result in a completely different dispersion curve in case
                               of root search failure """
@@ -128,7 +128,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         except Exception as e:
                             print "Error : could not plot dispersion curve (%s)" % str(e)
 
-                    cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['cmap'])
+                    cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
                     pos = rd.axdisp[-1].get_position()
                     cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
                     rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
@@ -140,20 +140,20 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         rd.plotmodel(color=colors[i], alpha=1.0, linewidth=3, *ms[i])
                         rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
 
-                    cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['cmap'])
+                    cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
                     pos = rd.axdisp[-1].get_position()
                     cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
                     rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
                     cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
             # ---- display posterior pdf
-            if "pdf" in argv.keys():
+            if "-pdf" in argv.keys():
 
-                assert argv["pdf"] is None or len(argv["pdf"]) == 3  # unexpected argument number
-                if argv["pdf"] is None:
+                assert argv["-pdf"] == [] or len(argv["-pdf"]) == 3  # unexpected argument number
+                if argv["-pdf"] == []:
                     pdf_llkmin, pdf_limit, pdf_step = default_pdf_llkmin, default_pdf_limit, default_pdf_step
-                elif len(argv['pdf']) == 3:
-                    pdf_llkmin, pdf_limit, pdf_step = argv['pdf']
+                elif len(argv['-pdf']) == 3:
+                    pdf_llkmin, pdf_limit, pdf_step = argv['-pdf']
 
                 print "pdf : llkmin %f, limit %d, step %d" % (pdf_llkmin, pdf_limit, pdf_step),
                 chainids, weights, llks, ms, ds = rundb.like_read_run_1(llkmin=pdf_llkmin, limit=pdf_limit,
@@ -232,8 +232,8 @@ def _display_function(rootname, argv, verbose, mapkwargs):
         print "call option --param to see prior depth boundaries"
 
     # --------------------
-    if "m96" in argv.keys():  # plot user data on top
-        for m96 in argv['m96']:
+    if "-m96" in argv.keys():  # plot user data on top
+        for m96 in argv['-m96']:
             try:
                 dm = depthmodel_from_mod96(m96)
                 dm.vp.show(rd.axvp, "m", linewidth=3, label=m96)
@@ -251,7 +251,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
         rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs), dvalues=d.dvalues, alpha=0.8, color="g",
                     linewidth=3)
 
-        if "overdisp" in argv.keys():
+        if "-overdisp" in argv.keys():
             rd.set_vlim((0.5 * d.values.min(), 1.5 * d.values.max()))
             rd.set_plim((0.8 / overfreqs.max(), 1.2 / overfreqs.min()))
         else:
@@ -261,11 +261,11 @@ def _display_function(rootname, argv, verbose, mapkwargs):
     rd.grid()
     rd.fig.suptitle(rootname.split('_HerrMet_')[-1])
     chftsz(rd.fig, 10)
-    if "png" in argv.keys():
+    if "-png" in argv.keys():
         if verbose:
             print "writing %s" % pngfile
         rd.fig.savefig(pngfile)
-    elif "inline" in argv.keys():
+    elif "-inline" in argv.keys():
         plt.show()
     else:
         showme()
@@ -274,22 +274,30 @@ def _display_function(rootname, argv, verbose, mapkwargs):
 
 # ------------------------------
 def display(argv, verbose, mapkwargs):
-    rootnames = argv['display']
-    if rootnames is None:
+
+    for k in argv.keys():
+        if k in ['main', "_keyorder"]:
+            continue  # private keys
+
+        if k not in authorized_keys:
+            raise Exception('option %s is not recognized' % k)
+
+    rootnames = argv['main']
+    if rootnames == []:
         rootnames = glob.glob(default_rootnames)
     assert len(rootnames)
 
     # -------------------------------------
-    if "cmap" not in argv.keys():
-        argv['cmap'] = [default_cmap]
+    if "-cmap" not in argv.keys():
+        argv['-cmap'] = [default_cmap]
 
     try:
-        argv['cmap'] = plt.get_cmap(argv['cmap'][0])
+        argv['-cmap'] = plt.get_cmap(argv['-cmap'][0])
     except ValueError:
         try:
-            argv['cmap'] = eval("cmaps.%s()" % argv['cmap'][0])
+            argv['-cmap'] = eval("cmaps.%s()" % argv['-cmap'][0])
         except:
-            raise Exception('could not find colormap %s neither in matplotlib neither in tetedenoeud.utils.cmaps' % argv['cmap'][0])
+            raise Exception('could not find colormap %s neither in matplotlib neither in tetedenoeud.utils.cmaps' % argv['-cmap'][0])
 
 
     # ----------- special case, just show the parameterization file from --param : ./_HerrMet.param
@@ -304,7 +312,7 @@ def display(argv, verbose, mapkwargs):
             elif not rootname.startswith('_HerrMet_'):
                 raise Exception('%s does not starts with _HerrMet_' % rootname)
 
-        if "png" not in argv.keys():
+        if "-png" not in argv.keys():
             # display mode, cannot parallelize
             for rootname in rootnames:
                 _display_function(rootname, argv=argv, verbose=verbose, mapkwargs=mapkwargs)

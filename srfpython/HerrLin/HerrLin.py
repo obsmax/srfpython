@@ -6,14 +6,13 @@ if "-png" in sys.argv[1:]: matplotlib.use('agg')
 
 from srfpython.utils import readargv1
 from srfpython.Herrmann.Herrmann import check_herrmann_codes
-from srfpython.HerrMet.plugins import target, param, send, run, \
-    extract, display, default
+from srfpython.HerrLin.plugins import default, target
 check_herrmann_codes()
 
 # -------------------------------------
 version = "6.0"
 default_verbose=1
-default_rootnames = "_HerrMet_*"
+default_rootnames = "_HerrLin_*"
 default_nworkers = None
 default_taskset = None
 
@@ -26,12 +25,7 @@ authorized_keys = \
      "-taskset",
      "-lowprio",
      "-verbose",
-     "--target",
-     "--param",
-     "--send",
-     "--run",
-     "--extract",
-     "--display"]
+     "--target"]
 
 # -------------------------------------
 help = '''HerrMet V{version}
@@ -44,23 +38,13 @@ help = '''HerrMet V{version}
 -lowprio              run processes with low priority if mentioned
 -verbose     i        reduce verbosity, 0/1, default {default_verbose}
 # ------- plugins, use --help plugin [plugin ...] for details
-{target_help}
-{param_help}
-{send_help}
-{run_help}
-{extract_help}
-{display_help}
+{default_help}
 '''.format(
     version=version,
     default_nworkers=default_nworkers,
     default_taskset=default_taskset,
     default_verbose=default_verbose,
-    target_help=target.short_help,
-    param_help=param.short_help,
-    send_help=send.short_help,
-    run_help=run.short_help,
-    extract_help=extract.short_help,
-    display_help=display.short_help)
+    default_help=default.short_help)
 
 
 # -------------------------------------
@@ -74,8 +58,8 @@ if __name__ == "__main__":
         sys.exit()
 
     # ------------------------------------- READ ARGUMENTS, CHECK
-    # prevent typos in arguments, keep the authorized_keys list up to date
-    assert not len(argv['main']) #arguments directly after HerrMet
+    # prevent typos in arguments, keep the autorized_keys list up to date
+    assert not len(argv['main'])  # arguments directly after HerrMet
 
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
@@ -126,6 +110,8 @@ if __name__ == "__main__":
 
         sys.exit()
 
+        sys.exit()
+
     # ------------------------------------- MAIN OPTIONS
     mapkwargs = {"Nworkers" : default_nworkers, "Taskset" : default_taskset} #for MapAsync
     verbose = bool(default_verbose)
@@ -150,23 +136,23 @@ if __name__ == "__main__":
     # ------------------------------------- PLUGINS
     if "--target" in argv.keys():
         target.target(argv['--target'], verbose)
-
-    # ------
-    if "--param" in argv.keys():
-        param.param(argv['--param'])
-
-    # ------
-    if "--send" in argv.keys():
-        send.send(argv['--send'], verbose)
-
-    # ------
-    if "--run" in argv.keys():
-        run.run(argv['--run'], verbose, mapkwargs)
-
-    # ------
-    if "--extract" in argv.keys():
-        extract.extract(argv['--extract'], verbose, mapkwargs)
-
-    # ------
-    if "--display" in argv.keys():
-        display.display(argv['--display'], verbose, mapkwargs)
+    #
+    # # ------
+    # if "param" in argv.keys():
+    #     param.param(argv)
+    #
+    # # ------
+    # if "send" in argv.keys():
+    #     send.send(argv, verbose)
+    #
+    # # ------
+    # if "run" in argv.keys():
+    #     run.run(argv, verbose, mapkwargs)
+    #
+    # # ------
+    # if "extract" in argv.keys():
+    #     extract.extract(argv, verbose, mapkwargs)
+    #
+    # # ------
+    # if "display" in argv.keys():
+    #     display.display(argv, verbose, mapkwargs)

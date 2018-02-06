@@ -103,11 +103,6 @@ def string2func(s):
 
 
 # -------------------------------------
-def minmax(X):
-    return min(X), max(X)
-
-
-# -------------------------------------
 def tostr(l, fmt):
     return " ".join(fmt % v for v in l)
 
@@ -118,6 +113,7 @@ def randstr(n):
     chrs   = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
     indexs = np.floor(np.random.rand(n) * len(chrs))
     return "".join([chrs[int(i)] for i in indexs])
+
 
 # -------------------------------------
 def string2func(s):
@@ -173,3 +169,130 @@ def readargv():
             D[k] = None
     D['_keyorder'] = keyorder
     return D
+
+# --------------------------------------
+def readargv1():
+    """"read sys.argv and store results into a dictionary
+    assume the argument list looks like
+
+    1 2 3 \
+    -option0 1 \
+    --plugin1 a 1.0 -2.0  \
+        -option1 ./*py \
+        -option2 1 2. kjhkjh \
+    --plugin2
+
+
+    => returns :
+        {'main': [1, 2, 3],
+         'option0': [1],
+         'plugin1': {'main': ['a', 1.0, -2.0],
+                    'option1': ['./__init__.py', './utils.py'],
+                    'option2': [1, 2.0, 'kjhkjh'],
+                    '_keyorder': ['option1', 'option2']
+                    }
+         'plugin2': {'main': [],
+                    '_keyorder': []
+                    },
+         '_keyorder': ['option0', 'plugin1', 'plugin2']
+         }
+
+
+    """
+
+    # -----
+    def isnumeric(a):
+        try:
+            float(a)
+            return True
+        except ValueError:
+            return False
+
+    # -----
+    def evalifpossible(a):
+        if isnumeric(a):
+            try:
+                return eval(a)
+            except Exception:
+                return a
+        return a
+
+    # -----
+    def isplugin(arg):
+        return arg.startswith('--')
+
+    def isoption(arg):
+        return not isplugin(arg) \
+               and arg.startswith('-') \
+               and not isnumeric(arg)
+
+    def readplugin(l, parent=None):
+        """recursive function"""
+        plugin = {"main": [], "_keyorder": []}
+        if not len(l):
+            return plugin, l
+
+        while len(l):
+            arg = l[0]
+
+            if isplugin(arg):
+                if parent is None: #highest level
+                    pluginname = arg#.split('-')[-1]
+                    plugin[pluginname], l = readplugin(l[1:], parent=plugin)
+                    plugin['_keyorder'].append(pluginname)
+                else: #already inside a plugin, just leave the current one
+                    break
+
+            elif isoption(arg):
+                optionname = arg#.split('-')[-1]
+                plugin[optionname] = []
+                plugin["_keyorder"].append(optionname)
+                l = l[1:]
+                while len(l):
+                    arg = l[0]
+                    if isplugin(arg) or isoption(arg):
+                        break
+                    plugin[optionname].append(evalifpossible(arg))
+                    l = l[1:]
+
+            else:
+                plugin['main'].append(evalifpossible(arg))
+                l = l[1:]
+        return plugin, l
+
+    # -----
+    if len(sys.argv) == 1:
+        return {}
+
+    # -----
+    D, remain = readplugin(sys.argv[1:])
+    assert not len(remain)
+    return D
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+    print (sys.argv[1:])
+    D = readargv1()
+    print (D.keys())
+    #
+    # print ("########MAIN")
+    # print(D['main'])
+    # print(D['_keyorder'])
+    # print(D.keys())
+    #
+    # print("########option0")
+    # print(D['option0'])
+    #
+    # print("########plugin1")
+    # print(D['plugin1'])
+    #
+    # print("########plugin2")
+    # print(D['plugin2'])
+    # # print(D['plugin2'])
+    #

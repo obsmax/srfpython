@@ -13,7 +13,7 @@ default_extract_limit = 0
 default_extract_step = 1
 
 # ------------------------------ autorized_keys
-authorized_keys = ["extract", "top"]
+authorized_keys = ["-top"]
 
 # ------------------------------ help messages
 short_help = "--extract    compute and write posterior pdf"
@@ -81,8 +81,15 @@ def _extract_function(rootname, extract_llkmin, extract_limit, extract_step, ver
 
 # ------------------------------
 def extract(argv, verbose, mapkwargs):
-    rootnames = argv['extract']
-    if rootnames is None:
+    for k in argv.keys():
+        if k in ['main', "_keyorder"]:
+            continue  # private keys
+
+        if k not in authorized_keys:
+            raise Exception('option %s is not recognized' % k)
+
+    rootnames = argv['main']
+    if rootnames == []:
         rootnames = glob.glob(default_rootnames)
     assert len(rootnames)
 
@@ -92,11 +99,11 @@ def extract(argv, verbose, mapkwargs):
         elif not rootname.startswith('_HerrMet_'):
             raise Exception('%s does not starts with _HerrMet_' % rootname)
 
-    assert "top" not in argv.keys() or len(argv["top"]) == 3  # unexpected argument number
-    if "top" not in argv.keys():
+    assert "-top" not in argv.keys() or len(argv["-top"]) == 3  # unexpected argument number
+    if "-top" not in argv.keys():
         extract_llkmin, extract_limit, extract_step = default_extract_llkmin, default_extract_limit, default_extract_step
-    elif len(argv['top']) == 3:
-        extract_llkmin, extract_limit, extract_step = argv['top']
+    elif len(argv['-top']) == 3:
+        extract_llkmin, extract_limit, extract_step = argv['-top']
 
     def gen():
         for rootname in rootnames:

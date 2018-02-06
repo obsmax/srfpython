@@ -18,7 +18,7 @@ example = """\
 ## DEFAULT
 # explain what is done 
 
-HerrMet --default 
+HerrLin --default 
 """
 
 

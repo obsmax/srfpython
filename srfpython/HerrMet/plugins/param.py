@@ -8,7 +8,7 @@ default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRz
 default_parameterization = default_parameterization_list[0]
 
 # ------------------------------ autorized_keys
-authorized_keys = ["param", "basedon", "t", "dvp", "dvs", "drh", "growing", "op"]
+authorized_keys = ["-basedon", "-t", "-dvp", "-dvs", "-drh", "-growing", "-op"]
 
 # ------------------------------ help messages
 short_help = "--param      create a template parameterization file"
@@ -75,27 +75,35 @@ HerrMet --send
 
 # ------------------------------
 def param(argv):
-    if "op" not in argv.keys():
+
+    for k in argv.keys():
+        if k in ['main', "_keyorder"]:
+            continue  # private keys
+
+        if k not in authorized_keys:
+            raise Exception('option %s is not recognized' % k)
+
+    if "-op" not in argv.keys():
         assert not os.path.exists('_HerrMet.param')
 
-    nlayer = int(argv["param"][0])
-    zbot = float(argv["param"][1])
-    type = argv['t'][0] if "t" in argv.keys() else default_parameterization
-    basedon = argv['basedon'][0] if "basedon" in argv.keys() else None
-    if "growing" in argv.keys():
-        assert "dvs" not in argv.keys()  # not compatible with -growing
-        assert "dvp" not in argv.keys()  # not compatible with -growing
-        assert "drh" not in argv.keys()  # not compatible with -growing
-        assert "dpr" not in argv.keys()  # not compatible with -growing
+    nlayer = int(argv["main"][0])
+    zbot = float(argv["main"][1])
+    type = argv['-t'][0] if "t" in argv.keys() else default_parameterization
+    basedon = argv['-basedon'][0] if "-basedon" in argv.keys() else None
+    if "-growing" in argv.keys():
+        assert "-dvs" not in argv.keys()  # not compatible with -growing
+        assert "-dvp" not in argv.keys()  # not compatible with -growing
+        assert "-drh" not in argv.keys()  # not compatible with -growing
+        assert "-dpr" not in argv.keys()  # not compatible with -growing
         dvp = 0., 5.
         dvs = 0., 5.
         drh = 0., 5.
         dpr = -5., 0.
     else:
-        dvp = minmax(np.asarray(argv['dvp'], float)) if "dvp" in argv.keys() else None
-        dvs = minmax(np.asarray(argv['dvs'], float)) if "dvs" in argv.keys() else None
-        drh = minmax(np.asarray(argv['drh'], float)) if "drh" in argv.keys() else None
-        dpr = minmax(np.asarray(argv['dpr'], float)) if "dpr" in argv.keys() else None
+        dvp = minmax(np.asarray(argv['-dvp'], float)) if "-dvp" in argv.keys() else None
+        dvs = minmax(np.asarray(argv['-dvs'], float)) if "-dvs" in argv.keys() else None
+        drh = minmax(np.asarray(argv['-drh'], float)) if "-drh" in argv.keys() else None
+        dpr = minmax(np.asarray(argv['-dpr'], float)) if "-dpr" in argv.keys() else None
 
     if not type in default_parameterization_list:
         raise Exception('please pick one type in %s' % str(default_parameterization_list))

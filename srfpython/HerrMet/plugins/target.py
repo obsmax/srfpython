@@ -5,7 +5,7 @@ from srfpython.depthdisp.dispcurves import Claw, surf96reader, freqspace
 # ------------------------------ defaults
 
 # ------------------------------ autorized_keys
-authorized_keys = ["target", "resamp", "lunc", "unc", "ot"]
+authorized_keys = ["-resamp", "-lunc", "-unc", "-ot"]
 
 # ------------------------------ help messages
 short_help = "--target     set the target data, create temporary directories (rootnames)"
@@ -49,21 +49,29 @@ HerrMet --display _HerrMet_t???
 
 # ------------------------------
 def target(argv, verbose):
+
+    for k in argv.keys():
+        if k in ['main', "_keyorder"]:
+            continue  # private keys
+
+        if k not in authorized_keys:
+            raise Exception('option %s is not recognized' % k)
+
     # determine root names from target filess
     rootnames = []
-    for s96 in argv['target']:
+    for s96 in argv['main']:
         rootname = "_HerrMet_" + s96.split('/')[-1].split('.s96')[0].split('.surf96')[0]
         rootnames.append(rootname)
     assert len(np.unique(rootnames)) == len(rootnames)  # make sure all rootnames are distinct
 
     # handle already existing files
-    if "ot" not in argv.keys():
+    if "-ot" not in argv.keys():
         for rootname in rootnames:
             if os.path.exists('%s/_HerrMet.target' % rootname):
                 raise Exception('file %s/_HerrMet.target exists already, use -ot to overwrite' % rootname)
 
     # loop over targets
-    for rootname, s96 in zip(rootnames, argv['target']):
+    for rootname, s96 in zip(rootnames, argv['main']):
 
         # create directory
         if not os.path.isdir(rootname):
@@ -72,13 +80,13 @@ def target(argv, verbose):
 
         s = surf96reader(s96)
         # -------------------
-        if "resamp" in argv.keys():
+        if "-resamp" in argv.keys():
             news = s.copy()
             news.clear()  # clear all entries
-            newf = freqspace(freqmin=float(argv["resamp"][0]),
-                             freqmax=float(argv["resamp"][1]),
-                             nfreq=int(argv["resamp"][2]),
-                             scale=argv["resamp"][3])
+            newf = freqspace(freqmin=float(argv["-resamp"][0]),
+                             freqmax=float(argv["-resamp"][1]),
+                             nfreq=int(argv["-resamp"][2]),
+                             scale=argv["-resamp"][3])
             for law in s.get_all():
                 law.set_extrapolationmode(1)
                 stdlaw = Claw(freq=law.freq, value=law.dvalue, extrapolationmode=0)
@@ -100,13 +108,13 @@ def target(argv, verbose):
             s = news
             # print news
         # -------------------
-        if "lunc" in argv.keys():
+        if "-lunc" in argv.keys():
             # set uncertainties to constant in log domain
-            lunc = float(argv["lunc"][0])
+            lunc = float(argv["-lunc"][0])
             s.data['DVALUE'] = s.data['VALUE'] * lunc
-        elif "unc" in argv.keys():
+        elif "-unc" in argv.keys():
             # set uncertainties to constant in lin domain
-            unc = float(argv["unc"][0])
+            unc = float(argv["-unc"][0])
             s.data['DVALUE'] = unc
         # -------------------
         if verbose:

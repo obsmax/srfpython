@@ -12,7 +12,7 @@ default_nchain = 12
 default_nkeep = 100
 
 # ------------------------------ autorized_keys
-authorized_keys = ["run", "append", "nchain", "nkeep"]
+authorized_keys = ["-append", "-nchain", "-nkeep"]
 
 # ------------------------------ help messages
 short_help = "--run        invert dispersion data using the Markov Chain Monte Carlo method"
@@ -45,13 +45,20 @@ HerrMet -w 4 \\
 # ------------------------------
 def run(argv, verbose, mapkwargs):
 
-    rootnames = argv['run']
-    if rootnames is None:
+    for k in argv.keys():
+        if k in ['main', "_keyorder"]:
+            continue  # private keys
+
+        if k not in authorized_keys:
+            raise Exception('option %s is not recognized' % k)
+
+    rootnames = argv['main']
+    if rootnames == []:
         rootnames = glob.glob(default_rootnames)
     assert len(rootnames)
-    runmode = "append" if "append" in argv.keys() else "restart"
-    Nchain = int(argv['nchain'][0]) if "nchain" in argv.keys() else default_nchain
-    Nkeep = int(argv['nkeep'][0]) if "nkeep" in argv.keys() else default_nkeep
+    runmode = "-append" if "-append" in argv.keys() else "-restart"
+    Nchain = int(argv['-nchain'][0]) if "-nchain" in argv.keys() else default_nchain
+    Nkeep = int(argv['-nkeep'][0]) if "-nkeep" in argv.keys() else default_nkeep
 
     # ------------------------
     def gen(rootnames, runmode):
@@ -61,9 +68,9 @@ def run(argv, verbose, mapkwargs):
             paramfile = "%s/_HerrMet.param" % rootname
             runfile = "%s/_HerrMet.run" % rootname
 
-            if runmode == "append" and not os.path.exists(runfile):
-                runmode = "restart"
-            elif runmode == "restart" and os.path.exists(runfile):
+            if runmode == "-append" and not os.path.exists(runfile):
+                runmode = "-restart"
+            elif runmode == "-restart" and os.path.exists(runfile):
                 os.remove(runfile)
 
             # ------
@@ -79,11 +86,11 @@ def run(argv, verbose, mapkwargs):
             # ------
             G = Theory(parameterizer=p, datacoder=d)
             # ---------------------------------
-            if runmode == "restart":
+            if runmode == "-restart":
                 with RunFile(runfile, create=True, verbose=verbose) as rundb:
                     rundb.drop()
                     rundb.reset(p.NLAYER, d.waves, d.types, d.modes, d.freqs)
-            elif runmode == "append":
+            elif runmode == "-append":
                 pass
 
             # ---------------------------------
