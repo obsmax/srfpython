@@ -9,7 +9,6 @@ from srfpython.depthdisp.dispcurves import surf96reader, \
 from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, plt, showme
 
 
-
 # ---------------------------------------------------
 def m962str(m96):
     dm = depthmodel_from_mod96(m96)
@@ -38,8 +37,6 @@ class HerrLinFile(object):
         assert isinstance(hlf, str)
         assert hlf.endswith('.hlf')
         self.hlf = hlf
-        self.target = None  # a tuple like (targetfilename, s96str)
-        self.init = None  # name of initfile
         self.models = []  # list of models (m96str), first = init
         self.forwards = []  # list of dispersion curves (s96str)
         self.chi2reds = []  # list of floats
@@ -50,16 +47,7 @@ class HerrLinFile(object):
                     if l == "": break
                     l = l.strip().rstrip('\n')
                     if l.startswith('>'):
-                        if ">target" in l:
-                            targetfile = l.split('>target')[-1].strip()
-                            L = []
-                            while True:
-                                l = fid.readline()
-                                if l == "" or l.startswith(">"): break
-                                L.append(l)
-                            self.target = (targetfile, "".join(L).strip('\n'))
-                            continue  # next line already read in
-                        elif ">model" in l:
+                        if ">model" in l:
                             nmodel = int(l.split('>model.')[-1].split()[0])
                             if not nmodel:  self.init = l.split()[-1]
                             assert len(self.models) == nmodel
@@ -89,11 +77,6 @@ class HerrLinFile(object):
             assert len(self.forwards) == len(self.models) or \
                    len(self.forwards) + 1 == len(self.models)
 
-    #        print self.chi2reds
-    #        for m, f, c in zip(self.models, self.forwards, self.chi2reds):
-    #            print m
-    #            print f
-    #            print c
     # -----------------------------------------------
     def __str__(self):
         s = ""
@@ -257,3 +240,31 @@ class HerrLinFile(object):
         rd.tick()
         # rd.fig.suptitle(self.target[0])
         rd.fig.suptitle(self.hlf)
+
+
+def readmstart(filename):
+    """read multiple start file
+    yields all depth model at mod96 format found in a single ascii file
+    starting signal = MODEL.01
+    ending   signal = layer with thickness 0
+    """
+    with open(filename, 'r') as fid:
+        l = fid.readline()
+        while True:
+            if l == "" : break
+            l = l.strip('\n').strip()
+            if l.startswith('MODEL.01'):
+                m = [l]
+                while True:
+                    l = fid.readline()
+                    if l == "" : break
+                    l = l.strip('\n').strip()
+                    m.append(l)
+                    if len(l.split()) == 10:
+                        try:
+                            H = float(l.split()[0])
+                            if H == 0. : break
+                        except KeyboardInterrupt: raise
+                        except: pass
+                yield "\n".join(m)
+            l = fid.readline()

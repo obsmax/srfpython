@@ -6,7 +6,8 @@ if "-png" in sys.argv[1:]: matplotlib.use('agg')
 
 from srfpython.utils import readargv1
 from srfpython.Herrmann.Herrmann import check_herrmann_codes
-from srfpython.HerrLin.plugins import default, target
+from srfpython.HerrMet.plugins import target, param, send
+from srfpython.HerrLin.plugins import default, init
 check_herrmann_codes()
 
 # -------------------------------------
@@ -25,7 +26,10 @@ authorized_keys = \
      "-taskset",
      "-lowprio",
      "-verbose",
-     "--target"]
+     "--target",
+     "--param",
+     "--send",
+     "--init"]
 
 # -------------------------------------
 help = '''HerrMet V{version}
@@ -38,13 +42,19 @@ help = '''HerrMet V{version}
 -lowprio              run processes with low priority if mentioned
 -verbose     i        reduce verbosity, 0/1, default {default_verbose}
 # ------- plugins, use --help plugin [plugin ...] for details
-{default_help}
+{target_help}
+{param_help}
+{send_help}
+{init_help}
 '''.format(
     version=version,
     default_nworkers=default_nworkers,
     default_taskset=default_taskset,
     default_verbose=default_verbose,
-    default_help=default.short_help)
+    target_help=target.short_help,
+    param_help=param.short_help,
+    send_help=send.short_help,
+    init_help=init.short_help)
 
 
 # -------------------------------------
@@ -85,7 +95,7 @@ if __name__ == "__main__":
                 try:
                     print eval('%s.long_help' % plugin_name)
                 except NameError:
-                    print "%s is not a valid plugin (long_help not found)"
+                    print "%s is not a valid plugin (long_help not found)" % plugin_name
                     continue
                 except:
                     raise
@@ -136,14 +146,20 @@ if __name__ == "__main__":
     # ------------------------------------- PLUGINS
     if "--target" in argv.keys():
         target.target(argv['--target'], verbose)
-    #
-    # # ------
-    # if "param" in argv.keys():
-    #     param.param(argv)
-    #
-    # # ------
-    # if "send" in argv.keys():
-    #     send.send(argv, verbose)
+
+    # ------
+    if "--param" in argv.keys():
+        param.param(argv['--param'])
+
+    # ------
+    if "--send" in argv.keys():
+        send.send(argv['--send'], verbose)
+
+    # ------
+    if "--init" in argv.keys():
+        init.init(argv['--init'], verbose, mapkwargs)
+
+
     #
     # # ------
     # if "run" in argv.keys():

@@ -76,6 +76,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
     paramfile = "%s/_HerrMet.param" % rootname
     runfile = '%s/_HerrMet.run' % rootname
     pngfile = '%s/_HerrMet.png' % rootname
+    HerrLininitfile = '%s/_HerrLin.init' % rootname
 
     # ------ Initiate the displayer using the target data if exists
     if os.path.exists(targetfile):
@@ -245,6 +246,21 @@ def _display_function(rootname, argv, verbose, mapkwargs):
             except Exception as e:
                 print 'could not read or display %s (reason %s)' % (m96, str(e))
             rd.axvp.legend(loc=3)
+    # --------------------
+    if os.path.exists(HerrLininitfile):
+        """test, to be moved to HerrLin display"""
+        try:
+            dm = depthmodel_from_mod96(HerrLininitfile)
+            dm.vp.show(rd.axvp, "c+-", linewidth=3, label="init")
+            dm.vs.show(rd.axvs, "c+-", linewidth=3)
+            dm.rh.show(rd.axrh, "c+-", linewidth=3)
+            dm.pr().show(rd.axpr, "c+-", linewidth=3)
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            print 'could not read or display %s (reason %s)' % ("init", str(e))
+        rd.axvp.legend(loc=3)
+
     # --------------------
     if os.path.exists(targetfile):
         # plot data on top
