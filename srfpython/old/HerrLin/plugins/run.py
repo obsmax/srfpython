@@ -38,15 +38,16 @@ def _run(rootname, argv, verbose):
     damping = argv['damp'][0] if 'damp' in argv.keys() else default_damping
 
     # ------
-    p, logRHOM = load_paramfile(paramfile)
+    p, _ = load_paramfile(paramfile)
+    mapr, CMinv = p.prior()
     # ------
     d = makedatacoder(targetfile, which=Datacoder_log)  # datacoder based on observations
     dobs, CDinv = d.target()
-    duncs = CDinv ** -.5
-    ND = len(dobs)
-    dinfs = d(0.1 * np.ones_like(d.values))
-    dsups = d(3.5 * np.ones_like(d.values))
-    logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
+    # duncs = CDinv ** -.5
+    # ND = len(dobs)
+    # dinfs = d(0.1 * np.ones_like(d.values))
+    # dsups = d(3.5 * np.ones_like(d.values))
+    # logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
     # ------
     G = Theory(parameterizer=p, datacoder=d)
 

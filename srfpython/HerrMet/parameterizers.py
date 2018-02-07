@@ -24,7 +24,7 @@ Datacoder     : object to convert output from Herrmann.dispersion to an array of
   |                      (waves, types, modes, freqs, values, (dvalues))
   |                          ^    |
   |                          |    |
-  |     surf96file ----->   datacoder      --------> d_obs, CD
+  |     surf96file ----->   datacoder      --------> d_obs, CD => logRHOD
   |      (target)            |    |
   v                          |    v
                           a data array (d)
@@ -33,34 +33,41 @@ Datacoder     : object to convert output from Herrmann.dispersion to an array of
 
 # -------------------------------------
 class Parameterizer(object):
-    """default class and methods, to be overwriten by subclasses"""
-    # def __init__(self, ZTOP, VP, VS, RH):
-    #     "init with the starting model and uncertainty"
-    #     self.ZTOP = ZTOP
-    #     self.VP   = VP
-    #     self.VS   = VS
-    #     self.RH   = RH
-    #
-    # # ------------------
-    # def getrange(self, hmin=0.001, hmax=1.0, prmin=r43, prmax=2.5, vsmin=0.08, vsmax=4.0, rhmin=2.0, rhmax=3.0):
-    #     "determines the lower and upper bounds in each dimension"
-    #     assert  0.001 <= hmin  < hmax
-    #     assert  r43   <= prmin < prmax
-    #     assert  0.08  <= vsmin < vsmax
-    #     assert  1.0   <= rhmin < rhmax
-    #     nlayer = len(self.VS)
-    #     o = np.ones(nlayer, float)
-    #     ztopinf = np.concatenate(([0.], (hmin * o)[:-1].cumsum()))
-    #     ztopsup = np.concatenate(([0.], (hmax * o)[:-1].cumsum()))
-    #     minf = self(ztopinf, prmin * vsmin * o, vsmin * o, rhmin * o)
-    #     msup = self(ztopsup, prmax * vsmax * o, vsmax * o, rhmax * o)
-    #     return minf, msup
-    
+    """the parameterizer object links the model array (m) to a set of variables that can
+       be understood by the theory function (ZTOP, VP, VS, RH)
+       this is the default class, methods must be overwritten by subclasses"""
+
+    # ------------------
+    def __init__(self, A):
+        """
+        :param A: AsciiFile with parameterization
+
+        please set up attributes :
+        self.NLAYER : int, the number of layers including half space
+        self.MDEFAULT : array, all the parameters including those that should not be inverted (not-masked)
+        self.I : boolean array, mask used to determine the parameters to be inverted, the others will
+                 keep constant and equal to self.MDEFAULT
+        self.MMEAN = array, the mean model, masked by self.I
+        self.MINF = array, lower boundary for each parameter, masked by self.I
+        self.MSUP = array, upper boundary for each parameter, masked by self.I
+        self.MSTD = array, markov proposal for each parameter, masked by self.I
+        """
+        raise Exception('Never used : please custom subclasses')
+
     # ------------------
     def boundaries(self):
         """
-        the lower model is not necessarily obtained when all parameters reach their lowest boundary
+        a method to determine the lowest and highest models, no arguments
+        based on columns VINF and VSUP in the parameterization file
+        warning : the lower model is not necessarily obtained when all parameters reach their lowest boundary (VINF)
+        please return lowest and highest depthmodels stored as depthmodel1D
+        vplow, vphgh,
+        vslow, vshgh,
+        rhlow, rhhgh,
+        prlow, prhgh
         """
+
+        # default behavior, to be customized if needed
         Ztopsup, VPlow, VSlow, RHlow = self.inv(self.MINF)
         Ztopinf, VPhgh, VShgh, RHhgh = self.inv(self.MSUP)
         z = np.sort(np.unique(np.concatenate((Ztopinf, Ztopsup))))
@@ -69,7 +76,8 @@ class Parameterizer(object):
         def f(Zinf, Zsup, V, which):
             v1 = depthmodel1D(Zinf, V).interp(z, interpmethod="stairs")
             v2 = depthmodel1D(Zsup, V).interp(z, interpmethod="stairs")
-            return depthmodel1D(z, which(np.concatenate(([v1], [v2]), axis = 0), axis = 0))
+            return depthmodel1D(z, which(np.concatenate(([v1], [v2]), axis=0), axis=0))
+
         # --------------------
         vplow = f(Ztopinf, Ztopsup, VPlow, np.min)
         vphgh = f(Ztopinf, Ztopsup, VPhgh, np.max)
@@ -85,14 +93,57 @@ class Parameterizer(object):
 
         return vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh
 
+    # ------------------
+    def keys(self):
+        """a method to provide the name of the inverted parameters
+
+        please return the masked version of the array, to return only the keys that
+        are actually inverted (use the boolean array self.I)
+
+        e.g. keys = np.array(['Z1', 'VP0', 'VP1', 'VS0', 'VS1', 'RH0', 'RH1'])[self.I]
+
+        :return: array or list of parameters
+        """
+        raise Exception('never used, please custom subclasses')
+
+    # ------------------
+    def __call__(self, ZTOP, VP, VS, RH):
+        """the method that is called to convert
+           a real depth model (ZTOP, VP, VS, RH)
+           into a model array (m = array of parameters).
+           Called inside Theory.__call__ just before dispersion
+           please keep consistent with self.inv
+           use self.keys to get the corresponding parameter names
+
+           :return: array of parameters m (corresponding to self.I)
+        """
+        raise Exception('never used, please custom subclasses')
+
+    # ------------------
+    def inv(self, m):
+        """the method that is called to convert model array
+           into a true depth model that can be understood by srfdis17.
+           Called for plotting (i.e. convert a model back to something more physical)
+           please keep consistent with self.__call__
+           :return: 4 arrays ZTOP, VP, VS, RH
+        """
+        raise Exception('never used, please custom subclasses')
+
+    # ------------------
+    def prior(self, ZTOP_apr, VP_apr, VS_apr, RH_apr):
+        """
+        to be used for linearized inversion (HerrLin)
+        :return: prior model (mapr) and covariance matrix (CMinv)
+                 in agreement with the parameterizer type
+        """
+        raise Exception('never used, please custom subclasses')
+
 
 # -------------------------------------
 class Parameterizer_mZVSPRRH(Parameterizer):
-    """the parameterizer object links the model array (m) to a set of variables that can
-       be understood by the theory function (ZTOP, VP, VS, RH)
-    """
+
     def __init__(self, A):
-        """Initiate from a AsciiFile object, assumes that read method has been called"""
+        """see Parameterizer"""
         assert A.metadata['TYPE'] == "mZVSPRRH"
         assert np.all(A.data['VINF'] <= A.data['VSUP'])
         if np.all(A.data['VINF'] == A.data['VSUP']):
@@ -110,7 +161,7 @@ class Parameterizer_mZVSPRRH(Parameterizer):
 
     # ------------------
     def boundaries(self):
-        """the lower model is not necessarily obtained when all parameters reach their lowest boundary"""
+        """see Parameterizer"""
         Ztopsup, VPlow, VSlow, RHlow = self.inv(self.MINF)
         Ztopinf, VPhgh, VShgh, RHhgh = self.inv(self.MSUP)
         z = np.sort(np.unique(np.concatenate((Ztopinf, Ztopsup))))
@@ -138,31 +189,24 @@ class Parameterizer_mZVSPRRH(Parameterizer):
 
         return vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh
 
-
     # ------------------
     def keys(self):
-         k = ["-Z%d" % i for i in xrange(1, self.NLAYER)] + \
+        """see Parameterizer"""
+        k = ["-Z%d" % i for i in xrange(1, self.NLAYER)] + \
              ['VS%d' % i for i in xrange(self.NLAYER)] + \
              ['PR%d' % i for i in xrange(self.NLAYER)] + \
              ['RH%d' % i for i in xrange(self.NLAYER)]
-         return np.asarray(k)[self.I]
+        return np.asarray(k)[self.I]
 
     # ------------------
     def __call__(self, ZTOP, VP, VS, RH):
-        """the method that is called to convert a real depth model into a model array
-           called inside Theory.__call__ just before srfdis17
-           please keep consistent with self.inv
-        """
+        """see Parameterizer"""
         m = np.concatenate((-1.0 * ZTOP[1:], VS, VP / VS, RH))[self.I]
         return m
 
     # ------------------
     def inv(self, m):
-        """the method that is called to convert model array
-           into a true depth model that can be understood by srfdis17
-           called for plotting (i.e. convert a model back to something more physical)
-           please keep consistent with self.__call__
-        """
+        """see Parameterizer"""
         M = self.MDEFAULT.copy()
         M[self.I] = m #overwrites default values with the one provided in m
 
@@ -174,6 +218,13 @@ class Parameterizer_mZVSPRRH(Parameterizer):
         VP = PR * VS
 
         return ZTOP, VP, VS, RH
+
+    # ------------------
+    def prior(self, ZTOP_apr, VP_apr, VS_apr, RH_apr,
+              **kwargs):
+        """see Parameterizer"""
+        mapr = self.__call__(ZTOP_apr, VP_apr, VS_apr, RH_apr)
+        raise NotImplementedError('')
 
 
 # -------------------------------------
@@ -197,13 +248,12 @@ class Parameterizer_mZVSVPRH(Parameterizer):
 
     # ------------------
     def boundaries(self):
-        """
-        the lower model is not necessarily obtained when all parameters reach their lowest boundary
-        """
+        """see Parameterizer"""
         Ztopsup, VPlow, VSlow, RHlow = self.inv(self.MINF)
         Ztopinf, VPhgh, VShgh, RHhgh = self.inv(self.MSUP)
         z = np.sort(np.unique(np.concatenate((Ztopinf, Ztopsup))))
-        #--------------------
+
+        # --------------------
         def f(Zinf, Zsup, V, which):
             v1 = depthmodel1D(Zinf, V).interp(z, interpmethod="stairs")
             v2 = depthmodel1D(Zsup, V).interp(z, interpmethod="stairs")
@@ -225,6 +275,7 @@ class Parameterizer_mZVSVPRH(Parameterizer):
 
     # ------------------
     def keys(self):
+        """see Parameterizer"""
         k = ["-Z%d" % i for i in xrange(1, self.NLAYER)] + \
             ['VS%d' % i for i in xrange(self.NLAYER)] + \
             ['VP%d' % i for i in xrange(self.NLAYER)] + \
@@ -233,11 +284,13 @@ class Parameterizer_mZVSVPRH(Parameterizer):
 
     # ------------------
     def __call__(self, ZTOP, VP, VS, RH):
+        """see Parameterizer"""
         m = np.concatenate((-1.0 * ZTOP[1:], VS, VP, RH))[self.I]
         return m
 
     # ------------------
     def inv(self, m):
+        """see Parameterizer"""
         M = self.MDEFAULT.copy()
         M[self.I] = m  # overwrites default values with the one provided in m
 
@@ -249,12 +302,21 @@ class Parameterizer_mZVSVPRH(Parameterizer):
 
         return ZTOP, VP, VS, RH
 
+    # ------------------
+    def prior(self, ZTOP_apr, VP_apr, VS_apr, RH_apr,
+              **kwargs):
+        """see Parameterizer"""
+        mapr = self.__call__(ZTOP_apr, VP_apr, VS_apr, RH_apr)
+
+        raise NotImplementedError('')
+
 
 # -------------------------------------
 class Parameterizer_mZVSPRzRHvp(Parameterizer):
     """see Parameterizer_mZVSPRRH for doc"""
 
     def __init__(self, A):
+        """see Parameterizer"""
         assert A.metadata['TYPE'] == "mZVSPRzRHvp"
         assert np.all(A.data['VINF'] <= A.data['VSUP'])
         if np.all(A.data['VINF'] == A.data['VSUP']):
@@ -284,23 +346,26 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
 
     # ------------------
     def boundaries(self):
+        """see Parameterizer"""
         print "boundaries method not implemented for %s, using default one" % self.__class__.__name__
         return Parameterizer.boundaries(self)
 
     # ------------------
     def keys(self):
+        """see Parameterizer"""
         k = ["-Z%d" % i for i in xrange(1, self.NLAYER)] + \
             ['VS%d' % i for i in xrange(self.NLAYER)]
         return np.asarray(k)[self.I]
 
     # ------------------
     def __call__(self, ZTOP, VP, VS, RH):
-        """VP and RH are ignored since they are not parameters of the model"""
+        """see Parameterizer"""
         m = np.concatenate((-1.0 * ZTOP[1:], VS))[self.I]
         return m
 
     # ------------------
     def inv(self, m):
+        """see Parameterizer"""
         M = self.MDEFAULT.copy()
         M[self.I] = m  # overwrites default values with the one provided in m
 
@@ -315,12 +380,18 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
 
         return ZTOP, VP, VS, RH
 
+    # ------------------
+    def prior(self, ZTOP_apr, VP_apr, VS_apr, RH_apr, **kwargs):
+        """see Parameterizer"""
+        raise NotImplementedError('')
+
 
 # -------------------------------------
 class Parameterizer_mZVSPRzRHz(Parameterizer):
     """see Parameterizer_mZVSPRRH for doc"""
 
     def __init__(self, A):
+        """see Parameterizer"""
         assert A.metadata['TYPE'] == "mZVSPRzRHz"
         assert np.all(A.data['VINF'] <= A.data['VSUP'])
         if np.all(A.data['VINF'] == A.data['VSUP']):
@@ -359,6 +430,7 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
 
     # ------------------
     def keys(self):
+        """see Parameterizer"""
         k = ["-Z%d" % i for i in xrange(1, self.NLAYER)] + \
             ['VS%d' % i for i in xrange(self.NLAYER)]
         return np.asarray(k)[self.I]
@@ -371,6 +443,7 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
 
     # ------------------
     def inv(self, m):
+        """see Parameterizer"""
         M = self.MDEFAULT.copy()
         M[self.I] = m  # overwrites default values with the one provided in m
 
@@ -384,4 +457,9 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
         RH = self.RHz(Z = ZMID)
 
         return ZTOP, VP, VS, RH
+
+    # ------------------
+    def prior(self, ZTOP_apr, VP_apr, VS_apr, RH_apr, **kwargs):
+        """see Parameterizer"""
+        raise NotImplementedError('')
 
