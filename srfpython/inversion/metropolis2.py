@@ -338,7 +338,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         icurrent = the position in array models of the last generated model
 
     """
-    summary = """%schain%5d %5s kept%5d/%5d fail%5d AK%5.2f MP%5.2f AS%7.2f/s LI %f"""
+    summary = """%schain%5d %5s kept%5d/%5d fail%5d AK%5.2f MP%5.2f AS%7.2f/s BST %f"""
     # ----
     nfail = 0
 
@@ -362,6 +362,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
     # ----
     MI = M0
     DI, LI, nfail = call(MI, nfail)
+    BEST = LI
     # ----
     ntest = nkept = nstay = 0
     MP    = 1.0 #master proposal, used to scale the markov chain proposal stds
@@ -405,7 +406,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         # ----------------------
         if nfail >= nkeep and nfail >= ntest and not nofail:
             #all attempts to call G failed, it might be due to a programming error...
-            print (summary % (head, chainid, "ERROR", nkept, ntest, nfail, AK, MP, AS, LI)) #PRESUMED ERROR IN THEORY
+            print (summary % (head, chainid, "ERROR", nkept, ntest, nfail, AK, MP, AS, BEST)) #PRESUMED ERROR IN THEORY
             while icurrent:
                 G(models[icurrent, :]) #run G to reproduce the error message
                 icurrent -= 1
@@ -414,7 +415,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         # ----------------------
         if nstay >= nkeep:
             #stuck signal
-            print (summary % (head, chainid, "STUCK", nkept, ntest, nfail, AK, MP, AS, LI))
+            print (summary % (head, chainid, "STUCK", nkept, ntest, nfail, AK, MP, AS, BEST))
             return models[:icurrent, :], datas[:icurrent, :], weights[:icurrent], llks[:icurrent]
 
         # ----------------------
@@ -422,16 +423,19 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
             #report stats
             if verbose:
                 print \
-                ("%schainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s LI %f" % \
-                (head, chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, LI))
+                ("%schainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s BST %f" %
+                    (head, chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, BEST))
 
         # ----------------------
         MII = MI + MP * MSTD * normallaw(len(M0))
         DII, LII, nfail = call(MII, nfail)
+        if LII > BEST:
+            BEST = LII
 
         # ----------------------
         if LII > LI:
             MI, DI, LI = MII, DII, LII
+
             nkept += 1
             nstay  = 0
             Ikept[ntest % HL] = True
@@ -465,7 +469,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
                 weights[icurrent] += 1
                 #yield True, MI, DI, LI #stay
 
-    print (summary % (head, chainid, "DONE", nkept, ntest, nfail, AK, MP, AS, LI))
+    print (summary % (head, chainid, "DONE", nkept, ntest, nfail, AK, MP, AS, BEST))
     return models, datas, weights, llks
 
 

@@ -7,7 +7,7 @@ if "-png" in sys.argv[1:]: matplotlib.use('agg')
 from srfpython.utils import readargv1
 from srfpython.Herrmann.Herrmann import check_herrmann_codes
 from srfpython.HerrMet.plugins import target, param, send, run, \
-    extract, display, default
+    neldermead, extract, display, default
 check_herrmann_codes()
 
 # -------------------------------------
@@ -30,6 +30,7 @@ authorized_keys = \
      "--param",
      "--send",
      "--run",
+     "--neldermead",
      "--extract",
      "--display"]
 
@@ -48,6 +49,7 @@ help = '''HerrMet V{version}
 {param_help}
 {send_help}
 {run_help}
+{neldermead_help}
 {extract_help}
 {display_help}
 '''.format(
@@ -59,6 +61,7 @@ help = '''HerrMet V{version}
     param_help=param.short_help,
     send_help=send.short_help,
     run_help=run.short_help,
+    neldermead_help=neldermead.short_help,
     extract_help=extract.short_help,
     display_help=display.short_help)
 
@@ -162,6 +165,10 @@ if __name__ == "__main__":
     # ------
     if "--run" in argv.keys():
         run.run(argv['--run'], verbose, mapkwargs)
+
+    # ------
+    if "--neldermead" in argv.keys():
+        neldermead.neldermead(argv['--neldermead'], verbose, mapkwargs)
 
     # ------
     if "--extract" in argv.keys():

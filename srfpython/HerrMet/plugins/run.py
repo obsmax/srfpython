@@ -144,7 +144,7 @@ def run(argv, verbose, mapkwargs):
             with RunFile(runfile, verbose=False) as rundb:
                 rundb.begintransaction()
                 try:
-                    rundb.insert(models, datas, weights, llks, p, d)
+                    rundb.insert("METROPOLIS", models, datas, weights, llks, p, d)
                     rundb.commit()
                 except:
                     rundb.rollback(crash=True)
