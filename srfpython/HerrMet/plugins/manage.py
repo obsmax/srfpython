@@ -57,7 +57,7 @@ def manage(argv, verbose, mapkwargs):
     # summarize all files
     for rootname, runfile in zip(rootnames, runfiles):
         with RunFile(runfile, verbose=False) as rundb:
-            print rundb.summary(head=rootname + " : ")
+            rundb.summary(head=rootname + " : ")
 
     # more options
     for rootname, runfile in zip(rootnames, runfiles):
@@ -65,7 +65,7 @@ def manage(argv, verbose, mapkwargs):
         with RunFile(runfile, verbose=True) as rundb:
             # ------------ print chains stats
             if "-stats" in argv.keys():
-                print rundb.stats(head=rootname + " : ")
+                rundb.stats(head=rootname + " : ")
 
             # ------------ rm
             if "-delbad" in argv.keys():
