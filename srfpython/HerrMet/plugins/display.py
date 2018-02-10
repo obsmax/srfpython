@@ -94,7 +94,6 @@ def _display_function(rootname, argv, verbose, mapkwargs):
         with RunFile(runfile, verbose=verbose) as rundb:
             s = rundb.select('select MODELID from MODELS limit 1')
             if s is not None:
-
                 # --- display best models
                 if "-top" in argv.keys():
 
@@ -256,8 +255,11 @@ def _display_function(rootname, argv, verbose, mapkwargs):
     # --------------------
     if os.path.exists(targetfile):
         # plot data on top
-        rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs), dvalues=d.dvalues, alpha=0.8, color="g",
-                    linewidth=3)
+        rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs),
+                    dvalues=d.dvalues,
+                    alpha=0.8,
+                    color="g",
+                    linewidth=1)
 
         if "-overdisp" in argv.keys():
             rd.set_vlim((0.5 * d.values.min(), 1.5 * d.values.max()))

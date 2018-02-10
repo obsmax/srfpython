@@ -5,7 +5,7 @@ from parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Param
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthspace
 from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
 import numpy as np
-import time
+import time, os
 
 
 # -------------------------------------
@@ -62,8 +62,8 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
             ztopsup[0] -= 0.001
             vsinf = 0.1 * np.ones(nlayer)
             vssup = 3.5 * np.ones(nlayer)
-            prinf = 1.6 * np.ones(nlayer) #r43 * np.ones(nlayer)
-            prsup = 2.5 * np.ones(nlayer) #3.5 * np.ones(nlayer)
+            prinf = 1.70 * np.ones(nlayer) #r43 * np.ones(nlayer)
+            prsup = 2.15 * np.ones(nlayer) #3.5 * np.ones(nlayer)
             rhinf = 1.8 * np.ones(nlayer)
             rhsup = 3.0 * np.ones(nlayer)
         else:
@@ -277,6 +277,7 @@ def load_paramfile(paramfile):
     # print "parameter type : ", p.__class__.__name__
     # print "prior type     : ", logRHOM.__class__.__name__
     return p, logRHOM
+
 
 # -------------------------------------
 # run file : based on sqlite
@@ -570,6 +571,81 @@ class RunFile(Database):
             dm = depthmodel_from_arrays(Z, VP, VS, RH)
             sr = surf96reader_from_arrays(W, T, M, F, DV, None)
             yield MODELID, CHAINID, WEIGHT, LLK, NLAYER, dm, sr
+
+    # ----------------------------
+    def summary(self, head=""):
+        """summarize the content of this runfile"""
+        s = self.select('''
+            select count(*) as NCHAIN, NMODEL, LLKMIN, LLKMAX from 
+                CHAINS
+                join (select count(*) as NMODEL, MIN(LLK) as LLKMIN, MAX(LLK) as LLKMAX from MODELS)
+                 ''')
+        if s is None:
+            return
+        filesize = os.stat(self.sqlitefile).st_size
+        NCHAIN, NMODEL, LLKMIN, LLKMAX = s.next()
+        print "%s%6d chains, %6d models, worst %10f, best %10f, filesize %dM" % \
+              (head,NCHAIN, NMODEL, LLKMIN, LLKMAX, filesize / 1024 / 1024)
+
+    # ----------------------------
+    def stats(self, head=""):
+        """print details about the content of this runfile"""
+        s = self.select('''
+            select CHAINID, count(*), MAX(LLK) as MLLK from MODELS
+                group by CHAINID
+                order by MLLK 
+            ''')
+        if s is None: return
+        for CHAINID, N, MLLK in s:
+            print "%schain : %6d  models : %6d maxllk : %f" % (head, CHAINID, N, MLLK)
+
+    # ----------------------------
+    def del_sql(self, sql=None):
+        """delete models based on a sql command, private"""
+        # switch off foerign keys for a moment, otherwise the deletion is fucking slow
+        self.cursor.execute('PRAGMA FOREIGN_KEYS = OFF; ')
+        try:
+            self.cursor.execute('''
+                delete from DISPVALUES
+                    where MODELID in
+                        (select MODELID from MODELS
+                            {sql})
+                    '''.format(sql=sql))
+
+            self.cursor.execute('''
+                delete from PARAMVALUES
+                    where MODELID in
+                        (select MODELID from MODELS
+                            {sql})
+                            '''.format(sql=sql))
+
+            self.cursor.execute('''
+                delete from MODELS 
+                    {sql}
+                    '''.format(sql=sql))
+        except:
+            raise
+        finally:
+            self.cursor.execute('''PRAGMA FOREIGN_KEYS = ON; ''')
+
+    # ----------------------------
+    def del_bad(self, llkmin):
+        sql = "where LLK < {llkmin}".format(llkmin=llkmin)
+        self.del_sql(sql=sql)
+
+    # ----------------------------
+    def del_chain(self, chainid):
+        """delete one or more chains using their chainids,
+           deletes only the models, dispvalues and paramvalues,
+           preserve entries in the CHAINS table
+        """
+        if not hasattr(chainid, "__iter__"):
+            sql = "where CHAINID = {chainid}".format(chainid=chainid)
+        elif len(chainid) == 1:
+            sql = "where CHAINID = {chainid}".format(chainid=chainid[0])
+        else:
+            sql = "where CHAINID in {chainid}".format(chainid=str(tuple(chainid)))
+        self.del_sql(sql=sql)
 
 
 # --------------------

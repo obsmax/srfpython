@@ -83,5 +83,7 @@ def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **map
             if verbose: wb.refresh(jobid / Njobs)
             dds = (overwaves, overtypes, overmodes, overfreqs, overvalues)
             yield mms, dds
-        if verbose: wb.close()
+        if verbose:
+            wb.close()
+            print
     print

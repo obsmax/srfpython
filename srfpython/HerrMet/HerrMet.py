@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+"""
+HerrMet : code for depth inversion of multimodal/multitypes surface waves
+This is the main program to be called from command lines with arguments,
+this program will call plugins with corresponding arguments
+"""
 
 import os, sys, matplotlib
 if "-png" in sys.argv[1:]: matplotlib.use('agg')
@@ -7,7 +12,7 @@ if "-png" in sys.argv[1:]: matplotlib.use('agg')
 from srfpython.utils import readargv1
 from srfpython.Herrmann.Herrmann import check_herrmann_codes
 from srfpython.HerrMet.plugins import target, param, send, run, \
-    neldermead, extract, display, default
+    manage, neldermead, extract, display, default
 check_herrmann_codes()
 
 # -------------------------------------
@@ -18,6 +23,7 @@ default_nworkers = None
 default_taskset = None
 
 # -------------------------------------
+# security, do not accept options that are not expected => prevent typos
 authorized_keys = \
     ["-help", "-h",
      "-version", "-v",
@@ -30,6 +36,7 @@ authorized_keys = \
      "--param",
      "--send",
      "--run",
+     "--manage",
      "--neldermead",
      "--extract",
      "--display"]
@@ -49,6 +56,7 @@ help = '''HerrMet V{version}
 {param_help}
 {send_help}
 {run_help}
+{manage_help}
 {neldermead_help}
 {extract_help}
 {display_help}
@@ -61,6 +69,7 @@ help = '''HerrMet V{version}
     param_help=param.short_help,
     send_help=send.short_help,
     run_help=run.short_help,
+    manage_help=manage.short_help,
     neldermead_help=neldermead.short_help,
     extract_help=extract.short_help,
     display_help=display.short_help)
@@ -165,6 +174,10 @@ if __name__ == "__main__":
     # ------
     if "--run" in argv.keys():
         run.run(argv['--run'], verbose, mapkwargs)
+
+    # ------
+    if "--manage" in argv.keys():
+        manage.manage(argv['--manage'], verbose, mapkwargs)
 
     # ------
     if "--neldermead" in argv.keys():
