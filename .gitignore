@@ -3,8 +3,11 @@
 *._*
 .ipynb_checkpoints
 *.pyc
+*.mod96
+*.surf96
+*.target
+*.param
+*.run
 srfpython/Herrmann/bin/max_srfdis96
 srfpython/Herrmann/bin/max_srfpre96
-srfpython/tutorial/dmtuto.mod96
-srfpython/tutorial/dmtuto.surf96
 srfpython/tutorial/_HerrMet.*
