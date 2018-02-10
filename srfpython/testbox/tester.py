@@ -13,10 +13,10 @@ for i in xrange(10):
     dm.show(gca())
     dm.write96('%03d.mod96' % i)
 
-    Curves = [('R', 'U', 0, freqspace(.2, 1., 15, "log")), \
-              ('R', 'U', 1, freqspace(.2, 1., 15, "log")), \
-              ('L', 'U', 0, freqspace(.2, 1., 15, "log")), \
-              ('L', 'U', 1, freqspace(.2, 1., 15, "log"))]
+    Curves = [('R', 'U', 0, freqspace(.2, 1., 15, "log"))] #, \
+             # ('R', 'U', 1, freqspace(.2, 1., 15, "log")), \
+             # ('L', 'U', 0, freqspace(.2, 1., 15, "log")), \
+             # ('L', 'U', 1, freqspace(.2, 1., 15, "log"))]
 
     waves, types, modes, freqs, values = [[] for _ in xrange(5)]
     for w, t, m, F, V in dispersion_2(ztop, vp, vs, rh, Curves,

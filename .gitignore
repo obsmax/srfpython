@@ -8,5 +8,7 @@
 *.target
 *.param
 *.run
+*.png
+*.surf96.copy
 srfpython/Herrmann/bin/max_srfdis96
 srfpython/Herrmann/bin/max_srfpre96
