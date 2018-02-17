@@ -1,7 +1,7 @@
 from srfpython.depthdisp.depthmodels import depthmodel1D, depthmodel
 from srfpython.utils import discrete_time_primitive
 import numpy as np
-from tetedenoeud.multipro.multipro8 import Job, StackAsync
+from srfpython.standalone.multipro8 import Job, StackAsync
 
 
 # ----------------------------------------------------

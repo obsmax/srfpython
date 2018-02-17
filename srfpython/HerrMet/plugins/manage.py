@@ -7,7 +7,7 @@ from srfpython.HerrMet.files import RunFile
 default_rootnames = "_HerrMet_*"
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-stats", "-plot", "-delbad", "-delchains"]
+authorized_keys = ["-stats", "-plot", "-delbad", "-delchains", "-inline"]
 
 # ------------------------------ help messages
 short_help = "--manage     summarize run file content, manage run results"
@@ -16,6 +16,7 @@ long_help = """\
 --manage     s [s..] manage run results for given rootnames, default {default_rootnames}
      -stats          prints detailed stats for each chain of each runfile 
      -plot           display the convergence for every chain and every rootname
+     -inline         do not pause (jupyter)
      -delbad f       delete bad models, log likelihood below a given threshold, no default
      -delchains i [i...] delete one or more chains using their chainid
       
@@ -59,10 +60,13 @@ def manage(argv, verbose, mapkwargs):
         with RunFile(runfile, verbose=False) as rundb:
             rundb.summary(head=rootname + " : ")
 
+    if "-inline" in argv.keys():
+        showme = plt.show
+
     # more options
     for rootname, runfile in zip(rootnames, runfiles):
 
-        with RunFile(runfile, verbose=True) as rundb:
+        with RunFile(runfile, verbose=verbose) as rundb:
             # ------------ print chains stats
             if "-stats" in argv.keys():
                 rundb.stats(head=rootname + " : ")

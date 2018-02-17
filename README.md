@@ -6,18 +6,6 @@
 
 install
 
-install tetedenoeud (required)
-> move to the installation path (e.g. "~/git") and get tetedenoeud
->
-> ```
-> cd ~/git
-> git clone http://github.com/obsmax/tetedenoeud.git
-> ```
->
-> follow instructions in tetedenoeud/README.md
-
-install srfpython
-
 > move to the installation path (e.g. "~/git") and get srfpython
 >
 > ```
@@ -25,10 +13,11 @@ install srfpython
 > git clone http://github.com/obsmax/srfpython.git
 > ```
 >
-> activate the virtual environment created for tetedenoeud
+> create the virtual environment and activate it
 >
 > ```
-> source activate tetedenoeud
+> conda create -n srfpython python=2.7
+> source activate srfpython
 > ```
 >
 > move to the repository, install the requirements and install the package
@@ -62,7 +51,22 @@ add the bin directory to the path (recommended)
 > export PATH=$PATH:"~/git/srfpython/srfpython/bin"
 > ```
 
-try the tutorial
+if you plan to use jupyter notebooks with python2 (optional)
+
+> make sure the environment is activated
+> ```
+> source activate srfpython
+> ```
+>
+> install with
+>
+> ```
+> conda install --yes notebook ipykernel
+> ipython kernel install --user
+> ```
+>
+
+try the tutorials
 
 > ```
 > cd ~/git/srfpython/tutorials/tutorial0

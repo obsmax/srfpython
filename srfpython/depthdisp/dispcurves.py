@@ -208,19 +208,14 @@ class freqinterpolator(object):
                 # velocity is a Jeffreys parameter
                 # val +- dval becomes log(val) +- dval / val
                 # then val +- dval becomes exp(log(val) +- dval / val) = val * exp(+- dval / val)
-                if "color" not in kwargs.keys():
-                    if period:
-                        ax.plot([1. / f, 1. / f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-",
-                                color=hdl.get_color(), *args, **kwargs)
-                    else:
-                        ax.plot([f, f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-",
-                                color=hdl.get_color(), *args, **kwargs)
+
+                if period:
+                    ax.plot([1. / f, 1. / f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-",
+                            color=hdl.get_color())
                 else:
-                    if period:
-                        ax.plot([1. / f, 1. / f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-", *args,
-                                **kwargs)
-                    else:
-                        ax.plot([f, f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-", *args, **kwargs)
+                    ax.plot([f, f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-",
+                            color=hdl.get_color())
+
 
         return hdl
 

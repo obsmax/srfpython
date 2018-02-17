@@ -18,7 +18,7 @@ if __name__ == "__main__":
         print help
         sys.exit()
 
-    from tetedenoeud.utils.display import gcf, gca, showme, pause, plt, logtick
+    from srfpython.standalone.display import gcf, gca, showme, pause, plt, logtick
     from srfpython.depthdisp.dispcurves import surf96reader, Claw, freqspace
     from srfpython.utils import readargv
     import numpy as np

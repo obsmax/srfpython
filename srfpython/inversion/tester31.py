@@ -1,5 +1,5 @@
-from tetedenoeud.utils.display import *
-from tetedenoeud.multipro.multipro8 import *
+from srfpython.standalone.display import *
+from srfpython.standalone.multipro8 import *
 from metropolis2 import *
 import numpy as np
 

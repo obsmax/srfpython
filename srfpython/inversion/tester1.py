@@ -1,4 +1,4 @@
-from tetedenoeud.utils.display import *
+from srfpython.standalone.display import *
 import numpy as np
 from metropolis2 import *
 

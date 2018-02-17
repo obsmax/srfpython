@@ -1,4 +1,4 @@
-from tetedenoeud.utils.display import plt, gcf, gca, pause, showme, Ntick, logtick
+from srfpython.standalone.display import plt, gcf, gca, pause, showme, Ntick, logtick
 from srfpython.depthdisp.dispcurves import surf96reader, mklaws
 from srfpython.depthdisp.depthmodels import depthmodel1D, depthmodel_from_mod96
 import numpy as np

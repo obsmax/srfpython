@@ -1,5 +1,5 @@
-from tetedenoeud.database.database import Database
-from tetedenoeud.utils.asciifile import AsciiFile
+from srfpython.standalone.database import Database
+from srfpython.standalone.asciifile import AsciiFile
 from priorpdf import DefaultLogRhoM, LogRhoM_DVS, LogRhoM_DVPDVSDRH, LogRhoM_DVPDVSDRHDPR
 from parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHvp, Parameterizer_mZVSPRzRHz
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthspace
@@ -341,7 +341,6 @@ class RunFile(Database):
             POINTID       integer references DISPPOINTS(POINTID),
             DISPVAL       real not null) --null leads to issues when grouping, insert -1.0 instead
             ''')
-
 
     # -------------------
     def reset(self, nlayer, waves, types, modes, freqs):

@@ -445,7 +445,7 @@ if __name__ == "__main__":
     """ DEMO """
 
     import matplotlib.pyplot as plt
-    from tetedenoeud.utils.display import logtick
+    from srfpython.standalone.display import logtick
     check_herrmann_codes()
 
 

@@ -1,8 +1,8 @@
 import os, glob
 import numpy as np
-from tetedenoeud.multipro.multipro8 import Job, MapAsync
-from tetedenoeud.utils.display import values2colors, makecolorbar, legendtext, chftsz
-from tetedenoeud.utils import cmaps #used in function eval
+from srfpython.standalone.multipro8 import Job, MapAsync
+from srfpython.standalone.display import values2colors, makecolorbar, legendtext, chftsz
+from srfpython.standalone import cmaps #used in function eval
 from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays
 from srfpython.depthdisp.dispcurves import freqspace
@@ -307,7 +307,7 @@ def display(argv, verbose, mapkwargs):
         try:
             argv['-cmap'] = eval("cmaps.%s()" % argv['-cmap'][0])
         except:
-            raise Exception('could not find colormap %s neither in matplotlib neither in tetedenoeud.utils.cmaps' % argv['-cmap'][0])
+            raise Exception('could not find colormap %s neither in matplotlib neither in srfpython.standalone.utils.cmaps' % argv['-cmap'][0])
 
 
     # ----------- special case, just show the parameterization file from --param : ./_HerrMet.param

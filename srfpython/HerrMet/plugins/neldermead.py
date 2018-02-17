@@ -1,6 +1,6 @@
 import os, glob
 import numpy as np
-from tetedenoeud.multipro.multipro8 import Job, MapAsync
+from srfpython.standalone.multipro8 import Job, MapAsync
 from srfpython.inversion.metropolis2 import LogGaussND
 from srfpython.inversion.neldermead2 import neldermead as neldermead_function
 from srfpython.HerrMet.files import load_paramfile, RunFile

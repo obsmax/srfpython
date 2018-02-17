@@ -1,6 +1,6 @@
 import os, glob
 import numpy as np
-from tetedenoeud.multipro.multipro8 import Job, MapAsync
+from srfpython.standalone.multipro8 import Job, MapAsync
 from srfpython.depthdisp.depthmodels import depthmodel, depthmodel1D
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.HerrMet.files import  RunFile
@@ -52,7 +52,7 @@ def _extract_function(rootname, extract_llkmin, extract_limit, extract_step, ver
     runfile = "%s/_HerrMet.run" % rootname
     with RunFile(runfile, verbose=verbose) as rundb:
         print "extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step),
-        chainids, weights, llks, ms, ds = rundb.like_read_run_1(llkmin=extract_llkmin, limit=extract_limit,
+        chainids, weights, llks, ms, ds = rundb.getzip(llkmin=extract_llkmin, limit=extract_limit,
                                                                 step=extract_step)
 
     dms, wgts = [], []
