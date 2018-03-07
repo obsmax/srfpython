@@ -49,11 +49,24 @@ def manage(argv, verbose, mapkwargs):
         if k not in authorized_keys:
             raise Exception('option %s is not recognized' % k)
 
-    rootnames = argv['main']
-    if rootnames == []:
-        rootnames = glob.glob(default_rootnames)
-    assert len(rootnames)
-    runfiles = ["%s/_HerrMet.run" % rootname for rootname in rootnames]
+    rootnames0 = argv['main']
+    if rootnames0 == []:
+        rootnames0 = glob.glob(default_rootnames)
+    assert len(rootnames0)
+
+    # exclude rootnames with no run file
+    rootnames = []
+    runfiles = []
+    for rootname in rootnames0:
+        runfile = "%s/_HerrMet.run" % rootname
+        if os.path.exists(runfile):
+            rootnames.append(rootname)
+            runfiles.append(runfile)
+        else:
+            pass #print "%s : %s does not exist" % (rootname, runfile)
+    del rootnames0
+    assert len(rootnames) and len(rootnames) == len(runfiles)
+
 
     # summarize all files
     for rootname, runfile in zip(rootnames, runfiles):

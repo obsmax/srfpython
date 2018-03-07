@@ -583,8 +583,11 @@ class RunFile(Database):
             return
         filesize = os.stat(self.sqlitefile).st_size
         NCHAIN, NMODEL, LLKMIN, LLKMAX = s.next()
-        print "%s%6d chains, %6d models, worst %10f, best %10f, filesize %dM" % \
+        if NCHAIN:
+            print "%s%6d chains, %6d models, worst %10f, best %10f, filesize %dM" % \
               (head,NCHAIN, NMODEL, LLKMIN, LLKMAX, filesize / 1024 / 1024)
+        else:
+            print head, "no chains"
 
     # ----------------------------
     def stats(self, head=""):

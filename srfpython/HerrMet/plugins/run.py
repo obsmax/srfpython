@@ -10,21 +10,25 @@ from srfpython.HerrMet.theory import Theory
 default_rootnames = "_HerrMet_*"
 default_nchain = 12
 default_nkeep = 100
-
+default_mode = "skip"
 # ------------------------------ autorized_keys
-authorized_keys = ["-append", "-nchain", "-nkeep"]
+authorized_keys = ["-mode", "-nchain", "-nkeep"]
 
 # ------------------------------ help messages
 short_help = "--run        invert dispersion data using the Markov Chain Monte Carlo method"
 
 long_help = """\
---run        s [s..] start inversion for the required rootnames, default {default_rootnames} 
-    -append          set running mode to append (i.e. add new models to the exiting run file(s)) 
-                     default is restart (overwrite the current run file(s) if any)
+--run        s [s..] start inversion for the required rootnames, default {default_rootnames}
+    -mode    s       set the running mode, default {default_mode}
+                     restart  : overwrite the current run file(s) if any   
+                     append   : add new models to the exiting run file(s) 
+                     skip     : ignore rootnames with existsing run file(s)               
     -nchain  i       number of chains to use, default {default_nchain}
     -nkeep   i       number of models to keep per chain, default {default_nkeep}
+    
     -w       i       see above, controls the max number of chains to run simultaneously
     """.format(default_rootnames=default_rootnames,
+           default_mode=default_mode,
            default_nchain=default_nchain,
            default_nkeep=default_nkeep)
 
@@ -56,7 +60,9 @@ def run(argv, verbose, mapkwargs):
     if rootnames == []:
         rootnames = glob.glob(default_rootnames)
     assert len(rootnames)
-    runmode = "-append" if "-append" in argv.keys() else "-restart"
+
+    runmode = argv['-mode'][0]
+    assert runmode in ['restart', 'append', 'skip']
     Nchain = int(argv['-nchain'][0]) if "-nchain" in argv.keys() else default_nchain
     Nkeep = int(argv['-nkeep'][0]) if "-nkeep" in argv.keys() else default_nkeep
 
@@ -72,6 +78,8 @@ def run(argv, verbose, mapkwargs):
                 runmode = "-restart"
             elif runmode == "-restart" and os.path.exists(runfile):
                 os.remove(runfile)
+            elif runmode == "-skip" and os.path.exists(runfile):
+                continue
 
             # ------
             p, logRHOM = load_paramfile(paramfile)
