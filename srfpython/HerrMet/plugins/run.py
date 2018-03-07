@@ -95,12 +95,14 @@ def run(argv, verbose, mapkwargs):
             # ------
             G = Theory(parameterizer=p, datacoder=d)
             # ---------------------------------
-            if runmode == "restart":
+            if runmode == "restart" or runmode == "skip":
                 with RunFile(runfile, create=True, verbose=verbose) as rundb:
                     rundb.drop()
                     rundb.reset(p.NLAYER, d.waves, d.types, d.modes, d.freqs)
             elif runmode == "append":
                 pass
+            else:
+                raise Exception('unexpected runmode %s' % runmode)
 
             # ---------------------------------
             for chainid in xrange(Nchain):
