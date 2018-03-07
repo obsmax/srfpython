@@ -60,8 +60,9 @@ def manage(argv, verbose, mapkwargs):
         with RunFile(runfile, verbose=False) as rundb:
             rundb.summary(head=rootname + " : ")
 
+    showfun = showme
     if "-inline" in argv.keys():
-        showme = plt.show
+        showfun = plt.show
 
     # more options
     for rootname, runfile in zip(rootnames, runfiles):
@@ -94,5 +95,5 @@ def manage(argv, verbose, mapkwargs):
                 gca().set_ylabel('log likelihood')
                 gca().grid(True, linestyle = ":")
                 gca().set_title(rootname.split('_HerrMet_')[-1])
-                showme()
+                showfun()
                 plt.close(gcf())
