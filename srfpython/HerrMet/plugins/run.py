@@ -61,7 +61,7 @@ def run(argv, verbose, mapkwargs):
         rootnames = glob.glob(default_rootnames)
     assert len(rootnames)
 
-    runmode = argv['-mode'][0]
+    runmode = argv['-mode'][0] if "-mode" in argv.keys() else default_mode
     assert runmode in ['restart', 'append', 'skip']
     Nchain = int(argv['-nchain'][0]) if "-nchain" in argv.keys() else default_nchain
     Nkeep = int(argv['-nkeep'][0]) if "-nkeep" in argv.keys() else default_nkeep
@@ -74,11 +74,12 @@ def run(argv, verbose, mapkwargs):
             paramfile = "%s/_HerrMet.param" % rootname
             runfile = "%s/_HerrMet.run" % rootname
 
-            if runmode == "-append" and not os.path.exists(runfile):
-                runmode = "-restart"
-            elif runmode == "-restart" and os.path.exists(runfile):
+            if runmode == "append" and not os.path.exists(runfile):
+                runmode = "restart"
+            elif runmode == "restart" and os.path.exists(runfile):
                 os.remove(runfile)
-            elif runmode == "-skip" and os.path.exists(runfile):
+            elif runmode == "skip" and os.path.exists(runfile):
+                print "skip %s" % rootname
                 continue
 
             # ------
@@ -94,11 +95,11 @@ def run(argv, verbose, mapkwargs):
             # ------
             G = Theory(parameterizer=p, datacoder=d)
             # ---------------------------------
-            if runmode == "-restart":
+            if runmode == "restart":
                 with RunFile(runfile, create=True, verbose=verbose) as rundb:
                     rundb.drop()
                     rundb.reset(p.NLAYER, d.waves, d.types, d.modes, d.freqs)
-            elif runmode == "-append":
+            elif runmode == "append":
                 pass
 
             # ---------------------------------
