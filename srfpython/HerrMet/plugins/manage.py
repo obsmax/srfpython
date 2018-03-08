@@ -78,35 +78,36 @@ def manage(argv, verbose, mapkwargs):
         showfun = plt.show
 
     # more options
-    for rootname, runfile in zip(rootnames, runfiles):
+    if np.any([opt in argv.keys() for opt in "-stats", "-delbad", "-delchains", "-plot"]):
+        for rootname, runfile in zip(rootnames, runfiles):
 
-        with RunFile(runfile, verbose=verbose) as rundb:
-            # ------------ print chains stats
-            if "-stats" in argv.keys():
-                rundb.stats(head=rootname + " : ")
+            with RunFile(runfile, verbose=verbose) as rundb:
+                # ------------ print chains stats
+                if "-stats" in argv.keys():
+                    rundb.stats(head=rootname + " : ")
 
-            # ------------ rm
-            if "-delbad" in argv.keys():
-                rundb.del_bad(llkmin=argv['-delbad'][0])
+                # ------------ rm
+                if "-delbad" in argv.keys():
+                    rundb.del_bad(llkmin=argv['-delbad'][0])
 
-            if "-delchains" in argv.keys():
-                rundb.del_chain(chainid=argv['-delchains'])
+                if "-delchains" in argv.keys():
+                    rundb.del_chain(chainid=argv['-delchains'])
 
-            # ------------ plot
-            if "-plot" in argv.keys():
-                s = rundb.select('''
-                select CHAINID, group_concat(NITER), group_concat(LLK) from MODELS
-                    group by CHAINID 
-                    ''')
-                plt.figure()
-                for CHAINID, NITER, LLK in s:
-                    NITER = np.asarray(NITER.split(','), int)
-                    LLK = np.asarray(LLK.split(','), float)
-                    gca().plot(NITER, LLK)
-                    gca().text(NITER[-1], LLK[-1], CHAINID)
-                gca().set_xlabel('# iteration')
-                gca().set_ylabel('log likelihood')
-                gca().grid(True, linestyle = ":")
-                gca().set_title(rootname.split('_HerrMet_')[-1])
-                showfun()
-                plt.close(gcf())
+                # ------------ plot
+                if "-plot" in argv.keys():
+                    s = rundb.select('''
+                    select CHAINID, group_concat(NITER), group_concat(LLK) from MODELS
+                        group by CHAINID 
+                        ''')
+                    plt.figure()
+                    for CHAINID, NITER, LLK in s:
+                        NITER = np.asarray(NITER.split(','), int)
+                        LLK = np.asarray(LLK.split(','), float)
+                        gca().plot(NITER, LLK)
+                        gca().text(NITER[-1], LLK[-1], CHAINID)
+                    gca().set_xlabel('# iteration')
+                    gca().set_ylabel('log likelihood')
+                    gca().grid(True, linestyle = ":")
+                    gca().set_title(rootname.split('_HerrMet_')[-1])
+                    showfun()
+                    plt.close(gcf())
