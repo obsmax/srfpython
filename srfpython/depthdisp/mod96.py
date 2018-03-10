@@ -6,7 +6,8 @@ def unpackmod96(string):
     """unpack 1D deptmodel depthdisp at mod96 format (see Herrmann's doc)
     """
     string = [line.strip() for line in string.split('\n')]
-    string.remove('')
+    if '' in string:
+        string.remove('')
     # assert string[0].strip() == "MODEL.01"
     # title = string[1].strip()
     # isotropic = string[2].strip().upper() #== "ISOTROPIC"
@@ -20,9 +21,10 @@ def unpackmod96(string):
     # assert string[10].strip() == "LINE11"
     # header = string[11]
 
+    assert string[11].startswith("H(KM)")
     nlayer = len(string) - 12
     #H, VP, VS, RHO, QP, QS, ETAP, ETAS, FREFP, FREFS = [np.empty(nlayer, float) for _ in xrange(10)]
-    DAT = np.empty((nlayer, 10), float)
+    DAT = np.zeros((nlayer, 10), float)
 
     for n in xrange(nlayer):
         DAT[n, :] = np.asarray(string[12 + n].split(), float)
@@ -52,6 +54,7 @@ def packmod96(Z, VP, VS, RHO, QP=None, QS=None, ETAP=None, ETAS=None, FREFP=None
     if FREFP is None: FREFP = np.ones_like(VS)
     if FREFS is None: FREFS = np.ones_like(VS)
     strout="""MODEL.01
+MODELTITLE
 ISOTROPIC
 KGS
 FLAT EARTH

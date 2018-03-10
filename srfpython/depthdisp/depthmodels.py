@@ -133,29 +133,34 @@ class depthmodel1D(object):
            overwrites self
         """
         assert thickness > 0.
-        thck, values = [], []
+        # thck, values = [], []
+        #
+        # for i, (h, v) in enumerate(zip(self.thickness(), self.values)):
+        #     if np.isinf(h):
+        #         thck.append(np.inf)
+        #         values.append(v)
+        #     else:
+        #         #q, r = diveucl(h, thickness)
+        #         q, r = h // thickness, h % thickness
+        #         print q, r
+        #         if r > 1.e-6:
+        #             values.append(v)
+        #             thck.append(r)
+        #
+        #         if q > 0.:
+        #             for j in xrange(int(q)):
+        #                 values.append(v)
+        #                 thck.append(thickness)
+        #
+        # ztop = np.concatenate(([0.], np.cumsum(thck[:-1])))
+        # ztop   = np.array(ztop)
+        # values = np.array(values)
+        newztop = np.concatenate((self.z, np.arange(0., self.z[-1], thickness)))
+        newztop = np.round(newztop, 6)
+        newztop = np.sort(np.unique(newztop))
 
-        for i, (h, v) in enumerate(zip(self.thickness(), self.values)):
-            if np.isinf(h):
-                thck.append(np.inf)
-                values.append(v)
-            else:
-                #q, r = diveucl(h, thickness)
-                q, r = h // thickness, h % thickness
-                if r > 1.e-6:
-                    values.append(v)
-                    thck.append(r)
-
-                if q > 0.:
-                    for j in xrange(int(q)):
-                        values.append(v)
-                        thck.append(thickness)
-
-        ztop = np.concatenate(([0.], np.cumsum(thck[:-1])))
-        ztop   = np.array(ztop)
-        values = np.array(values)
-
-        self.__init__(ztop, values)
+        newvalues = self.interp(newztop+1.e-12, interpmethod="stairs")
+        self.__init__(newztop, newvalues)
 
     # -------------------------------------------------
     def add_layer(self, thickness):

@@ -51,6 +51,7 @@ if __name__ == "__main__":
     elif "split" in argv.keys():
         thickness = argv['thck'][0]
         suffix    = argv['sfx'][0] if "sfx" in argv.keys() else "split"
+
         for f in argv['split']:
             dm = depthmodel_from_mod96(f)
             dm.split(thickness)
@@ -62,13 +63,13 @@ if __name__ == "__main__":
                 fout = ".".join(fout)
                 assert not os.path.exists(fout)
             print (f, ">", fout)
-            dm.write96(fout, overwrite = "o" in argv.keys())
+            dm.write96(fout)
         sys.exit()
 
     # -----------------------------------
     elif "addlayer" in argv.keys():
         thickness = argv['thck'][0]
-        suffix    = argv['sfx'][0] if "sfx" in argv.keys() else "split"
+        suffix    = argv['sfx'][0] if "sfx" in argv.keys() else "add"
         for f in argv['addlayer']:
             dm = depthmodel_from_mod96(f)
             dm.add_layer(thickness)
@@ -79,8 +80,8 @@ if __name__ == "__main__":
                 fout = ".".join(fout)
                 assert not os.path.exists(fout)
             print (f, ">", fout)
-            dm.write96(fout, overwrite = "o" in argv.keys())
-        exit()
+            dm.write96(fout)
+        sys.exit()
 
     # -----------------------------------
     elif "show" in argv.keys():

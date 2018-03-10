@@ -94,8 +94,10 @@ def prep_srfpre96_2(z, vp, vs, rh):
     z = np.asarray(z, float)
     if (np.isinf(z) | np.isnan(z)).any():
         raise CPiSDomainError('got inapropriate values for Z (%s)' % str(z))
-    if (z[1:] - z[:-1] < 0.001).any():#    assert np.all(z[1:] - z[:-1] >= 0.001)
-        raise CPiSDomainError('Z must be growing, layers must be at least 0.001km thick, got %s' % str(z))
+    Ibad = (z[1:] - z[:-1] < 0.001)
+    if Ibad.any():
+        H = z[1:] - z[:-1]
+        raise CPiSDomainError('Z must be growing, layers must be at least 0.001km thick, got %s (%s)' % (str(z), str(H[Ibad])))
 
     vs = np.asarray(vs, float)
     if (np.isinf(vs) | np.isnan(vs)).any(): raise CPiSDomainError('vs value error %s' % str(vs))
@@ -115,25 +117,8 @@ def prep_srfpre96_2(z, vp, vs, rh):
           ("%f " * n) % tuple(vs) + "\n" + \
           ("%f " * n) % tuple(rh)
     return out
-        #    out="""MODEL.01
-#model-title
-#ISOTROPIC
-#KGS
-#FLAT EARTH
-#1-D
-#CONSTANT VELOCITY
-#LINE08
-#LINE09
-#LINE10
-#LINE11
-#      H(KM)   VP(KM/S)   VS(KM/S) RHO(GM/CC)     QP         QS       ETAP       ETAS      FREFP      FREFS    """
-#    fmt = "\n %f %f %f %f 0.00 0.00 0.00 0.00 1.00 1.00"
 
-#    for i in xrange(n - 1):
-#        out += fmt % (z[i+1] - z[i], vp[i], vs[i], rh[i])
-#    out += fmt % (0., vp[n-1], vs[n-1], rh[n-1])
-#    return out
-#_____________________________________
+# _____________________________________
 def prep_srfpre96_3(waves,types,modes,freqs):
     """prepare input for modified srfpre96 (max_srfpre96)"""
     nlc = nlu = nrc = nru = 0
@@ -341,7 +326,8 @@ def dispersion(ztop, vp, vs, rh, \
         with Timeout(5):
             p = Popen("%s|%s" % (srfpre96_exe, srfdis96_exe), stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=True, preexec_fn=os.setsid)#, stderr = stderrfid)
             qstdout, _ = p.communicate(pstdin)
-            if p.returncode : raise CPiSError('error : %s | %s failed' % (srfpre96_exe, srfdis96_exe))
+            if p.returncode:
+                raise CPiSError('error : %s | %s failed' % (srfpre96_exe, srfdis96_exe))
     except TimeOutError:
         print ("error *123*", ztop, vp, vs, rh)
         os.killpg(os.getpgid(p.pid), signal.SIGKILL)

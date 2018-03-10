@@ -1,7 +1,10 @@
-# from Herrmann.dispersion import *
+#!/usr/bin/env python
+
 import numpy as np
-from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, Timer, groupbywtm, igroupbywtm
+from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, Timer, groupbywtm, igroupbywtm, CPiSDomainError
 from srfpython.utils import minmax
+from srfpython.standalone.cmaps import cccfcmap3, tomocmap1
+from srfpython.standalone.multipro8 import MapSync, Job
 
 """
 srfker17, Maximilien Lehujeur, 01/11/2017
@@ -12,10 +15,26 @@ use __main__ for demo
 see also Herrmann.dispersion.dispersion
 """
 
-#_____________________________________
+
+# _____________________________________
+def lognofail(x):
+
+    def ilognofail(x):
+        if np.isnan(x):  return x
+        elif x < 0.:     return np.nan
+        elif x == 0.:    return -np.inf
+        return np.log(x)
+
+    if hasattr(x, "__iter__"):
+        return np.asarray(map(ilognofail, x), float)
+    else:
+        return ilognofail(x)
+
+
+# _____________________________________
 def sker17(ztop, vp, vs, rh, \
     waves, types, modes, freqs,
-    delta = 0.05, norm = True, 
+    dz=0.001, dlogvs=0.01, dlogpr=0.01, dlogrh=0.01, norm=True,
     h = 0.005, dcl = 0.005, dcr = 0.005):
     """sker17 : compute finite difference sensitivity kernels for surface waves dispersion curves 
     input: 
@@ -26,77 +45,113 @@ def sker17(ztop, vp, vs, rh, \
         waves, types, modes, freqs : lists or arrays, see dispersion
 
         -> sensitivity kernel computation
-        delta = float, > 0, relative perturbation to apply to each parameter and each layer
-        norm  = bool, If false, I compute the simple derivative of the dispersion velocity
-                                relative to a given parameter (e.g. dU(T)/dVs(z) where T is a given period and z is a given depth)
-                      If true, I compute the ratio between the relative input perturbation (e.g. dVs(z)/Vs(z))
-                               and the output perturbation (e.g. dU(T)/U(T))
+        dz = depth increment in km
+        dlogvs = increment to apply to the logarithm of vs
+        dlogpr = increment to apply to the logarithm of vp/vs
+        dlogrh = increment to apply to the logarithm of rho
+        norm = if True, I divide the sensitivity values by the thickness of each layer
+                => this corrects for the difference of sensitivity due to the variable thicknesss
 
         -> Herrmann's parameters, see CPS documentation
         h, dcl, dcr = passed to dispersion
 
     output:
-        -> yields a tuple (w, t, m, F, DVADZ, DVADA, DVADB, DVADR) for each wave, type and mode
+        -> yields a tuple (w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH) for each wave, type and mode
         w      = string, wave letter (L = Love or R = Rayleigh)
         t      = string, type letter (C = phase or U = group)
         m      = int, mode number (0= fundamental)
         F      = array, 1D, frequency array in Hz
-        DVADZ  = array, 2D, [normed] sensitivity kernel relative to top depth of each layer (lines) and frequency (columns)
-        DVADA  = array, 2D, [normed] sensitivity kernel relative to Pwave velocity of each layer (lines) and frequency (columns)
-        DVADB  = array, 2D, [normed] sensitivity kernel relative to Swave velocity of each layer (lines) and frequency (columns)
-        DVADR  = array, 2D, [normed] sensitivity kernel relative to density of each layer (lines) and frequency (columns)                
+        DLOGVADZ  = array, 2D, [normed] sensitivity kernel relative to top depth of each layer (lines) and frequency (columns)
+        DLOGVADLOGVS  = array, 2D, [normed] sensitivity kernel relative to Pwave velocity of each layer (lines) and frequency (columns)
+        DLOGVADLOGPR  = array, 2D, [normed] sensitivity kernel relative to Swave velocity of each layer (lines) and frequency (columns)
+        DLOGVADLOGRH  = array, 2D, [normed] sensitivity kernel relative to density of each layer (lines) and frequency (columns)                
                  note that these arrays might contain nans
     see also :
         sker17_1
         dispersion
     """
-    
 
     waves, types, modes, freqs = [np.asarray(_) for _ in waves, types, modes, freqs]
     nlayer = len(ztop)
-    H = np.asarray(ztop)
+    H = np.array(ztop) # NOT ASARRAY
     H[:-1], H[-1] = H[1:] - H[:-1], np.inf #layer thickness in km
 
-    model0 = np.concatenate((ztop, vp, vs, rh))
-    values0 = dispersion(ztop, vp, vs, rh, \
-                       waves, types, modes, freqs, \
-                       h = h, dcl = dcl, dcr = dcr)
+    model0 = np.concatenate((ztop, np.log(vs), np.log(vp/vs), np.log(rh)))
+    dmodel = np.concatenate((dz * np.ones_like(ztop),
+                             dlogvs * np.ones_like(vs),
+                             dlogpr * np.ones_like(vs),
+                             dlogrh * np.ones_like(rh)))
 
-    IZ  = np.arange(nlayer)
-    IVP = np.arange(nlayer, 2*nlayer)    
-    IVS = np.arange(2*nlayer, 3*nlayer)        
+    logvalues0 = lognofail(dispersion(ztop, vp, vs, rh,
+                       waves, types, modes, freqs,
+                       h = h, dcl = dcl, dcr = dcr))
+
+    IZ = np.arange(nlayer)
+    IVS = np.arange(nlayer, 2*nlayer)
+    IPR = np.arange(2*nlayer, 3*nlayer)
     IRH = np.arange(3*nlayer, 4*nlayer)        
     DVADP = np.zeros((4 * nlayer, len(waves)), float) * np.nan
 
-    for i in xrange(1, 4 * len(ztop)):
-        modeli = model0.copy()
-        modeli[i] *= (1. + delta)
-        ztopi, vpi, vsi, rhi = modeli[IZ], modeli[IVP], modeli[IVS], modeli[IRH]
-        try:
-            valuesi = dispersion(ztopi, vpi, vsi, rhi, \
-                           waves, types, modes, freqs, \
-                           h = h, dcl = dcl, dcr = dcr)        
-        except CPiSDomainError as err: 
-            print ("error during gradient computation %s" % str(err))
-            continue
-        except: raise
-        if norm:
-            DVADP[i, :] = ((valuesi - values0) / values0) / \
-                          ((modeli[i] - model0[i]) / model0[i])
+    # ----
+    # parallel
+    # ----
+    def fun(i, modeli):
+        ztopi, logvsi, logpri, logrhi = \
+            modeli[IZ], modeli[IVS], modeli[IPR], modeli[IRH]
+        n = len(ztopi)
+        ilayer = i % n
+        if ilayer == n-1:
+            Hi = 1.e50 # thickness of the half-space
         else:
-            DVADP[i, :] = (valuesi - values0) / (modeli[i] - model0[i]) 
+            Hi = ztopi[ilayer + 1] - ztopi[ilayer]
+
+        try:
+            logvaluesi = lognofail(dispersion(
+                ztopi, np.exp(logvsi + logpri),
+                np.exp(logvsi), np.exp(logrhi),
+                waves, types, modes, freqs,
+                h=h, dcl=dcl, dcr=dcr))
+        except CPiSDomainError as err:
+            print ("error during gradient computation %s" % str(err))
+            return i, None
+        except:
+            raise
+        if norm:
+            # sensitivity corrected from the layer thicknesses
+            DVAVPi = (logvaluesi - logvalues0) / (modeli[i] - model0[i]) / Hi
+        else:
+            # absolute sensitivity regardless the thickness differences
+            DVAVPi = (logvaluesi - logvalues0) / (modeli[i] - model0[i])
+
+        return i, DVAVPi
+
+    # ----
+    def gen():
+        for i in xrange(1, 4 * len(ztop)):
+            modeli = model0.copy()
+            modeli[i] += dmodel[i]
+            yield Job(i, modeli)
+
+    # ----
+    with MapSync(fun, gen()) as ma:
+        for _, (i, DVAVPi), _, _ in ma:
+            if DVAVPi is None: continue
+            DVADP[i, :] = DVAVPi
 
     for w, t, m, F, Iwtm in groupbywtm(waves, types, modes, freqs, np.arange(len(waves))):
-        DVADZ = DVADP[IZ, :][:, Iwtm]
-        DVADA = DVADP[IVP, :][:, Iwtm]
-        DVADB = DVADP[IVS, :][:, Iwtm]
-        DVADR = DVADP[IRH, :][:, Iwtm]
-        DVADZ, DVADA, DVADB, DVADR = [np.ma.masked_where(np.isnan(_), _) for _ in [DVADZ, DVADA, DVADB, DVADR]]
+        DLOGVADZ = DVADP[IZ, :][:, Iwtm]
+        DLOGVADLOGPR = DVADP[IPR, :][:, Iwtm]
+        DLOGVADLOGVS = DVADP[IVS, :][:, Iwtm]
+        DLOGVADLOGRH = DVADP[IRH, :][:, Iwtm]
+        DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH = \
+            [np.ma.masked_where(np.isnan(_), _) for _ in
+             [DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH]]
         
-        yield w, t, m, F, DVADZ, DVADA, DVADB, DVADR
+        yield w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH
 
-#_____________________________________
-def sker17_1(ztop, vp, vs, rh, \
+
+# _____________________________________
+def sker17_1(ztop, vp, vs, rh,
     Waves, Types, Modes, Freqs, **kwargs):
     """sker17_1 : same as sker17 with slightely more convenient input (no need to repeat wave, type and mode)
 
@@ -108,88 +163,131 @@ def sker17_1(ztop, vp, vs, rh, \
     see sker17 for detailed input and output arguments
     """
     waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
-    for tup in sker17(ztop, vp, vs, rh, \
+    for tup in sker17(ztop, vp, vs, rh,
             waves, types, modes, freqs, **kwargs):
         yield tup
 
-#_____________________________________
+
+# -----------------------------
 if __name__ == "__main__":
-    """ DEMO """
-    import matplotlib.pyplot as plt
+    import sys
 
-    ###depth model
-    ztop = [0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80] #km, top layer depth
-    vp   = [1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80] #km/s
-    vs   = [0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31] #km/s
-    rh   = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63] #g/cm3
+    help = '''sker17
+    -m96          depthmodel to read 
+    -RU0          rayleigh, group, mode 0 : expects 4 frequency arguments : fstart, fend, nfreq, fscale
+    -RU1          rayleigh, group, mode 1 : expects 4 frequency arguments : fstart, fend, nfreq, fscale
+    -RC0          rayleigh, phase, mode 0 : expects 4 frequency arguments : fstart, fend, nfreq, fscale          
+    -LC0          love,     phase, mode 0 : expects 4 frequency arguments : fstart, fend, nfreq, fscale
+    ...
 
-    ###dipsersion parameters
-    def f(): return np.logspace(np.log10(0.1), np.log10(5.5), 35)
-    Waves = ['R', 'R', 'R', 'R', 'L', 'L', 'L', 'L']
-    Types = ['U', 'U', 'C', 'C', 'U', 'U', 'C', 'C']
-    Modes = [ 0 ,  1,   0,   1,   0,   1,   0,   1 ]
-    Freqs = [ f(), f(), f(), f(), f(), f(), f(), f()]
+    '''
+    if len(sys.argv) == 1:
+        print help
+        sys.exit()
 
-    ###compute dispersion curves
+    from srfpython.standalone.display import plt
+    from srfpython.utils import readargv
+    from srfpython.Herrmann.Herrmann import dispersion_1
+    from srfpython.depthdisp.dispcurves import freqspace
+    from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
+    import numpy as np
+
+    argv = readargv()
+    # -----------------------------------:
+    dm = depthmodel_from_mod96(argv['m96'][0])
+    ztop = dm.vp.ztop()
+    vp = dm.vp.values
+    vs = dm.vs.values
+    rh = dm.rh.values
+
+    # -----------------------------------
+    Waves, Types, Modes, Freqs = [], [], [], []
+    for k in argv.keys():
+        if k[0].upper() in "RL" and k[1].upper() in "UC" and k[2] in "0123456789":
+            fstart, fend, nfreq, fspace = argv[k]
+            freq = freqspace(float(fstart), float(fend), int(nfreq), fspace)
+            Waves.append(k[0])
+            Types.append(k[1])
+            Modes.append(int(k[2:]))
+            Freqs.append(freq)
+
+    # -----------------------------------
+    # ##compute dispersion curves
     with Timer('dispersion'):
         out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
 
     for w, t, m, fs, us in out:
-        plt.gca().loglog(1. / fs, us, '+-', label = "%s%s%d" % (w, t, m))
+        plt.gca().loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
     plt.gca().set_xlabel('period (s)')
-    plt.gca().set_ylabel('velocity (km/s)')    
-    plt.gca().grid(True, which = "major")
-    plt.gca().grid(True, which = "minor")    
+    plt.gca().set_ylabel('velocity (km/s)')
+    plt.gca().grid(True, which="major")
+    plt.gca().grid(True, which="minor")
     plt.legend()
     plt.gcf().show()
 
-
-    ###sensitivity kernels
+    # ##sensitivity kernels
     norm = True
-    fig = plt.figure()  
-    fig.subplots_adjust(wspace = 0.3, hspace = 0.3)
+    fig = plt.figure()
+    fig.subplots_adjust(wspace=0.1, hspace=0.2)
     fig.show()
-    for w, t, m, F, DVADZ, DVADA, DVADB, DVADR in sker17_1(ztop, vp, vs, rh, \
-        Waves, Types, Modes, Freqs, 
-        norm = norm,   delta = 0.01, 
-        h = 0.005, dcl = 0.005, dcr = 0.005):
-        
+    for w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH in \
+            sker17_1(ztop, vp, vs, rh,
+                     Waves, Types, Modes, Freqs,
+                     dz=0.001, dlogvs=.01, dlogpr=.01, dlogrh=.01, norm=True,
+                     h=0.005, dcl=0.005, dcr=0.005):
+
         fig.clf()
-        #------        
-        ilayer = np.arange(DVADZ.shape[0]+1)-0.5
-        iF = np.concatenate(([F[0] * 0.95], F * 1.05))   
+        # ------
+        _depth_ = np.concatenate((ztop, [1.1 * ztop[-1]]))
+        _F_ = np.concatenate(([F[0] * 0.95], F * 1.05))
         fig.suptitle('%s%s%d' % (w, t, m))
-        
-        #------
-        vmin, vmax, cmap = -1., 1., plt.cm.RdBu
-        ax1 = fig.add_subplot(221)        
-        plt.pcolormesh(1./ iF, ilayer, DVADZ, vmin = vmin, vmax = vmax, cmap = cmap)
-        plt.colorbar()
-        ax2 = fig.add_subplot(222, sharex = ax1, sharey = ax1)        
-        plt.pcolormesh(1./ iF, ilayer, DVADA, vmin = vmin, vmax = vmax, cmap = cmap)
-        plt.colorbar()        
-        ax3 = fig.add_subplot(223, sharex = ax1, sharey = ax1)        
-        plt.pcolormesh(1./ iF, ilayer, DVADB, vmin = vmin, vmax = vmax, cmap = cmap)
-        plt.colorbar()            
-        ax4 = fig.add_subplot(224, sharex = ax1, sharey = ax1)
-        plt.pcolormesh(1./ iF, ilayer, DVADR, vmin = vmin, vmax = vmax, cmap = cmap)
-        plt.colorbar()            
-        #------
-        for ax, p in zip([ax1, ax2, ax3, ax4], ["Z", "Vp", "Vs", "rho"]):
-            ax.set_xlim(minmax(1./ iF))
-            ax.set_ylim(minmax(ilayer))        
+
+        # ------
+        vmax = abs(DLOGVADLOGVS).max()#np.max([abs(DLOGVADZ).max(), abs(DLOGVADLOGVS).max(), abs(DLOGVADLOGPR).max(), abs(DLOGVADLOGRH).max()])
+        vmax = np.min([vmax, 10.])
+        vmin, vmax, cmap = -vmax, vmax, tomocmap1(W=.25) #cccfcmap3() #plt.cm.RdBu
+        ax1 = fig.add_subplot(221)
+        plt.pcolormesh(1. / _F_, _depth_, DLOGVADZ,
+                       vmin=vmin, vmax=vmax, cmap=cmap)
+
+        ax2 = fig.add_subplot(222, sharex=ax1, sharey=ax1)
+        plt.pcolormesh(1. / _F_, _depth_, DLOGVADLOGVS,
+                       vmin=vmin, vmax=vmax, cmap=cmap)
+
+        ax3 = fig.add_subplot(223, sharex=ax1, sharey=ax1)
+        plt.pcolormesh(1. / _F_, _depth_, DLOGVADLOGPR,
+                       vmin=vmin, vmax=vmax, cmap=cmap)
+
+        ax4 = fig.add_subplot(224, sharex=ax1, sharey=ax1)
+        plt.pcolormesh(1. / _F_, _depth_, DLOGVADLOGRH,
+                       vmin=vmin, vmax=vmax, cmap=cmap)
+
+        cax = fig.add_axes((.91, .3, .01, .4))
+        cb = plt.cm.ScalarMappable(norm=None, cmap=cmap)
+        cb.set_array([vmin, vmax])
+        fig.colorbar(cb, cax=cax)
+
+        #  ------
+        for ax, p in zip([ax1, ax2, ax3, ax4], ["Z_{top}", "ln V_s", "ln (V_p/V_s)", r"ln \rho"]):
+            ax.set_xlim(minmax(1. / _F_))
+            ax.set_ylim(minmax(_depth_))
             ax.set_xscale('log')
-            ax.set_ylabel('layer number')
-            ax.set_xlabel('period (s)')
-            if norm:
-                ax.set_title(r'$ \frac{d%s/%s}{d%s/%s} $' % (t, t, p, p))        
-            else:
-                ax.set_title('d%s/d%s' % (t, p))        
-                
-            if not ax.yaxis_inverted(): ax.invert_yaxis()            
-        #------        
+            if ax in [ax1, ax3]:
+                ax.set_ylabel('depth (km)')
+            if ax in [ax3, ax4]:
+                ax.set_xlabel('period (s)')
+
+            ax.set_title(r'$ \frac{1}{H} \, \frac{d ln%s}{d %s} $' % (t, p))
+
+            if not ax.yaxis_inverted(): ax.invert_yaxis()
+
+        # ------
+        plt.setp(ax1.get_xticklabels(), visible=False)
+        plt.setp(ax2.get_xticklabels(), visible=False)
+        plt.setp(ax2.get_yticklabels(), visible=False)
+        plt.setp(ax4.get_yticklabels(), visible=False)
         fig.canvas.draw()
         raw_input('pause : press enter to plot the next wave type and mode')
-    #--------------------    
+    # --------------------
     raw_input('bye')
-    
+
