@@ -3,8 +3,8 @@ import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
 from srfpython.standalone.display import values2colors, makecolorbar, legendtext, chftsz
 from srfpython.standalone import cmaps #used in function eval
-from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm
-from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays
+from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm, dispersion
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthmodel
 from srfpython.depthdisp.dispcurves import freqspace
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, plt, showme
@@ -120,7 +120,8 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             *list(groupbywtm(waves, types, modes, freqs, np.arange(len(freqs)), None, True)))
                         overfreqs = [freqspace(0.6 * min(freqs), 1.4 * max(freqs), 100, "plog") for _ in
                                      xrange(len(overwaves))]
-                        overwaves, overtypes, overmodes, overfreqs = igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
+                        overwaves, overtypes, overmodes, overfreqs = \
+                            igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
                         for clr, (mms, dds) in zip(colors[::-1],
                                                    overdisp(ms[::-1],
                                                             overwaves, overtypes, overmodes, overfreqs,
@@ -171,6 +172,19 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         dm = depthmodel_from_arrays(ztop, vp, vs, rh)
                         dms.append(dm)
                         wgts.append(weight)
+
+                    # prepare the forward project of the statistics models
+                    fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
+                        [np.array(_) for _ in d.waves, d.types, d.modes, d.freqs]
+                    if "-overdisp" in argv.keys():
+                        overwaves, overtypes, overmodes, _, _ = zip(
+                            *list(groupbywtm(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, np.arange(len(fwdfreqs)), None, True)))
+                        overfreqs = np.array([freqspace(0.6 * min(fwdfreqs), 1.4 * max(fwdfreqs), 100, "plog") for _ in
+                                     xrange(len(overwaves))])
+                        fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
+                            igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
+
+                    # display the depth models and their projections
                     for p, (vppc, vspc, rhpc, prpc) in \
                             dmstats1(dms,
                                      percentiles=[0.16, 0.5, 0.84],
@@ -184,8 +198,13 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             rhpc.show(rd.axrh, color="b", linewidth=l)
                             prpc.show(rd.axpr, color="b", linewidth=l)
 
-                            # dmout = depthmodel(vppc, vspc, rhpc) #use extract for saveing
-                            # dmout.write96('_HerrMet.p%.2f.mod96' % p, overwrite=True)#use extract for saveing
+                            # project these solutions to the dataspace
+                            fwdvalues = dispersion(vppc.z, vppc.values, vspc.values, rhpc.values,
+                                                   fwdwaves, fwdtypes, fwdmodes, fwdfreqs)
+
+                            rd.plotdisp(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, fwdvalues,
+                                         dvalues=None, color="b", alpha=1., linewidth=l)
+
                         except KeyboardInterrupt:
                             raise
                         except Exception as e:
