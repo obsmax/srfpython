@@ -10,5 +10,6 @@
 *.run
 *.png
 *.surf96.copy
+.DS_Store
 srfpython/Herrmann/bin/max_srfdis96
 srfpython/Herrmann/bin/max_srfpre96
