@@ -15,7 +15,7 @@ short_help = "--manage     summarize run file content, manage run results"
 long_help = """\
 --manage     s [s..] manage run results for given rootnames, default {default_rootnames}
      -stats          prints detailed stats for each chain of each runfile 
-     -plot           display the convergence for every chain and every rootname
+     -plot   [f]     display the convergence for every chain and every rootname, specify the lower bound
      -inline         do not pause (jupyter)
      -delbad f       delete bad models, log likelihood below a given threshold, no default
      -delchains i [i...] delete one or more chains using their chainid
@@ -95,6 +95,7 @@ def manage(argv, verbose, mapkwargs):
 
                 # ------------ plot
                 if "-plot" in argv.keys():
+                    vmin = argv['-plot'][0] if len(argv['-plot']) else None
                     s = rundb.select('''
                     select CHAINID, group_concat(NITER), group_concat(LLK) from MODELS
                         group by CHAINID 
@@ -105,9 +106,12 @@ def manage(argv, verbose, mapkwargs):
                         LLK = np.asarray(LLK.split(','), float)
                         gca().plot(NITER, LLK)
                         gca().text(NITER[-1], LLK[-1], CHAINID)
+                    if vmin is not None:
+                        gca().set_ylim(vmin, 0)
                     gca().set_xlabel('# iteration')
                     gca().set_ylabel('log likelihood')
                     gca().grid(True, linestyle = ":")
                     gca().set_title(rootname.split('_HerrMet_')[-1])
                     showfun()
+                    gcf().savefig("%s/_HerrMet.stats.png" % rootname)
                     plt.close(gcf())

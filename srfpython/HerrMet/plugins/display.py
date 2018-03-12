@@ -3,6 +3,7 @@ import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
 from srfpython.standalone.display import values2colors, makecolorbar, legendtext, chftsz
 from srfpython.standalone import cmaps #used in function eval
+from srfpython.standalone.asciifile import AsciiFile
 from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm, dispersion
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthmodel
 from srfpython.depthdisp.dispcurves import freqspace
@@ -28,7 +29,7 @@ default_cmap = "gray" # plt.cm.jet# plt.cm.gray #
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-top", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-inline"]
+authorized_keys = ["-top", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-inline", "-ritt"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
@@ -286,6 +287,11 @@ def _display_function(rootname, argv, verbose, mapkwargs):
             except :#Exception as e:
                 print 'could not read or display %s (reason : %s)' % (m96, str(e))
             rd.axvp.legend(loc=3)
+    if "-ritt" in argv.keys():
+        a = AsciiFile('/mnt/labex2/home/max/data/boreholes/GRT1/GRT1.logsonic')
+        rd.axvs.plot(a.data['VS'], a.data['TVD']/1000., "m", alpha=0.5)
+        rd.axvp.plot(a.data['VP'], a.data['TVD'] / 1000., "m", alpha=0.5)
+        rd.axpr.plot(a.data['VP']/a.data['VS'], a.data['TVD'] / 1000., "m", alpha=0.5)
     # --------------------
     if os.path.exists(targetfile):
         # plot data on top

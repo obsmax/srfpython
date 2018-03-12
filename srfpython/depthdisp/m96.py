@@ -109,7 +109,6 @@ if __name__ == "__main__":
     # -----------------------------------
     elif "disp" in argv.keys():
 
-
         for m in argv['disp']:
             dm = depthmodel_from_mod96(m)
             ztop = dm.vp.ztop()
@@ -139,9 +138,9 @@ if __name__ == "__main__":
 
                 assert s96out.endswith('.surf96') or s96out.endswith('.s96')
                 with open(s96out, 'w') as fid:
-                    for w, t, m, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs, h=0.0005, dcl=0.00005, dcr=0.00005):
+                    for w, t, mm, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs):
                         for FF, VV in zip(F, V):
-                            fid.write('SURF96 %s %s T %d %f %f 0.1\n' % (w, t, m, 1. / FF, VV))
+                            fid.write('SURF96 %s %s T %d %f %f 0.1\n' % (w, t, mm, 1. / FF, VV))
             else:
                 axvp = gcf().add_subplot(1, 5, 1)
                 axvs = gcf().add_subplot(1, 5, 2, sharey=axvp)

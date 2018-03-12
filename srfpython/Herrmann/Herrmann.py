@@ -219,16 +219,22 @@ def argcrossfind(X, Y):
 # _____________________________________
 def readsrfdis96(stdout, waves, types, modes, freqs):
     "converts output from max_srfdis96"
-    stdout = stdout.replace('**************', ' 0            ') #??? what the fuck
     periods = 1./freqs
-    A = (" ".join(stdout.strip().rstrip('\n').split('\n'))).split()
 
+    stdout = stdout.replace('**************', ' 0            ') #??? what the fuck
+    stdout = stdout.strip().rstrip('\n').split('\n')
+    stdout = [_[:2] + " " + _[2:] for _ in stdout] # add one more space for mode numbers higher than 10
+
+    A = (" ".join(stdout)).split()
     W   = np.asarray(A[::6],  int)-1  #wave type 0 = Love, 1 = Rayleigh
     M   = np.asarray(A[1::6], int)    #(iq-1) mode number, 0 = fundamental
     T1A = np.asarray(A[2::6], float)  #t1 if phase only else lower period = t1/(1+h), in s
     T1B = np.asarray(A[3::6], float)  #0. if phase only else upper period = t1/(1-h), in s;
     CC0 = np.asarray(A[4::6], float)  #phase velocity at t1 if phase only else at t1a, in km/s;
     CC1 = np.asarray(A[5::6], float)  #phase velocity at t1 if phase only else at t1b, in km/s;
+
+
+
     n = len(W)
     I = T1B == 0. #True means phase only
     L = W == 0    #True means Love
