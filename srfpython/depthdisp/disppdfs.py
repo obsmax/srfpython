@@ -1,4 +1,5 @@
 from srfpython.utils import discrete_time_primitive
+from srfpython.depthdisp.dispcurves import surf96reader, groupbywtm
 import numpy as np
 
 
@@ -22,7 +23,7 @@ class disppdf(object):
         self.appendN(law, Ntimes = 1)
 
     # ------------------------------------------------
-    def appendN(self, law, Ntimes=1, **kwargs):
+    def appendN(self, law, Ntimes=1):
         """append the same model Ntimes times in the histogram"""
         v = law(self.f)
         for i in xrange(len(self.f)):
@@ -37,7 +38,7 @@ class disppdf(object):
         self.appenddatN(f, v, Ntimes = 1)
 
     # ------------------------------------------------
-    def appenddatN(self, f, v, Ntimes=1, **kwargs):
+    def appenddatN(self, f, v, Ntimes=1):
         if (f != self.f).any():
             v = np.interp(self.f, xp = f, fp = v, left = np.nan, right = np.nan)
         for i in xrange(len(self.f)):
@@ -72,6 +73,30 @@ class disppdf(object):
 
 
 # ------------------------------------------------
-# class disppdf_from_zpdffile(disppdf):
-#    def __init__(self, filename):
-#        self.f, self.v, self.H = unpkl(filename)
+def dispstats(ds, percentiles=[0.16, 0.5, 0.84], Ndisp=100, weights=None, **mapkwargs):
+    assert np.all([0 < p < 1 for p in percentiles])
+    assert len(percentiles) == len(np.unique(percentiles))
+    if weights is None:
+        weights = np.ones(len(ds))
+    else:
+        assert len(weights) == len(ds)
+
+    # initiate the depthpdfs
+    waves, types, modes, freqs, values = ds[0]
+
+    dpdfs = {}
+    for w, t, m, f, _ in groupbywtm(waves, types, modes, freqs, values):
+        dpdfs["%s%s%d" % (w, t, m)] = disppdf(f, np.logspace(np.log10(0.08), np.log10(4.0), Ndisp))
+
+    for weight, (waves, types, modes, freqs, values) in zip(weights, ds):
+        for w, t, m, f, v in groupbywtm(waves, types, modes, freqs, values):
+            dpdfs["%s%s%d" % (w, t, m)].appenddatN(f, v, Ntimes=weight)
+
+    for w, t, m, _, _ in groupbywtm(waves, types, modes, freqs, values):
+        for p in percentiles:
+            fpc, vpc = dpdfs["%s%s%d" % (w, t, m)].purcentile(p)
+            wavespc = np.array([w for _ in xrange(len(fpc))], "|S1")
+            typespc = np.array([t for _ in xrange(len(fpc))], "|S1")
+            modespc = np.array([m for _ in xrange(len(fpc))], int)
+            yield p, (wavespc, typespc, modespc, fpc, vpc)
+

@@ -196,7 +196,7 @@ def dmstats1(dms, percentiles=[0.16, 0.5, 0.84], Ndepth=100, Nvalue=100, weights
     vpmin, vpmax = np.inf, -np.inf
     rhmin, rhmax = np.inf, -np.inf
     prmin, prmax = np.inf, -np.inf
-    for dm in dms:
+    for dm in dms[:10]:
         zmax = np.max([zmax, 1.1 * dm.vs.z[-1]])
         vsmin = np.min([vsmin, dm.vs.values.min()])
         vsmax = np.max([vsmax, dm.vs.values.max()])

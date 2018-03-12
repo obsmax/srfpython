@@ -1,8 +1,10 @@
 import os, glob
 import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
-from srfpython.depthdisp.depthmodels import depthmodel, depthmodel1D
+from srfpython.depthdisp.depthmodels import depthmodel, depthmodel_from_arrays
+from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
 from srfpython.depthdisp.depthpdfs import dmstats1
+from srfpython.depthdisp.disppdfs import dispstats
 from srfpython.HerrMet.files import  RunFile
 
 
@@ -55,24 +57,44 @@ def _extract_function(rootname, extract_llkmin, extract_limit, extract_step, ver
         chainids, weights, llks, ms, ds = rundb.getzip(llkmin=extract_llkmin, limit=extract_limit,
                                                                 step=extract_step)
 
-    dms, wgts = [], []
-    for weight, (ztop, vp, vs, rh) in zip(weights, ms):  # readHerrmetout("_HerrMet.run"):
-        dm = depthmodel(depthmodel1D(ztop, vp),
-                        depthmodel1D(ztop, vs),
-                        depthmodel1D(ztop, rh))
-        dms.append(dm)
-        wgts.append(weight)
-    for p, (vppc, vspc, rhpc, prpc) in dmstats1(dms,
-                                                percentiles=percentiles,
-                                                Ndepth=100,
-                                                Nvalue=100,
-                                                weights=wgts, **mapkwargs):
+    dms = [depthmodel_from_arrays(ztop, vp, vs, rh) for ztop, vp, vs, rh in ms]
+    for p, (vppc, vspc, rhpc, prpc) in \
+            dmstats1(dms,
+                     percentiles=percentiles,
+                     Ndepth=100,
+                     Nvalue=100,
+                     weights=weights,
+                     **mapkwargs):
         try:
             dmout = depthmodel(vppc, vspc, rhpc)
             out = '%s/_HerrMet.p%.2f.mod96' % (rootname, p)
             if verbose:
                 print "writing %s" % out
             dmout.write96(out)  # , overwrite=True)
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            print "Error", str(e)
+
+
+    # display the disp pdf
+    for p in percentiles:
+        out = '%s/_HerrMet.p%.2f.surf96' % (rootname, p)
+        os.system('trash %s' % out)
+    for p, (wpc, tpc, mpc, fpc, vpc) in \
+            dispstats(ds,
+                      percentiles=percentiles,
+                      Ndisp=100,
+                      weights=weights,
+                      **mapkwargs):
+        try:
+            srout = surf96reader_from_arrays(wpc, tpc, mpc, fpc, vpc)
+            out = '%s/_HerrMet.p%.2f.surf96' % (rootname, p)
+            if verbose:
+                print "writing to %s" % out
+            with open(out, 'a') as fid:
+                fid.write(srout.__str__())
+                fid.write('\n')
         except KeyboardInterrupt:
             raise
         except Exception as e:

@@ -7,6 +7,7 @@ from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm, dispersion
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthmodel
 from srfpython.depthdisp.dispcurves import freqspace
 from srfpython.depthdisp.depthpdfs import dmstats1
+from srfpython.depthdisp.disppdfs import dispstats
 from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, plt, showme
 from srfpython.HerrMet.files import load_paramfile, RunFile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
@@ -167,30 +168,27 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                                                                    step=pdf_step,
                                                                    algo="METROPOLIS")
 
-                    dms, wgts = [], []
-                    for weight, (ztop, vp, vs, rh) in zip(weights, ms):  # readHerrmetout("_HerrMet.run"):
-                        dm = depthmodel_from_arrays(ztop, vp, vs, rh)
-                        dms.append(dm)
-                        wgts.append(weight)
+                    dms = [depthmodel_from_arrays(ztop, vp, vs, rh) for ztop, vp, vs, rh in ms]
 
-                    # prepare the forward project of the statistics models
-                    fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
-                        [np.array(_) for _ in d.waves, d.types, d.modes, d.freqs]
-                    if "-overdisp" in argv.keys():
-                        overwaves, overtypes, overmodes, _, _ = zip(
-                            *list(groupbywtm(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, np.arange(len(fwdfreqs)), None, True)))
-                        overfreqs = np.array([freqspace(0.6 * min(fwdfreqs), 1.4 * max(fwdfreqs), 100, "plog") for _ in
-                                     xrange(len(overwaves))])
-                        fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
-                            igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
+                    # # prepare the forward projection of the depth models
+                    # fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
+                    #     [np.array(_) for _ in d.waves, d.types, d.modes, d.freqs]
+                    # if "-overdisp" in argv.keys():
+                    #     overwaves, overtypes, overmodes, _, _ = zip(
+                    #         *list(groupbywtm(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, np.arange(len(fwdfreqs)), None, True)))
+                    #     overfreqs = np.array([freqspace(0.6 * min(fwdfreqs), 1.4 * max(fwdfreqs), 100, "plog") for _ in
+                    #                  xrange(len(overwaves))])
+                    #     fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
+                    #         igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
 
                     # display the depth models and their projections
                     for p, (vppc, vspc, rhpc, prpc) in \
                             dmstats1(dms,
-                                     percentiles=[0.16, 0.5, 0.84],
+                                     percentiles=[0.01, 0.16, 0.5, 0.84, 0.99],
                                      Ndepth=100,
                                      Nvalue=100,
-                                     weights=wgts, **mapkwargs):
+                                     weights=weights,
+                                     **mapkwargs):
                         try:
                             l = 3 if p == 0.5 else 1
                             vppc.show(rd.axvp, color="b", linewidth=l)
@@ -198,12 +196,29 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             rhpc.show(rd.axrh, color="b", linewidth=l)
                             prpc.show(rd.axpr, color="b", linewidth=l)
 
-                            # project these solutions to the dataspace
-                            fwdvalues = dispersion(vppc.z, vppc.values, vspc.values, rhpc.values,
-                                                   fwdwaves, fwdtypes, fwdmodes, fwdfreqs)
+                            # # project these solutions to the dataspace
+                            # fwdvalues = dispersion(vppc.z, vppc.values, vspc.values, rhpc.values,
+                            #                        fwdwaves, fwdtypes, fwdmodes, fwdfreqs)
+                            #
+                            # rd.plotdisp(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, fwdvalues,
+                            #              dvalues=None, color="b", alpha=1., linewidth=l)
 
-                            rd.plotdisp(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, fwdvalues,
-                                         dvalues=None, color="b", alpha=1., linewidth=l)
+                        except KeyboardInterrupt:
+                            raise
+                        except Exception as e:
+                            print "Error", str(e)
+
+                    # display the disp pdf
+                    for p, (wpc, tpc, mpc, fpc, vpc) in \
+                            dispstats(ds,
+                                      percentiles=[0.01, 0.16, 0.5, 0.84, 0.99],
+                                      Ndisp=100,
+                                      weights=weights,
+                                      **mapkwargs):
+                        try:
+                            l = 3 if p == 0.5 else 1
+                            rd.plotdisp(wpc, tpc, mpc, fpc, vpc,
+                                        dvalues=None, color="b", alpha=1., linewidth=l)
 
                         except KeyboardInterrupt:
                             raise
@@ -268,8 +283,8 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                 dm.pr().show(rd.axpr, "m", linewidth=3)
             except KeyboardInterrupt:
                 raise
-            except Exception as e:
-                print 'could not read or display %s (reason %s)' % (m96, str(e))
+            except :#Exception as e:
+                print 'could not read or display %s (reason : %s)' % (m96, str(e))
             rd.axvp.legend(loc=3)
     # --------------------
     if os.path.exists(targetfile):
@@ -327,7 +342,6 @@ def display(argv, verbose, mapkwargs):
             argv['-cmap'] = eval("cmaps.%s()" % argv['-cmap'][0])
         except:
             raise Exception('could not find colormap %s neither in matplotlib neither in srfpython.standalone.utils.cmaps' % argv['-cmap'][0])
-
 
     # ----------- special case, just show the parameterization file from --param : ./_HerrMet.param
     if len(rootnames) == 1 and rootnames[0] == '.':

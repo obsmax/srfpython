@@ -6,22 +6,26 @@ def unpackmod96(string):
     """unpack 1D deptmodel depthdisp at mod96 format (see Herrmann's doc)
     """
     string = [line.strip() for line in string.split('\n')]
-    if '' in string:
-        string.remove('')
-    # assert string[0].strip() == "MODEL.01"
-    # title = string[1].strip()
-    # isotropic = string[2].strip().upper() #== "ISOTROPIC"
-    # kgs = string[3].strip().upper() #== "KGS"
-    # flatearth = string[4].strip().upper() #== "FLAT EARTH"
-    # oned = string[5].strip().upper() == "1-D"
-    # cstvelo = string[6].strip().upper() == "CONSTANT VELOCITY"
-    # assert string[7].strip() == "LINE08"
-    # assert string[8].strip() == "LINE09"
-    # assert string[9].strip() == "LINE10"
-    # assert string[10].strip() == "LINE11"
-    # header = string[11]
 
+    # remove blank lines
+    # string.remove('') #fucking not working all the time
+    I = [_ != '' for _ in string]
+    string = [string[i] for i in np.arange(len(string))[I]]
+
+    # make sure the header is correctly formated
+    assert string[0] == "MODEL.01"
+    # title = string[1].strip()
+    assert string[2].upper() == "ISOTROPIC"
+    assert string[3].upper() == "KGS"
+    assert string[4].upper() == "FLAT EARTH"
+    assert string[5].upper() == "1-D"
+    assert string[6].upper() == "CONSTANT VELOCITY"
+    assert string[7] == "LINE08"
+    assert string[8] == "LINE09"
+    assert string[9] == "LINE10"
+    assert string[10] == "LINE11"
     assert string[11].startswith("H(KM)")
+
     nlayer = len(string) - 12
     #H, VP, VS, RHO, QP, QS, ETAP, ETAS, FREFP, FREFS = [np.empty(nlayer, float) for _ in xrange(10)]
     DAT = np.zeros((nlayer, 10), float)
