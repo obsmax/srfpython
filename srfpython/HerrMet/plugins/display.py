@@ -19,17 +19,19 @@ from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameteriz
 
 # ------------------------------ defaults
 default_rootnames = "_HerrMet_*"
-default_top_llkmin = -1000.
-default_top_limit = 100
-default_top_step = 1
-default_pdf_llkmin = 0
+default_plot_mode = "last"
+default_plot_limit = 100
+default_plot_llkmin = 0.
+default_plot_step = 1
+default_pdf_mode = "last"
 default_pdf_limit = 0
+default_pdf_llkmin = 0.
 default_pdf_step = 1
 default_cmap = "gray" # plt.cm.jet# plt.cm.gray #
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-top", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-inline", "-ritt"]
+authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-inline", "-ritt"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
@@ -37,22 +39,28 @@ short_help = "--display    display target, parameterization, solutions"
 long_help = """\
 --display   s [s...] display param, target, and run outputs for the required rootnames, default {default_rootnames}
                      (use "." to see the parameterzation template ./_HerrMet.param from option --param)
-    -top    [f i i]  show the best models on the figure, see --extract for arguments
-                     default {default_top_llkmin}, {default_top_limit}, {default_top_step}
+    -plot  [s i f i] show the best models on the figure, arguments are :  
+                     first argument = selection mode, last or best
+                     second argument = highest model number to include (>=0, 0 means all)  
+                     third argument = lowest log likelyhood value to include (<=0.0, 0.0 means all)
+                     fourth argument = include only one model over "step" (>=1)
+                     default {default_plot_mode} {default_plot_limit} {default_plot_llkmin} {default_plot_step}             
     -overdisp        recompute dispersion curves of the best models selected with higher resolution
-    -pdf    [f i i]  compute and show the statistics for the selected models, see --extract for arguments
-                     default {default_pdf_llkmin}, {default_pdf_limit}, {default_pdf_step} 
-                     use --extract to save pdf outputs (median 16% and 84% percentiles at mod96 format)
+    -pdf   [s i f i] compute and show the statistics for the selected models, see -plot for arguments
+                     default {default_pdf_mode} {default_pdf_limit} {default_pdf_llkmin} {default_pdf_step} 
+                     use --extract to save pdf outputs
     -png             save figure as pngfile instead of displaying it on screen
     -m96    s [s...] append depth model(s) to the plot from mod96 file(s)
     -cmap            colormap, default {default_cmap}
     -inline          do not pause (use in jupyter notebooks)
     """.format(default_rootnames=default_rootnames,
-               default_top_llkmin=default_top_llkmin,
-               default_top_limit=default_top_limit,
-               default_top_step=default_top_step,
-               default_pdf_llkmin=default_pdf_llkmin,
+               default_plot_mode=default_plot_mode,
+               default_plot_limit=default_plot_limit,
+               default_plot_llkmin=default_plot_llkmin,
+               default_plot_step=default_plot_step,
+               default_pdf_mode=default_pdf_mode,
                default_pdf_limit=default_pdf_limit,
+               default_pdf_llkmin=default_pdf_llkmin,
                default_pdf_step=default_pdf_step,
                default_cmap=default_cmap)
 
@@ -65,7 +73,7 @@ example = """\
 # save as png file (non display backend) 
 
 HerrMet --display \\
-            -top 0.0 10 1 \\
+            -plot last 10 0.0 1 \\
             -overdisp \\
             -pdf \\
             -png 
@@ -91,25 +99,38 @@ def _display_function(rootname, argv, verbose, mapkwargs):
         rd = DepthDispDisplay()
 
     # ------ Display run results if exist
-    if os.path.exists(runfile) and ("-top" in argv.keys() or "-pdf" in argv.keys()):
+    if os.path.exists(runfile) and ("-plot" in argv.keys() or "-pdf" in argv.keys()):
 
         with RunFile(runfile, verbose=verbose) as rundb:
             s = rundb.select('select MODELID from MODELS limit 1')
             if s is not None:
                 # --- display best models
-                if "-top" in argv.keys():
+                if "-plot" in argv.keys():
 
-                    assert argv["-top"] == [] or len(argv["-top"]) == 3  # unexpected argument number
-                    if argv["-top"] == []:
-                        top_llkmin, top_limit, top_step = default_top_llkmin, default_top_limit, default_top_step
-                    elif len(argv['-top']) == 3:
-                        top_llkmin, top_limit, top_step = argv['-top']
+                    assert argv["-plot"] == [] or len(argv["-plot"]) == 4  # unexpected argument number
+                    if argv["-plot"] == []:
+                        plot_mode, plot_limit, plot_llkmin, plot_step = \
+                            default_plot_mode, default_plot_limit, \
+                            default_plot_llkmin, default_plot_step
+                    elif len(argv['-plot']) == 4:
+                        plot_mode, plot_limit, plot_llkmin, plot_step = argv['-plot']
 
-                    print "top : llkmin %f, limit %d, step %d" % (top_llkmin, top_limit, top_step),
-                    chainids, weights, llks, ms, ds = rundb.getzip(llkmin=top_llkmin,
-                                                                   limit=top_limit,
-                                                                   step=top_step,
-                                                                   algo="METROPOLIS")
+                    print "plot : %s, limit %d, llkmin %f, step %d" % (plot_mode, plot_limit, plot_llkmin, plot_step),
+                    if plot_mode == "best":
+                        chainids, weights, llks, ms, ds = \
+                            rundb.getzip(limit=plot_limit,
+                                         llkmin=plot_llkmin,
+                                         step=plot_step,
+                                         algo="METROPOLIS")
+                    elif plot_mode == "last":
+                        chainids, weights, llks, ms, ds = \
+                            rundb.getlastszip(limit=plot_limit,
+                                              llkmin=plot_llkmin,
+                                              step=plot_step,
+                                              algo="METROPOLIS")
+                    else:
+                        raise Exception('unexpected plot mode %s' % plot_mode)
+
                     vmin, vmax = llks.min(), llks.max()
                     colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
 
@@ -157,30 +178,30 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                 # ---- display posterior pdf
                 if "-pdf" in argv.keys():
 
-                    assert argv["-pdf"] == [] or len(argv["-pdf"]) == 3  # unexpected argument number
+                    assert argv["-pdf"] == [] or len(argv["-pdf"]) == 4  # unexpected argument number
                     if argv["-pdf"] == []:
-                        pdf_llkmin, pdf_limit, pdf_step = default_pdf_llkmin, default_pdf_limit, default_pdf_step
-                    elif len(argv['-pdf']) == 3:
-                        pdf_llkmin, pdf_limit, pdf_step = argv['-pdf']
+                        pdf_mode, pdf_limit, pdf_llkmin, pdf_step = \
+                            default_pdf_mode, default_pdf_limit, default_pdf_llkmin, default_pdf_step
+                    elif len(argv['-pdf']) == 4:
+                        pdf_mode, pdf_limit, pdf_llkmin, pdf_step = argv['-pdf']
 
-                    print "pdf : llkmin %f, limit %d, step %d" % (pdf_llkmin, pdf_limit, pdf_step),
-                    chainids, weights, llks, ms, ds = rundb.getzip(llkmin=pdf_llkmin,
-                                                                   limit=pdf_limit,
-                                                                   step=pdf_step,
-                                                                   algo="METROPOLIS")
+                    print "pdf : %s, limit %d, llkmin %f, step %d" % (pdf_mode, pdf_limit, pdf_llkmin, pdf_step),
+                    if pdf_mode == "best":
+                        chainids, weights, llks, ms, ds = \
+                            rundb.getzip(limit=pdf_limit,
+                                         llkmin=pdf_llkmin,
+                                         step=pdf_step,
+                                         algo="METROPOLIS")
+                    elif pdf_mode == "last":
+                        chainids, weights, llks, ms, ds = \
+                            rundb.getlastszip(limit=pdf_limit,
+                                              llkmin=pdf_llkmin,
+                                              step=pdf_step,
+                                              algo="METROPOLIS")
+                    else:
+                        raise Exception('unexpected pdf mode %s' % pdf_mode)
 
                     dms = [depthmodel_from_arrays(ztop, vp, vs, rh) for ztop, vp, vs, rh in ms]
-
-                    # # prepare the forward projection of the depth models
-                    # fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
-                    #     [np.array(_) for _ in d.waves, d.types, d.modes, d.freqs]
-                    # if "-overdisp" in argv.keys():
-                    #     overwaves, overtypes, overmodes, _, _ = zip(
-                    #         *list(groupbywtm(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, np.arange(len(fwdfreqs)), None, True)))
-                    #     overfreqs = np.array([freqspace(0.6 * min(fwdfreqs), 1.4 * max(fwdfreqs), 100, "plog") for _ in
-                    #                  xrange(len(overwaves))])
-                    #     fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
-                    #         igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
 
                     # display the depth models and their projections
                     for p, (vppc, vspc, rhpc, prpc) in \
@@ -196,13 +217,6 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             vspc.show(rd.axvs, color="b", linewidth=l)
                             rhpc.show(rd.axrh, color="b", linewidth=l)
                             prpc.show(rd.axpr, color="b", linewidth=l)
-
-                            # # project these solutions to the dataspace
-                            # fwdvalues = dispersion(vppc.z, vppc.values, vspc.values, rhpc.values,
-                            #                        fwdwaves, fwdtypes, fwdmodes, fwdfreqs)
-                            #
-                            # rd.plotdisp(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, fwdvalues,
-                            #              dvalues=None, color="b", alpha=1., linewidth=l)
 
                         except KeyboardInterrupt:
                             raise
@@ -225,6 +239,135 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             raise
                         except Exception as e:
                             print "Error", str(e)
+                # # --- display best models
+                # if "-top" in argv.keys():
+                #
+                #     assert argv["-top"] == [] or len(argv["-top"]) == 3  # unexpected argument number
+                #     if argv["-top"] == []:
+                #         top_llkmin, top_limit, top_step = default_top_llkmin, default_top_limit, default_top_step
+                #     elif len(argv['-top']) == 3:
+                #         top_llkmin, top_limit, top_step = argv['-top']
+                #
+                #     print "top : llkmin %f, limit %d, step %d" % (top_llkmin, top_limit, top_step),
+                #     chainids, weights, llks, ms, ds = rundb.getzip(llkmin=top_llkmin,
+                #                                                    limit=top_limit,
+                #                                                    step=top_step,
+                #                                                    algo="METROPOLIS")
+                #     vmin, vmax = llks.min(), llks.max()
+                #     colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
+                #
+                #     if "-overdisp" in argv.keys():
+                #         """note : recomputing dispersion with another frequency array might
+                #                   result in a completely different dispersion curve in case
+                #                   of root search failure """
+                #         waves, types, modes, freqs, _ = ds[0]
+                #         overwaves, overtypes, overmodes, _, _ = zip(
+                #             *list(groupbywtm(waves, types, modes, freqs, np.arange(len(freqs)), None, True)))
+                #         overfreqs = [freqspace(0.6 * min(freqs), 1.4 * max(freqs), 100, "plog") for _ in
+                #                      xrange(len(overwaves))]
+                #         overwaves, overtypes, overmodes, overfreqs = \
+                #             igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
+                #         for clr, (mms, dds) in zip(colors[::-1],
+                #                                    overdisp(ms[::-1],
+                #                                             overwaves, overtypes, overmodes, overfreqs,
+                #                                             verbose=verbose, **mapkwargs)):
+                #             rd.plotmodel(color=clr, alpha=1.0, linewidth=3, *mms)
+                #             try:
+                #                 rd.plotdisp(color=clr, alpha=1.0, linewidth=3, *dds)
+                #             except KeyboardInterrupt:
+                #                 raise
+                #             except Exception as e:
+                #                 print "Error : could not plot dispersion curve (%s)" % str(e)
+                #
+                #         cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
+                #         pos = rd.axdisp[-1].get_position()
+                #         cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
+                #         rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+                #         cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
+                #
+                #     else:
+                #         "display the dispersion curves as stored in the database"
+                #         for i in range(len(llks))[::-1]:
+                #             rd.plotmodel(color=colors[i], alpha=1.0, linewidth=3, *ms[i])
+                #             rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
+                #
+                #         cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
+                #         pos = rd.axdisp[-1].get_position()
+                #         cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
+                #         rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+                #         cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
+
+                # # ---- display posterior pdf
+                # if "-pdf" in argv.keys():
+                #
+                #     assert argv["-pdf"] == [] or len(argv["-pdf"]) == 3  # unexpected argument number
+                #     if argv["-pdf"] == []:
+                #         pdf_llkmin, pdf_limit, pdf_step = default_pdf_llkmin, default_pdf_limit, default_pdf_step
+                #     elif len(argv['-pdf']) == 3:
+                #         pdf_llkmin, pdf_limit, pdf_step = argv['-pdf']
+                #
+                #     print "pdf : llkmin %f, limit %d, step %d" % (pdf_llkmin, pdf_limit, pdf_step),
+                #     chainids, weights, llks, ms, ds = rundb.getzip(llkmin=pdf_llkmin,
+                #                                                    limit=pdf_limit,
+                #                                                    step=pdf_step,
+                #                                                    algo="METROPOLIS")
+                #
+                #     dms = [depthmodel_from_arrays(ztop, vp, vs, rh) for ztop, vp, vs, rh in ms]
+                #
+                #     # # prepare the forward projection of the depth models
+                #     # fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
+                #     #     [np.array(_) for _ in d.waves, d.types, d.modes, d.freqs]
+                #     # if "-overdisp" in argv.keys():
+                #     #     overwaves, overtypes, overmodes, _, _ = zip(
+                #     #         *list(groupbywtm(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, np.arange(len(fwdfreqs)), None, True)))
+                #     #     overfreqs = np.array([freqspace(0.6 * min(fwdfreqs), 1.4 * max(fwdfreqs), 100, "plog") for _ in
+                #     #                  xrange(len(overwaves))])
+                #     #     fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
+                #     #         igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
+                #
+                #     # display the depth models and their projections
+                #     for p, (vppc, vspc, rhpc, prpc) in \
+                #             dmstats1(dms,
+                #                      percentiles=[0.01, 0.16, 0.5, 0.84, 0.99],
+                #                      Ndepth=100,
+                #                      Nvalue=100,
+                #                      weights=weights,
+                #                      **mapkwargs):
+                #         try:
+                #             l = 3 if p == 0.5 else 1
+                #             vppc.show(rd.axvp, color="b", linewidth=l)
+                #             vspc.show(rd.axvs, color="b", linewidth=l)
+                #             rhpc.show(rd.axrh, color="b", linewidth=l)
+                #             prpc.show(rd.axpr, color="b", linewidth=l)
+                #
+                #             # # project these solutions to the dataspace
+                #             # fwdvalues = dispersion(vppc.z, vppc.values, vspc.values, rhpc.values,
+                #             #                        fwdwaves, fwdtypes, fwdmodes, fwdfreqs)
+                #             #
+                #             # rd.plotdisp(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, fwdvalues,
+                #             #              dvalues=None, color="b", alpha=1., linewidth=l)
+                #
+                #         except KeyboardInterrupt:
+                #             raise
+                #         except Exception as e:
+                #             print "Error", str(e)
+                #
+                #     # display the disp pdf
+                #     for p, (wpc, tpc, mpc, fpc, vpc) in \
+                #             dispstats(ds,
+                #                       percentiles=[0.01, 0.16, 0.5, 0.84, 0.99],
+                #                       Ndisp=100,
+                #                       weights=weights,
+                #                       **mapkwargs):
+                #         try:
+                #             l = 3 if p == 0.5 else 1
+                #             rd.plotdisp(wpc, tpc, mpc, fpc, vpc,
+                #                         dvalues=None, color="b", alpha=1., linewidth=l)
+                #
+                #         except KeyboardInterrupt:
+                #             raise
+                #         except Exception as e:
+                #             print "Error", str(e)
 
     # ------
     if os.path.exists(paramfile):

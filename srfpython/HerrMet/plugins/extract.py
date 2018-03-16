@@ -10,26 +10,30 @@ from srfpython.HerrMet.files import  RunFile
 
 # ------------------------------ defaults
 default_rootnames = "_HerrMet_*"
-default_extract_llkmin = 0
+default_extract_mode = "last"
 default_extract_limit = 0
+default_extract_llkmin = 0
 default_extract_step = 1
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-top"]
+authorized_keys = ["-pdf"]
 
 # ------------------------------ help messages
 short_help = "--extract    compute and write posterior pdf"
 
 long_help = """\
 --extract    s [s..] rootnames for which to compute and extract pdf, default {default_rootnames}
-    -top    [f i i]  extract posterior distribution of the models, save them as mod96files
-                     first argument = lowest log likelyhood value to include (<=0.0, 0.0 means all)
-                     second argument = highest model number to include (>=0, 0 means all)
-                     third argument = include only one model over "step" (>=1)
-                     default {default_extract_llkmin}, {default_extract_limit}, {default_extract_step}
-                     """.format(default_rootnames=default_rootnames,
-           default_extract_llkmin=default_extract_llkmin,
+    -pdf   [s i f i] extract posterior distribution of the models, save them as mod96files
+                     first argument = selection mode, last or best
+                     second argument = highest model number to include (>=0, 0 means all)  
+                     third argument = lowest log likelyhood value to include (<=0.0, 0.0 means all)
+                     fourth argument = include only one model over "step" (>=1)
+                     default {default_extract_mode} {default_extract_limit} {default_extract_llkmin} {default_extract_step}
+                     """.format(\
+           default_rootnames=default_rootnames,
+           default_extract_mode=default_extract_mode,
            default_extract_limit=default_extract_limit,
+           default_extract_llkmin=default_extract_llkmin,
            default_extract_step=default_extract_step)
 
 
@@ -38,12 +42,12 @@ example = """\
 ## EXTRACT
 # compute pdf using the best 1000 models 
 
-HerrMet --extract -top 0. 1000 1
+HerrMet --extract -pdf last 1000 0. 1
 """
 
 
 # -------------------------------------
-def _extract_function(rootname, extract_llkmin, extract_limit, extract_step, verbose, percentiles, mapkwargs):
+def _extract_function(rootname, extract_mode, extract_limit, extract_llkmin, extract_step, verbose, percentiles, mapkwargs):
     """private"""
     percentiles = np.array(percentiles, float)
     assert len(np.unique(percentiles)) == len(percentiles)
@@ -54,8 +58,20 @@ def _extract_function(rootname, extract_llkmin, extract_limit, extract_step, ver
     runfile = "%s/_HerrMet.run" % rootname
     with RunFile(runfile, verbose=verbose) as rundb:
         print "extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step),
-        chainids, weights, llks, ms, ds = rundb.getzip(llkmin=extract_llkmin, limit=extract_limit,
-                                                                step=extract_step)
+        if extract_mode == "best":
+            chainids, weights, llks, ms, ds = \
+                rundb.getzip(limit=extract_limit,
+                             llkmin=extract_llkmin,
+                             step=extract_step,
+                             algo="METROPOLIS")
+        elif extract_mode == "last":
+            chainids, weights, llks, ms, ds = \
+                rundb.getlastszip(limit=extract_limit,
+                                  llkmin=extract_llkmin,
+                                  step=extract_step,
+                                  algo="METROPOLIS")
+        else:
+            raise Exception('unexpected extract mode %s' % extract_mode)
 
     dms = [depthmodel_from_arrays(ztop, vp, vs, rh) for ztop, vp, vs, rh in ms]
     for p, (vppc, vspc, rhpc, prpc) in \
@@ -121,15 +137,17 @@ def extract(argv, verbose, mapkwargs):
         elif not rootname.startswith('_HerrMet_'):
             raise Exception('%s does not starts with _HerrMet_' % rootname)
 
-    assert "-top" not in argv.keys() or len(argv["-top"]) == 3  # unexpected argument number
-    if "-top" not in argv.keys():
-        extract_llkmin, extract_limit, extract_step = default_extract_llkmin, default_extract_limit, default_extract_step
-    elif len(argv['-top']) == 3:
-        extract_llkmin, extract_limit, extract_step = argv['-top']
+    assert "-pdf" not in argv.keys() or len(argv["-pdf"]) == 4  # unexpected argument number
+    if "-pdf" not in argv.keys():
+        extract_mode, extract_limit, extract_llkmin, extract_step = \
+            default_extract_mode, default_extract_limit, \
+            default_extract_llkmin, default_extract_step
+    elif len(argv['-pdf']) == 4:
+        extract_mode, extract_limit, extract_llkmin, extract_step = argv['-pdf']
 
     def gen():
         for rootname in rootnames:
-            yield Job(rootname, extract_llkmin, extract_limit, extract_step, verbose,
+            yield Job(rootname, extract_mode, extract_limit, extract_llkmin, extract_step, verbose,
                       percentiles=[.16,.5,.84], mapkwargs=mapkwargs)
 
     with MapAsync(_extract_function, gen(), **mapkwargs) as ma:
