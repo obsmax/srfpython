@@ -27,7 +27,8 @@ default_pdf_mode = "last"
 default_pdf_limit = 0
 default_pdf_llkmin = 0.
 default_pdf_step = 1
-default_cmap = "gray" # plt.cm.jet# plt.cm.gray #
+default_cmap = "viridis"  # plt.cm.jet# plt.cm.gray #
+default_dpi = 100
 
 
 # ------------------------------ autorized_keys
@@ -49,7 +50,7 @@ long_help = """\
     -pdf   [s i f i] compute and show the statistics for the selected models, see -plot for arguments
                      default {default_pdf_mode} {default_pdf_limit} {default_pdf_llkmin} {default_pdf_step} 
                      use --extract to save pdf outputs
-    -png             save figure as pngfile instead of displaying it on screen
+    -png   [i]       save figure as pngfile instead of displaying it on screen, requires dpi, default {default_dpi} 
     -m96    s [s...] append depth model(s) to the plot from mod96 file(s)
     -cmap            colormap, default {default_cmap}
     -inline          do not pause (use in jupyter notebooks)
@@ -62,7 +63,8 @@ long_help = """\
                default_pdf_limit=default_pdf_limit,
                default_pdf_llkmin=default_pdf_llkmin,
                default_pdf_step=default_pdf_step,
-               default_cmap=default_cmap)
+               default_cmap=default_cmap,
+               default_dpi=default_dpi)
 
 # ------------------------------ example usage
 example = """\
@@ -76,7 +78,7 @@ HerrMet --display \\
             -plot last 10 0.0 1 \\
             -overdisp \\
             -pdf \\
-            -png 
+            -png 300
 """
 
 
@@ -114,6 +116,8 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             default_plot_llkmin, default_plot_step
                     elif len(argv['-plot']) == 4:
                         plot_mode, plot_limit, plot_llkmin, plot_step = argv['-plot']
+                    else:
+                        raise Exception()
 
                     print "plot : %s, limit %d, llkmin %f, step %d" % (plot_mode, plot_limit, plot_llkmin, plot_step),
                     if plot_mode == "best":
@@ -184,6 +188,8 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             default_pdf_mode, default_pdf_limit, default_pdf_llkmin, default_pdf_step
                     elif len(argv['-pdf']) == 4:
                         pdf_mode, pdf_limit, pdf_llkmin, pdf_step = argv['-pdf']
+                    else:
+                        raise Exception()
 
                     print "pdf : %s, limit %d, llkmin %f, step %d" % (pdf_mode, pdf_limit, pdf_llkmin, pdf_step),
                     if pdf_mode == "best":
@@ -203,7 +209,10 @@ def _display_function(rootname, argv, verbose, mapkwargs):
 
                     dms = [depthmodel_from_arrays(ztop, vp, vs, rh) for ztop, vp, vs, rh in ms]
 
-                    # display the depth models and their projections
+                    # display percentiles of model and data pdfs
+                    clr = "b" if "-plot" not in argv.keys() else "k"
+                    alp = 1.0 if "-plot" not in argv.keys() else 0.5
+
                     for p, (vppc, vspc, rhpc, prpc) in \
                             dmstats1(dms,
                                      percentiles=[0.01, 0.16, 0.5, 0.84, 0.99],
@@ -213,10 +222,10 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                                      **mapkwargs):
                         try:
                             l = 3 if p == 0.5 else 1
-                            vppc.show(rd.axvp, color="b", linewidth=l)
-                            vspc.show(rd.axvs, color="b", linewidth=l)
-                            rhpc.show(rd.axrh, color="b", linewidth=l)
-                            prpc.show(rd.axpr, color="b", linewidth=l)
+                            vppc.show(rd.axvp, color=clr, linewidth=l, alpha=alp)
+                            vspc.show(rd.axvs, color=clr, linewidth=l, alpha=alp)
+                            rhpc.show(rd.axrh, color=clr, linewidth=l, alpha=alp)
+                            prpc.show(rd.axpr, color=clr, linewidth=l, alpha=alp)
 
                         except KeyboardInterrupt:
                             raise
@@ -233,7 +242,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         try:
                             l = 3 if p == 0.5 else 1
                             rd.plotdisp(wpc, tpc, mpc, fpc, vpc,
-                                        dvalues=None, color="b", alpha=1., linewidth=l)
+                                        dvalues=None, color=clr, alpha=alp, linewidth=l)
 
                         except KeyboardInterrupt:
                             raise
@@ -386,14 +395,14 @@ def _display_function(rootname, argv, verbose, mapkwargs):
 
         #
         vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh = p.boundaries()
-        vplow.show(rd.axvp, alpha=1.0, color="r", marker="o--", linewidth=3)
-        vphgh.show(rd.axvp, alpha=1.0, color="r", marker="o--", linewidth=3)
-        vslow.show(rd.axvs, alpha=1.0, color="r", marker="o--", linewidth=3)
-        vshgh.show(rd.axvs, alpha=1.0, color="r", marker="o--", linewidth=3)
-        rhlow.show(rd.axrh, alpha=1.0, color="r", marker="o--", linewidth=3)
-        rhhgh.show(rd.axrh, alpha=1.0, color="r", marker="o--", linewidth=3)
-        prlow.show(rd.axpr, alpha=1.0, color="r", marker="o--", linewidth=3)
-        prhgh.show(rd.axpr, alpha=1.0, color="r", marker="o--", linewidth=3)
+        vplow.show(rd.axvp, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
+        vphgh.show(rd.axvp, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
+        vslow.show(rd.axvs, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
+        vshgh.show(rd.axvs, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
+        rhlow.show(rd.axrh, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
+        rhhgh.show(rd.axrh, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
+        prlow.show(rd.axpr, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
+        prhgh.show(rd.axpr, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
         zmax = 1.1 * p.inv(p.MINF)[0][-1]
 
         if isinstance(p, Parameterizer_mZVSPRzRHvp):
@@ -440,9 +449,9 @@ def _display_function(rootname, argv, verbose, mapkwargs):
         # plot data on top
         rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs),
                     dvalues=d.dvalues,
-                    alpha=0.8,
-                    color="g",
-                    linewidth=1)
+                    alpha=1.0,
+                    color="r",
+                    linewidth=2)
 
         if "-overdisp" in argv.keys():
             rd.set_vlim((0.5 * d.values.min(), 1.5 * d.values.max()))
@@ -455,9 +464,10 @@ def _display_function(rootname, argv, verbose, mapkwargs):
     rd.fig.suptitle(rootname.split('_HerrMet_')[-1])
     chftsz(rd.fig, 10)
     if "-png" in argv.keys():
+        dpi = argv['-png'][0] if len(argv['-png']) else default_dpi
         if verbose:
             print "writing %s" % pngfile
-        rd.fig.savefig(pngfile)
+        rd.fig.savefig(pngfile, dpi=dpi)
     elif "-inline" in argv.keys():
         plt.show()
     else:

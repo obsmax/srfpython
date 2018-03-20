@@ -179,17 +179,6 @@ class LogUniND(object):
         self.ls = [LogUni(vinf, vsup, k, nanbehavior) for vinf, vsup in zip(vinfs, vsups)]
 
     # ------------------------------------------------------
-    def __str__(self):
-        return "{name}(vinfs={vinfs}, vsups={vsups}, k={k}, nanbehavior={nanbehavior})".format(
-            name=self.__class__.__name__,
-            vmean=self.vmean,
-            vunc=self.vunc,
-            vinf=self.vinf,
-            vsup=self.vsup,
-            k=self.k,
-            nanbehavior=self.nanbehavior)
-
-    # ------------------------------------------------------
     def callpoints(self, points):
         """points = 2D array : raws = list of points, columns = dimensions"""
         y = np.zeros_like(points.shape[0], float)
