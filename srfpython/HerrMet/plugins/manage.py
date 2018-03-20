@@ -100,18 +100,26 @@ def manage(argv, verbose, mapkwargs):
                     select CHAINID, group_concat(NITER), group_concat(LLK) from MODELS
                         group by CHAINID 
                         ''')
-                    plt.figure()
+                    plt.figure(figsize=(8,4))
+                    ax0 = gcf().add_subplot(121)
+                    ax1 = gcf().add_subplot(122, sharey=ax0)
+                    LLKs = []
                     for CHAINID, NITER, LLK in s:
                         NITER = np.asarray(NITER.split(','), int)
                         LLK = np.asarray(LLK.split(','), float)
-                        gca().plot(NITER, LLK)
-                        gca().text(NITER[-1], LLK[-1], CHAINID)
+                        ax0.plot(NITER, LLK)
+                        ax0.text(NITER[-1], LLK[-1], CHAINID)
+                        LLKs = np.concatenate((LLKs, LLK))
+
+                    ax1.plot(np.sort(LLKs)[::-1])
                     if vmin is not None:
-                        gca().set_ylim(vmin, 0)
-                    gca().set_xlabel('# iteration')
-                    gca().set_ylabel('log likelihood')
-                    gca().grid(True, linestyle = ":")
-                    gca().set_title(rootname.split('_HerrMet_')[-1])
+                        ax0.set_ylim(vmin, 0)
+                    ax0.set_xlabel('# iteration')
+                    ax0.set_ylabel('log likelihood')
+                    ax1.set_xlabel('# rank')
+                    ax0.grid(True, linestyle=":")
+                    ax1.grid(True, linestyle = ":")
+                    gcf().suptitle(rootname.split('_HerrMet_')[-1])
                     showfun()
                     gcf().savefig("%s/_HerrMet.stats.png" % rootname)
                     plt.close(gcf())
