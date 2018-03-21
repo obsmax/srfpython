@@ -1,7 +1,7 @@
 import os, glob
 import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
-from srfpython.standalone.display import values2colors, makecolorbar, legendtext, chftsz
+from srfpython.standalone.display import values2colors, legendtext, chftsz
 from srfpython.standalone import cmaps #used in function eval
 from srfpython.standalone.asciifile import AsciiFile
 from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm, dispersion
@@ -9,7 +9,7 @@ from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_fr
 from srfpython.depthdisp.dispcurves import freqspace
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.disppdfs import dispstats
-from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, plt, showme
+from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, DepthDispDisplayCompact, plt, showme
 from srfpython.HerrMet.files import load_paramfile, RunFile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import overdisp
@@ -28,11 +28,12 @@ default_pdf_limit = 0
 default_pdf_llkmin = 0.
 default_pdf_step = 1
 default_cmap = "viridis"  # plt.cm.jet# plt.cm.gray #
+default_fontsize = 10
 default_dpi = 100
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-inline", "-ritt"]
+authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-compact", "-ftsz", "-inline", "-ritt"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
@@ -53,6 +54,8 @@ long_help = """\
     -png   [i]       save figure as pngfile instead of displaying it on screen, requires dpi, default {default_dpi} 
     -m96    s [s...] append depth model(s) to the plot from mod96 file(s)
     -cmap            colormap, default {default_cmap}
+    -compact         display only vs and the dispersion curves, default False
+    -ftsz  i         set font size, default {default_fontsize}
     -inline          do not pause (use in jupyter notebooks)
     """.format(default_rootnames=default_rootnames,
                default_plot_mode=default_plot_mode,
@@ -64,6 +67,7 @@ long_help = """\
                default_pdf_llkmin=default_pdf_llkmin,
                default_pdf_step=default_pdf_step,
                default_cmap=default_cmap,
+               default_fontsize=default_fontsize,
                default_dpi=default_dpi)
 
 # ------------------------------ example usage
@@ -92,13 +96,18 @@ def _display_function(rootname, argv, verbose, mapkwargs):
     #HerrLininitfile = '%s/_HerrLin.init' % rootname
 
     # ------ Initiate the displayer using the target data if exists
+    if "-compact" in argv.keys(): # compact mode
+        which_displayer = DepthDispDisplayCompact
+    else:
+        which_displayer = DepthDispDisplay
+
     if os.path.exists(targetfile):
-        rd = DepthDispDisplay(targetfile=targetfile)
+        rd = which_displayer(targetfile=targetfile)
         d = makedatacoder(targetfile, which=Datacoder_log)  # datacoder based on observations
         dobs, _ = d.target()
     else:
         print "no target file found in %s" % rootname
-        rd = DepthDispDisplay()
+        rd = which_displayer()
 
     # ------ Display run results if exist
     if os.path.exists(runfile) and ("-plot" in argv.keys() or "-pdf" in argv.keys()):
@@ -161,11 +170,11 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             except Exception as e:
                                 print "Error : could not plot dispersion curve (%s)" % str(e)
 
-                        cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
-                        pos = rd.axdisp[-1].get_position()
-                        cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-                        rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
-                        cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
+                        # cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
+                        # pos = rd.axdisp[-1].get_position()
+                        # cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
+                        # rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+
 
                     else:
                         "display the dispersion curves as stored in the database"
@@ -173,11 +182,14 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             rd.plotmodel(color=colors[i], alpha=1.0, linewidth=3, *ms[i])
                             rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
 
-                        cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
-                        pos = rd.axdisp[-1].get_position()
-                        cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-                        rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
-                        cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
+                        # cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
+                        # pos = rd.axdisp[-1].get_position()
+                        # cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
+                        # rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+                        # cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
+
+                    rd.colorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], label="log likelyhood", orientation="horizontal")
+                    rd.cax.set_xticklabels(rd.cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
                 # ---- display posterior pdf
                 if "-pdf" in argv.keys():
@@ -222,10 +234,9 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                                      **mapkwargs):
                         try:
                             l = 3 if p == 0.5 else 1
-                            vppc.show(rd.axvp, color=clr, linewidth=l, alpha=alp)
-                            vspc.show(rd.axvs, color=clr, linewidth=l, alpha=alp)
-                            rhpc.show(rd.axrh, color=clr, linewidth=l, alpha=alp)
-                            prpc.show(rd.axpr, color=clr, linewidth=l, alpha=alp)
+                            for what, where in zip([vppc, vspc, rhpc, prpc], [rd.axvp, rd.axvs, rd.axrh, rd.axpr]):
+                                if where is not None:
+                                    what.show(where, color=clr, linewidth=l, alpha=alp)
 
                         except KeyboardInterrupt:
                             raise
@@ -248,135 +259,6 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             raise
                         except Exception as e:
                             print "Error", str(e)
-                # # --- display best models
-                # if "-top" in argv.keys():
-                #
-                #     assert argv["-top"] == [] or len(argv["-top"]) == 3  # unexpected argument number
-                #     if argv["-top"] == []:
-                #         top_llkmin, top_limit, top_step = default_top_llkmin, default_top_limit, default_top_step
-                #     elif len(argv['-top']) == 3:
-                #         top_llkmin, top_limit, top_step = argv['-top']
-                #
-                #     print "top : llkmin %f, limit %d, step %d" % (top_llkmin, top_limit, top_step),
-                #     chainids, weights, llks, ms, ds = rundb.getzip(llkmin=top_llkmin,
-                #                                                    limit=top_limit,
-                #                                                    step=top_step,
-                #                                                    algo="METROPOLIS")
-                #     vmin, vmax = llks.min(), llks.max()
-                #     colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
-                #
-                #     if "-overdisp" in argv.keys():
-                #         """note : recomputing dispersion with another frequency array might
-                #                   result in a completely different dispersion curve in case
-                #                   of root search failure """
-                #         waves, types, modes, freqs, _ = ds[0]
-                #         overwaves, overtypes, overmodes, _, _ = zip(
-                #             *list(groupbywtm(waves, types, modes, freqs, np.arange(len(freqs)), None, True)))
-                #         overfreqs = [freqspace(0.6 * min(freqs), 1.4 * max(freqs), 100, "plog") for _ in
-                #                      xrange(len(overwaves))]
-                #         overwaves, overtypes, overmodes, overfreqs = \
-                #             igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
-                #         for clr, (mms, dds) in zip(colors[::-1],
-                #                                    overdisp(ms[::-1],
-                #                                             overwaves, overtypes, overmodes, overfreqs,
-                #                                             verbose=verbose, **mapkwargs)):
-                #             rd.plotmodel(color=clr, alpha=1.0, linewidth=3, *mms)
-                #             try:
-                #                 rd.plotdisp(color=clr, alpha=1.0, linewidth=3, *dds)
-                #             except KeyboardInterrupt:
-                #                 raise
-                #             except Exception as e:
-                #                 print "Error : could not plot dispersion curve (%s)" % str(e)
-                #
-                #         cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
-                #         pos = rd.axdisp[-1].get_position()
-                #         cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-                #         rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
-                #         cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
-                #
-                #     else:
-                #         "display the dispersion curves as stored in the database"
-                #         for i in range(len(llks))[::-1]:
-                #             rd.plotmodel(color=colors[i], alpha=1.0, linewidth=3, *ms[i])
-                #             rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
-                #
-                #         cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
-                #         pos = rd.axdisp[-1].get_position()
-                #         cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-                #         rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
-                #         cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
-
-                # # ---- display posterior pdf
-                # if "-pdf" in argv.keys():
-                #
-                #     assert argv["-pdf"] == [] or len(argv["-pdf"]) == 3  # unexpected argument number
-                #     if argv["-pdf"] == []:
-                #         pdf_llkmin, pdf_limit, pdf_step = default_pdf_llkmin, default_pdf_limit, default_pdf_step
-                #     elif len(argv['-pdf']) == 3:
-                #         pdf_llkmin, pdf_limit, pdf_step = argv['-pdf']
-                #
-                #     print "pdf : llkmin %f, limit %d, step %d" % (pdf_llkmin, pdf_limit, pdf_step),
-                #     chainids, weights, llks, ms, ds = rundb.getzip(llkmin=pdf_llkmin,
-                #                                                    limit=pdf_limit,
-                #                                                    step=pdf_step,
-                #                                                    algo="METROPOLIS")
-                #
-                #     dms = [depthmodel_from_arrays(ztop, vp, vs, rh) for ztop, vp, vs, rh in ms]
-                #
-                #     # # prepare the forward projection of the depth models
-                #     # fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
-                #     #     [np.array(_) for _ in d.waves, d.types, d.modes, d.freqs]
-                #     # if "-overdisp" in argv.keys():
-                #     #     overwaves, overtypes, overmodes, _, _ = zip(
-                #     #         *list(groupbywtm(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, np.arange(len(fwdfreqs)), None, True)))
-                #     #     overfreqs = np.array([freqspace(0.6 * min(fwdfreqs), 1.4 * max(fwdfreqs), 100, "plog") for _ in
-                #     #                  xrange(len(overwaves))])
-                #     #     fwdwaves, fwdtypes, fwdmodes, fwdfreqs = \
-                #     #         igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
-                #
-                #     # display the depth models and their projections
-                #     for p, (vppc, vspc, rhpc, prpc) in \
-                #             dmstats1(dms,
-                #                      percentiles=[0.01, 0.16, 0.5, 0.84, 0.99],
-                #                      Ndepth=100,
-                #                      Nvalue=100,
-                #                      weights=weights,
-                #                      **mapkwargs):
-                #         try:
-                #             l = 3 if p == 0.5 else 1
-                #             vppc.show(rd.axvp, color="b", linewidth=l)
-                #             vspc.show(rd.axvs, color="b", linewidth=l)
-                #             rhpc.show(rd.axrh, color="b", linewidth=l)
-                #             prpc.show(rd.axpr, color="b", linewidth=l)
-                #
-                #             # # project these solutions to the dataspace
-                #             # fwdvalues = dispersion(vppc.z, vppc.values, vspc.values, rhpc.values,
-                #             #                        fwdwaves, fwdtypes, fwdmodes, fwdfreqs)
-                #             #
-                #             # rd.plotdisp(fwdwaves, fwdtypes, fwdmodes, fwdfreqs, fwdvalues,
-                #             #              dvalues=None, color="b", alpha=1., linewidth=l)
-                #
-                #         except KeyboardInterrupt:
-                #             raise
-                #         except Exception as e:
-                #             print "Error", str(e)
-                #
-                #     # display the disp pdf
-                #     for p, (wpc, tpc, mpc, fpc, vpc) in \
-                #             dispstats(ds,
-                #                       percentiles=[0.01, 0.16, 0.5, 0.84, 0.99],
-                #                       Ndisp=100,
-                #                       weights=weights,
-                #                       **mapkwargs):
-                #         try:
-                #             l = 3 if p == 0.5 else 1
-                #             rd.plotdisp(wpc, tpc, mpc, fpc, vpc,
-                #                         dvalues=None, color="b", alpha=1., linewidth=l)
-                #
-                #         except KeyboardInterrupt:
-                #             raise
-                #         except Exception as e:
-                #             print "Error", str(e)
 
     # ------
     if os.path.exists(paramfile):
@@ -395,14 +277,12 @@ def _display_function(rootname, argv, verbose, mapkwargs):
 
         #
         vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh = p.boundaries()
-        vplow.show(rd.axvp, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
-        vphgh.show(rd.axvp, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
-        vslow.show(rd.axvs, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
-        vshgh.show(rd.axvs, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
-        rhlow.show(rd.axrh, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
-        rhhgh.show(rd.axrh, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
-        prlow.show(rd.axpr, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
-        prhgh.show(rd.axpr, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
+
+        for what, where in zip(\
+                [vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh],
+                [rd.axvp, rd.axvp, rd.axvs, rd.axvs, rd.axrh, rd.axrh, rd.axpr, rd.axpr]):
+            if where is not None:
+                what.show(where, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
         zmax = 1.1 * p.inv(p.MINF)[0][-1]
 
         if isinstance(p, Parameterizer_mZVSPRzRHvp):
@@ -441,9 +321,11 @@ def _display_function(rootname, argv, verbose, mapkwargs):
             rd.axvp.legend(loc=3)
     if "-ritt" in argv.keys():
         a = AsciiFile('/mnt/labex2/home/max/data/boreholes/GRT1/GRT1.logsonic')
-        rd.axvs.plot(a.data['VS'], a.data['TVD']/1000., "m", alpha=0.5)
-        rd.axvp.plot(a.data['VP'], a.data['TVD'] / 1000., "m", alpha=0.5)
-        rd.axpr.plot(a.data['VP']/a.data['VS'], a.data['TVD'] / 1000., "m", alpha=0.5)
+
+        for what, where in zip([a.data['VS'], a.data['VP'], a.data['VP']/a.data['VS']], [rd.axvs, rd.axvp, rd.axpr]):
+            if where is not None:
+                where.plot(what, a.data['TVD']/1000., "m", alpha=0.5)
+
     # --------------------
     if os.path.exists(targetfile):
         # plot data on top
@@ -462,7 +344,10 @@ def _display_function(rootname, argv, verbose, mapkwargs):
     rd.tick()
     rd.grid()
     rd.fig.suptitle(rootname.split('_HerrMet_')[-1])
-    chftsz(rd.fig, 10)
+    if "-ftsz" in argv.keys():
+        chftsz(rd.fig, argv["-ftsz"][0])
+    else:
+        chftsz(rd.fig, default_fontsize)
     if "-png" in argv.keys():
         dpi = argv['-png'][0] if len(argv['-png']) else default_dpi
         if verbose:

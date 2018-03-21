@@ -1,4 +1,4 @@
-from srfpython.standalone.display import plt, gcf, gca, pause, showme, Ntick, logtick
+from srfpython.standalone.display import plt, gcf, gca, pause, showme, Ntick, logtick, makecolorbar
 from srfpython.depthdisp.dispcurves import surf96reader, mklaws
 from srfpython.depthdisp.depthmodels import depthmodel1D, depthmodel_from_mod96
 import numpy as np
@@ -52,6 +52,10 @@ class DepthDispDisplay(object):
             plt.setp(ax.get_xticklabels(), visible=True)
             ax.set_xlabel('$period\,(s)$')
 
+        pos = self.axdisp[-1].get_position()
+        #self.cax = self.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
+        self.cax = self.fig.add_axes((pos.x0, pos.y0 - 0.12, pos.width, 0.01))
+
         plt.setp(self.axvs.get_yticklabels(), visible=False)
         plt.setp(self.axpr.get_yticklabels(), visible=False)
         plt.setp(self.axrh.get_yticklabels(), visible=False)
@@ -60,6 +64,10 @@ class DepthDispDisplay(object):
         self.axdepth = [self.axvp, self.axvs, self.axpr, self.axrh]
         if not self.axvp.yaxis_inverted():
             self.axvp.invert_yaxis()
+
+    def colorbar(self, vmin, vmax, cmap, **kwargs):
+        cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
+        self.fig.colorbar(cb, cax=self.cax, **kwargs)
 
     def cla(self):
         for ax in self.axdisp: ax.cla()
@@ -159,3 +167,66 @@ class DepthDispDisplay(object):
         for ax in self.axdepth:
             ax.set_ylim(max(abs(zlim)), min(abs(zlim)))
 
+# _____________________________________________
+class DepthDispDisplayCompact(DepthDispDisplay):
+    """display only vs and the dispersion curves"""
+    def __init__(self, fig=None, targetfile=None):
+        if fig is None:
+            self.fig = plt.figure(figsize=(5, 6))#figsize=(18, 10))
+            self.fig.subplots_adjust(wspace=0.05)
+        else:
+            self.fig = fig
+
+        self.axvs = self.fig.add_subplot(1, 2, 1, title="$V_S\,(km/s)$", ylabel="depth (km)")
+        self.axvp = self.axpr = self.axrh = None
+
+        if targetfile is None:
+            self.axru0 = self.fig.add_subplot(3, 2, 2, title="RU0", ylabel="grpvel (km/s)")
+            self.axru1 = self.fig.add_subplot(3, 2, 4, title="RU1", ylabel="grpvel (km/s)", sharex=self.axru0, sharey=self.axru0)
+            # self.axrc0 = self.fig.add_subplot(4, 2, 6, title="RC0", ylabel="phsvel (km/s)", sharex=self.axru0, sharey=self.axru0)
+            # self.axrc1 = self.fig.add_subplot(4, 2, 8, title="RC1", ylabel="phsvel (km/s)", sharex=self.axru0, sharey=self.axru0)
+            self.axdisp = [self.axru0, self.axru1] #, self.axrc0, self.axrc1]
+            for ax in self.axdisp:
+                ax.loglog([1.],[1.]) #fuck matplotlib v2
+                ax.yaxis.set_label_position("right")
+                ax.yaxis.tick_right()
+        else:
+            #adjust the suplots according to the target data
+            s = surf96reader(targetfile)
+            Ndisp = max([3, len(list(s.wtm()))])
+
+            self.axdisp = []
+            share = None
+            for n, (w, t, m)  in enumerate(s.wtm()):
+                ax = self.fig.add_subplot(Ndisp, 2, (n+1)*2,
+                                          title="%s%s%d" % (w, t, m),
+                                          sharex=share, sharey=share,
+                                          #ylabel="velocity (km/s)")
+                                          ylabel="%s (km/s)" % (["grpvel", "phsvel"][int(t=="C")]))
+                ax.yaxis.set_label_position("right")
+                ax.yaxis.tick_right()
+                share=ax
+                self.__setattr__("ax%s%s%d" % (w.lower(), t.lower(), m), ax)
+                self.axdisp.append(eval("self.ax%s%s%d" % (w.lower(), t.lower(), m)))
+                plt.setp(ax.get_xticklabels(), visible = False)
+            plt.setp(ax.get_xticklabels(), visible=True)
+            ax.set_xlabel('$period\,(s)$')
+
+        pos = self.axdisp[-1].get_position()
+        #self.cax = self.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
+        self.cax = self.fig.add_axes((pos.x0, pos.y0 - 0.12, pos.width, 0.01))
+
+        # plt.setp(self.axvs.get_yticklabels(), visible=False)
+        self.axconv = None #Not needed here
+
+        self.axdepth = [self.axvs]
+        if not self.axvs.yaxis_inverted():
+            self.axvs.invert_yaxis()
+
+    # _____________________________________________
+    def plotmodel(self, *args, **kwargs):
+        kwargs.setdefault('showpr', False)
+        kwargs.setdefault('showvp', False)
+        kwargs.setdefault('showrh', False)
+
+        DepthDispDisplay.plotmodel(self, *args, **kwargs)
