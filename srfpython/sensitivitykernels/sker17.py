@@ -215,13 +215,15 @@ if __name__ == "__main__":
     # ##compute dispersion curves
     with Timer('dispersion'):
         out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
-
+    ax1 = plt.gcf().add_subplot(121)
+    dm.show(ax1)
+    ax2 = plt.gcf().add_subplot(122)
     for w, t, m, fs, us in out:
-        plt.gca().loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
-    plt.gca().set_xlabel('period (s)')
-    plt.gca().set_ylabel('velocity (km/s)')
-    plt.gca().grid(True, which="major")
-    plt.gca().grid(True, which="minor")
+        ax2.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
+    ax2.set_xlabel('period (s)')
+    ax2.set_ylabel('velocity (km/s)')
+    ax2.grid(True, which="major")
+    ax2.grid(True, which="minor")
     plt.legend()
     plt.gcf().show()
 
@@ -268,7 +270,7 @@ if __name__ == "__main__":
         fig.colorbar(cb, cax=cax)
 
         #  ------
-        for ax, p in zip([ax1, ax2, ax3, ax4], ["Z_{top}", "ln V_s", "ln (V_p/V_s)", r"ln \rho"]):
+        for ax, p in zip([ax1, ax2, ax3, ax4], ["Z^{top}_i", "ln Vs_i", "ln (Vp/Vs)_i", r"ln \rho _i"]):
             ax.set_xlim(minmax(1. / _F_))
             ax.set_ylim(minmax(_depth_))
             ax.set_xscale('log')
@@ -277,7 +279,7 @@ if __name__ == "__main__":
             if ax in [ax3, ax4]:
                 ax.set_xlabel('period (s)')
 
-            ax.set_title(r'$ \frac{1}{H} \, \frac{d ln%s}{d %s} $' % (t, p))
+            ax.set_title(r'$ \frac{1}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p))
 
             if not ax.yaxis_inverted(): ax.invert_yaxis()
 
