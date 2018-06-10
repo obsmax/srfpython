@@ -5,6 +5,7 @@ from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, Timer, groupby
 from srfpython.utils import minmax
 from srfpython.standalone.cmaps import cccfcmap3, tomocmap1
 from srfpython.standalone.multipro8 import MapSync, Job
+from srfpython.standalone.display import logtick
 
 """
 srfker17, Maximilien Lehujeur, 01/11/2017
@@ -179,7 +180,10 @@ if __name__ == "__main__":
     -RC0          rayleigh, phase, mode 0 : expects 4 frequency arguments : fstart, fend, nfreq, fscale          
     -LC0          love,     phase, mode 0 : expects 4 frequency arguments : fstart, fend, nfreq, fscale
     ...
-
+    -png          save figures as pngfiles (overwrite if exists)
+                  sker17_depthdisp.png
+                  sker17_RU0_fstart_fend_nfreq_fscale.png
+                  ...
     '''
     if len(sys.argv) == 1:
         print help
@@ -213,25 +217,38 @@ if __name__ == "__main__":
 
     # -----------------------------------
     # ##compute dispersion curves
+    fig1 = plt.figure(figsize=(8,4))
+    fig1.subplots_adjust(wspace=0.3)
     with Timer('dispersion'):
         out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
-    ax1 = plt.gcf().add_subplot(121)
+    ax1 = fig1.add_subplot(121)
     dm.show(ax1)
-    ax2 = plt.gcf().add_subplot(122)
+    ax1.grid(True, linestyle=":", color="k")
+    plt.legend()
+    ax2 = fig1.add_subplot(122)
     for w, t, m, fs, us in out:
         ax2.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
     ax2.set_xlabel('period (s)')
     ax2.set_ylabel('velocity (km/s)')
     ax2.grid(True, which="major")
     ax2.grid(True, which="minor")
+    logtick(ax2, "xy")
     plt.legend()
-    plt.gcf().show()
+    if "png" in argv.keys():
+        fout = "sker17_depthdisp.png"
+        print fout
+        fig1.savefig(fout, dpi=300)
+    else:
+        fig1.show()
+
 
     # ##sensitivity kernels
     norm = True
     fig = plt.figure()
     fig.subplots_adjust(wspace=0.1, hspace=0.2)
-    fig.show()
+    if "png" not in argv.keys():
+        fig.show()
+
     for w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH in \
             sker17_1(ztop, vp, vs, rh,
                      Waves, Types, Modes, Freqs,
@@ -282,6 +299,7 @@ if __name__ == "__main__":
             ax.set_title(r'$ \frac{1}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p))
 
             if not ax.yaxis_inverted(): ax.invert_yaxis()
+            logtick(ax, "x")
 
         # ------
         plt.setp(ax1.get_xticklabels(), visible=False)
@@ -289,7 +307,15 @@ if __name__ == "__main__":
         plt.setp(ax2.get_yticklabels(), visible=False)
         plt.setp(ax4.get_yticklabels(), visible=False)
         fig.canvas.draw()
-        raw_input('pause : press enter to plot the next wave type and mode')
+
+        if "png" in argv.keys():
+            k = "%s%s%d" % (w, t, m)
+            fout = 'sker17_%s_%s_%s_%s_%s.png' % (k, argv[k][0], argv[k][1], argv[k][2], argv[k][3])
+            print fout
+            fig.savefig(fout, dpi=300)
+        else:
+            raw_input('pause : press enter to plot the next wave type and mode')
     # --------------------
-    raw_input('bye')
+    if "png" not in argv.keys():
+        raw_input('bye')
 
