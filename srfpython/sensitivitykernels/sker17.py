@@ -180,6 +180,8 @@ if __name__ == "__main__":
     -RC0          rayleigh, phase, mode 0 : expects 4 frequency arguments : fstart, fend, nfreq, fscale          
     -LC0          love,     phase, mode 0 : expects 4 frequency arguments : fstart, fend, nfreq, fscale
     ...
+    -norm         if mentionned the kernels are divided by the layer thickness
+                  use it for depth models with irregular thicknesses 
     -png          save figures as pngfiles (overwrite if exists)
                   sker17_depthdisp.png
                   sker17_RU0_fstart_fend_nfreq_fscale.png
@@ -243,7 +245,7 @@ if __name__ == "__main__":
 
 
     # ##sensitivity kernels
-    norm = True
+    norm = "norm" in argv.keys()
     fig = plt.figure()
     fig.subplots_adjust(wspace=0.1, hspace=0.2)
     if "png" not in argv.keys():
@@ -252,7 +254,7 @@ if __name__ == "__main__":
     for w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH in \
             sker17_1(ztop, vp, vs, rh,
                      Waves, Types, Modes, Freqs,
-                     dz=0.001, dlogvs=.01, dlogpr=.01, dlogrh=.01, norm=True,
+                     dz=0.001, dlogvs=.01, dlogpr=.01, dlogrh=.01, norm=norm,
                      h=0.005, dcl=0.005, dcr=0.005):
 
         fig.clf()
@@ -263,7 +265,19 @@ if __name__ == "__main__":
 
         # ------
         vmax = abs(DLOGVADLOGVS).max()#np.max([abs(DLOGVADZ).max(), abs(DLOGVADLOGVS).max(), abs(DLOGVADLOGPR).max(), abs(DLOGVADLOGRH).max()])
-        vmax = np.min([vmax, 10.])
+        if norm:
+            vmax = np.min([vmax, 10.])
+        else:
+            vmax = np.min([vmax, 0.33])
+
+        if not norm:
+            # mask half space because it integrates the sensitivity over very thick layer => overestimated sensitivity
+            for _ in DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH:
+                _[-1, :] = np.nan
+            DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH = \
+                [np.ma.masked_where(np.isnan(_), _) \
+                 for _ in DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH]
+
         vmin, vmax, cmap = -vmax, vmax, tomocmap1(W=.25) #cccfcmap3() #plt.cm.RdBu
         ax1 = fig.add_subplot(221)
         plt.pcolormesh(1. / _F_, _depth_, DLOGVADZ,
@@ -296,7 +310,10 @@ if __name__ == "__main__":
             if ax in [ax3, ax4]:
                 ax.set_xlabel('period (s)')
 
-            ax.set_title(r'$ \frac{1}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p))
+            if norm:
+                ax.set_title(r'$ \frac{1}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p))
+            else:
+                ax.set_title(r'$ \frac{d ln%s_j}{d %s} $' % (t, p))
 
             if not ax.yaxis_inverted(): ax.invert_yaxis()
             logtick(ax, "x")
@@ -310,7 +327,7 @@ if __name__ == "__main__":
 
         if "png" in argv.keys():
             k = "%s%s%d" % (w, t, m)
-            fout = 'sker17_%s_%s_%s_%s_%s.png' % (k, argv[k][0], argv[k][1], argv[k][2], argv[k][3])
+            fout = 'sker17_%s_%s_%s_%s_%s%s.png' % (k, argv[k][0], argv[k][1], argv[k][2], argv[k][3], "_norm" if norm else "")
             print fout
             fig.savefig(fout, dpi=300)
         else:
