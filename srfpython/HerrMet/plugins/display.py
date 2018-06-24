@@ -235,7 +235,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                                      **mapkwargs):
                         try:
                             l = 3 if p == 0.5 else 1
-                            for what, where in zip([vppc, vspc, rhpc, prpc], [rd.axvp, rd.axvs, rd.axrh, rd.axpr]):
+                            for what, where in zip([vppc, vspc, rhpc, prpc], [rd.axdepth['VP'], rd.axdepth['VS'], rd.axdepth['RH'], rd.axdepth['PR']]):
                                 if where is not None:
                                     what.show(where, color=clr, linewidth=l, alpha=alp)
 
@@ -281,26 +281,26 @@ def _display_function(rootname, argv, verbose, mapkwargs):
 
         for what, where in zip(\
                 [vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh],
-                [rd.axvp, rd.axvp, rd.axvs, rd.axvs, rd.axrh, rd.axrh, rd.axpr, rd.axpr]):
+                [rd.axdepth['VP'], rd.axdepth['VP'], rd.axdepth['VS'], rd.axdepth['VS'], rd.axdepth['RH'], rd.axdepth['RH'], rd.axdepth['PR'], rd.axdepth['PR']]):
             if where is not None:
                 what.show(where, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
         zmax = 1.1 * p.inv(p.MINF)[0][-1]
 
         if isinstance(p, Parameterizer_mZVSPRzRHvp):
-            rd.axpr.plot(
+            rd.axdepth['PR'].plot(
                 p.PRz(np.linspace(0., zmax, 100)),
                 np.linspace(0., zmax, 100), "r--", linewidth=3)
-            legendtext(rd.axpr, p.PRzName, loc=4)
-            legendtext(rd.axrh, p.RHvpName, loc=4)
+            legendtext(rd.axdepth['PR'], p.PRzName, loc=4)
+            legendtext(rd.axdepth['RH'], p.RHvpName, loc=4)
         elif isinstance(p, Parameterizer_mZVSPRzRHz):
-            rd.axpr.plot(
+            rd.axdepth['PR'].plot(
                 p.PRz(np.linspace(0., zmax, 100)),
                 np.linspace(0., zmax, 100), "r--", linewidth=3)
-            rd.axrh.plot(
+            rd.axdepth['RH'].plot(
                 p.RHz(np.linspace(0., zmax, 100)),
                 np.linspace(0., zmax, 100), "r--", linewidth=3)
-            legendtext(rd.axpr, p.PRzName, loc=4)
-            legendtext(rd.axrh, p.RHzName, loc=4)
+            legendtext(rd.axdepth['PR'], p.PRzName, loc=4)
+            legendtext(rd.axdepth['RH'], p.RHzName, loc=4)
 
         rd.set_zlim(np.array([0, zmax]))
     else:
@@ -311,19 +311,19 @@ def _display_function(rootname, argv, verbose, mapkwargs):
         for m96 in argv['-m96']:
             try:
                 dm = depthmodel_from_mod96(m96)
-                dm.vp.show(rd.axvp, "m", linewidth=3, label=m96)
-                dm.vs.show(rd.axvs, "m", linewidth=3)
-                dm.rh.show(rd.axrh, "m", linewidth=3)
-                dm.pr().show(rd.axpr, "m", linewidth=3)
+                dm.vp.show(rd.axdepth['VP'], "m", linewidth=3, label=m96)
+                dm.vs.show(rd.axdepth['VS'], "m", linewidth=3)
+                dm.rh.show(rd.axdepth['RH'], "m", linewidth=3)
+                dm.pr().show(rd.axdepth['PR'], "m", linewidth=3)
             except KeyboardInterrupt:
                 raise
             except :#Exception as e:
                 print 'could not read or display %s (reason : %s)' % (m96, str(e))
-            rd.axvp.legend(loc=3)
+            rd.axdepth['VP'].legend(loc=3)
     if "-ritt" in argv.keys():
         a = AsciiFile('/mnt/labex2/home/max/data/boreholes/GRT1/GRT1.logsonic')
 
-        for what, where in zip([a.data['VS'], a.data['VP'], a.data['VP']/a.data['VS']], [rd.axvs, rd.axvp, rd.axpr]):
+        for what, where in zip([a.data['VS'], a.data['VP'], a.data['VP']/a.data['VS']], [rd.axdepth['VS'], rd.axdepth['VP'], rd.axdepth['PR']]):
             if where is not None:
                 where.plot(what, a.data['TVD']/1000., "m", alpha=0.5)
 

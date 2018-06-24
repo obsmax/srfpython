@@ -73,6 +73,13 @@ class depthmodel1D(object):
         return Z, self.values[I]
 
     # -------------------------------------------------
+    def dontshow(self):
+        """compute the coordinates of the line for display as in self.show but do not diplay anything"""
+        zz, vv = self.stairs()
+        zz[-1] = np.max([1.5 * self.z[-1], 3.0])  # cannot plot np.inf...
+        return vv, zz
+
+    # -------------------------------------------------
     def show(self, ax, marker = "-", **kwargs): #halfspacemarker="-",
 
         zz, vv = self.stairs()
