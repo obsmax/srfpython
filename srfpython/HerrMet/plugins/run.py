@@ -25,8 +25,7 @@ long_help = """\
                      skip     : ignore rootnames with existsing run file(s)               
     -nchain  i       number of chains to use, default {default_nchain}
     -nkeep   i       number of models to keep per chain, default {default_nkeep}
-    
-    -w       i       see above, controls the max number of chains to run simultaneously
+    [use -w option before --run to control the maximum number of chains to run simultaneously]   
     """.format(default_rootnames=default_rootnames,
            default_mode=default_mode,
            default_nchain=default_nchain,
