@@ -1,6 +1,7 @@
 from srfpython.standalone.display import plt, gcf, gca, pause, showme, Ntick, logtick, makecolorbar
 from srfpython.depthdisp.dispcurves import surf96reader, mklaws
 from srfpython.depthdisp.depthmodels import depthmodel1D, depthmodel_from_mod96
+from matplotlib.collections import LineCollection
 import numpy as np
 
 
@@ -15,18 +16,19 @@ class DepthDispDisplay(object):
         else:
             self.fig = fig
 
-        self.axvp = self.fig.add_subplot(1, 5, 1, title="$V_P\,(km/s)$", ylabel="depth (km)")
-        self.axvs = self.fig.add_subplot(1, 5, 2, title="$V_S\,(km/s)$", sharey=self.axvp)  # , sharex = self.axvp)
-        self.axpr = self.fig.add_subplot(1, 5, 3, title=r"$V_P/V_S$", sharey=self.axvp)
-        self.axrh = self.fig.add_subplot(1, 5, 4, title=r"$\rho\,(g/cm^3)$", sharey=self.axvp)
+        self.axdepth = {}
+        self.axdepth['VP'] = self.fig.add_subplot(1, 5, 1, title="$V_P\,(km/s)$", ylabel="depth (km)")
+        self.axdepth['VS'] = self.fig.add_subplot(1, 5, 2, title="$V_S\,(km/s)$",sharey=self.axdepth['VP'])
+        self.axdepth['PR'] = self.fig.add_subplot(1, 5, 3, title=r"$V_P/V_S$", sharey=self.axdepth['VP'])
+        self.axdepth['RH'] = self.fig.add_subplot(1, 5, 4, title=r"$\rho\,(g/cm^3)$", sharey=self.axdepth['VP'])
 
         if targetfile is None:
-            self.axru0 = self.fig.add_subplot(4, 5, 5,  title="RU0", ylabel="grpvel (km/s)")
-            self.axru1 = self.fig.add_subplot(4, 5, 10, title="RU1", ylabel="grpvel (km/s)", sharex=self.axru0, sharey=self.axru0)
-            self.axrc0 = self.fig.add_subplot(4, 5, 15, title="RC0", ylabel="phsvel (km/s)", sharex=self.axru0, sharey=self.axru0)
-            self.axrc1 = self.fig.add_subplot(4, 5, 20, title="RC1", ylabel="phsvel (km/s)", sharex=self.axru0, sharey=self.axru0)
-            self.axdisp = [self.axru0, self.axru1, self.axrc0, self.axrc1]
-            for ax in self.axdisp:
+            self.axdisp = {}
+            self.axdisp['RU0'] = self.fig.add_subplot(4, 5, 5, title="RU0", ylabel="grpvel (km/s)")
+            self.axdisp['RU1'] = self.fig.add_subplot(4, 5, 10, title="RU1", ylabel="grpvel (km/s)", sharex=self.axdisp['RU0'], sharey=self.axdisp['RU0'])
+            self.axdisp['RC0'] = self.fig.add_subplot(4, 5, 15, title="RC0", ylabel="phsvel (km/s)", sharex=self.axdisp['RU0'], sharey=self.axdisp['RU0'])
+            self.axdisp['RC1'] = self.fig.add_subplot(4, 5, 20, title="RC1", ylabel="phsvel (km/s)", sharex=self.axdisp['RU0'], sharey=self.axdisp['RU0'])
+            for key, ax in self.axdisp.items():
                 ax.loglog([1.],[1.]) #fuck matplotlib v2
                 ax.yaxis.set_label_position("right")
                 ax.yaxis.tick_right()
@@ -35,7 +37,7 @@ class DepthDispDisplay(object):
             s = surf96reader(targetfile)
             Ndisp = max([4, len(list(s.wtm()))])
 
-            self.axdisp = []
+            self.axdisp = {}
             share = None
             for n, (w, t, m)  in enumerate(s.wtm()):
                 ax = self.fig.add_subplot(Ndisp, 5, (n+1)*5,
@@ -45,70 +47,76 @@ class DepthDispDisplay(object):
                                           ylabel="%s (km/s)" % (["grpvel", "phsvel"][int(t=="C")]))
                 ax.yaxis.set_label_position("right")
                 ax.yaxis.tick_right()
-                share=ax
-                self.__setattr__("ax%s%s%d" % (w.lower(), t.lower(), m), ax)
-                self.axdisp.append(eval("self.ax%s%s%d" % (w.lower(), t.lower(), m)))
+
+                self.axdisp["%s%s%d" % (w.upper(), t.upper(), m)] = share = ax
                 plt.setp(ax.get_xticklabels(), visible = False)
             plt.setp(ax.get_xticklabels(), visible=True)
             ax.set_xlabel('$period\,(s)$')
 
-        pos = self.axdisp[-1].get_position()
-        #self.cax = self.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-        self.cax = self.fig.add_axes((pos.x0, pos.y0 - 0.12, pos.width, 0.01))
+        pos = ax.get_position()
+        self.cax = self.fig.add_axes((pos.x0, np.max([0.12, pos.y0 - 0.12]), pos.width, 0.01))
 
-        plt.setp(self.axvs.get_yticklabels(), visible=False)
-        plt.setp(self.axpr.get_yticklabels(), visible=False)
-        plt.setp(self.axrh.get_yticklabels(), visible=False)
+        plt.setp(self.axdepth['VS'].get_yticklabels(), visible=False)
+        plt.setp(self.axdepth['PR'].get_yticklabels(), visible=False)
+        plt.setp(self.axdepth['RH'].get_yticklabels(), visible=False)
         self.axconv = None #Not needed here
 
-        self.axdepth = [self.axvp, self.axvs, self.axpr, self.axrh]
-        if not self.axvp.yaxis_inverted():
-            self.axvp.invert_yaxis()
+        if not self.axdepth['VP'].yaxis_inverted():
+            self.axdepth['VP'].invert_yaxis()
+
+        # initiate collections data
+        self.clear_collections()
 
     def colorbar(self, vmin, vmax, cmap, **kwargs):
         cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
         self.fig.colorbar(cb, cax=self.cax, **kwargs)
 
     def cla(self):
-        for ax in self.axdisp: ax.cla()
-        for ax in self.axdepth: ax.cla()
+        for _, ax in self.axdisp.items(): ax.cla()
+        for _, ax in self.axdepth.items(): ax.cla()
         self.axconv.cla()
 
     def cliplim(self):
-        vplim = self.axvp.get_xlim()
-        vslim = self.axvs.get_xlim()
-        prlim = self.axpr.get_xlim()
-        rhlim = self.axrh.get_xlim()
+        vplim = self.axdepth['VP'].get_xlim()
+        vslim = self.axdepth['VS'].get_xlim()
+        prlim = self.axdepth['PR'].get_xlim()
+        rhlim = self.axdepth['RH'].get_xlim()
         vplim = np.clip(vplim, 0., np.inf)
         vslim = np.clip(vslim, 0., np.inf)
         prlim = np.clip(prlim, 1., np.inf)
         rhlim = np.clip(rhlim, 1., np.inf)
-        self.axvp.set_xlim(vplim)
-        self.axvs.set_xlim(vslim)
-        self.axpr.set_xlim(prlim)
-        self.axrh.set_xlim(rhlim)
+        self.axdepth['VP'].set_xlim(vplim)
+        self.axdepth['VS'].set_xlim(vslim)
+        self.axdepth['PR'].set_xlim(prlim)
+        self.axdepth['RH'].set_xlim(rhlim)
 
     def grid(self):
-        for ax in self.axdisp:  ax.grid(True, linestyle=":")
-        for ax in self.axdepth: ax.grid(True, linestyle=":")
+        for _, ax in self.axdisp.items():  ax.grid(True, linestyle=":")
+        for _, ax in self.axdepth.items():
+            if ax is not None:
+                ax.grid(True, linestyle=":")
         if self.axconv is not None:
             self.axconv.grid(True, linestyle=":")
 
     def tick(self):
-        for ax in self.axdisp:  logtick(ax, "xy")
-        for ax in self.axdepth: Ntick(ax, 4, "x")
+        for _, ax in self.axdisp.items():  logtick(ax, "xy")
+        for _, ax in self.axdepth.items():
+            if ax is not None:
+                Ntick(ax, 4, "x")
 
-    def plotmodel(self, ztop, vp, vs, rh, color="k", alpha=0.2, showvp=True, showvs=True, showrh=True, showpr=True,
+    def plotmodel(self, ztop, vp, vs, rh, color="k", alpha=0.2,
+                  showvp=True, showvs=True, showrh=True, showpr=True,
                   **kwargs):
         if showpr: pr = depthmodel1D(ztop, vp / vs)
         if showvp: vp = depthmodel1D(ztop, vp)
         if showvs: vs = depthmodel1D(ztop, vs)
         if showrh: rh = depthmodel1D(ztop, rh)
 
-        if showpr: pr.show(self.axpr, color=color, alpha=alpha, **kwargs)
-        if showvp: vp.show(self.axvp, color=color, alpha=alpha, **kwargs)
-        if showvs: vs.show(self.axvs, color=color, alpha=alpha, **kwargs)
-        if showrh: rh.show(self.axrh, color=color, alpha=alpha, **kwargs)
+        if showpr: pr.show(self.axdepth['PR'], color=color, alpha=alpha, **kwargs)
+        if showvp: vp.show(self.axdepth['VP'], color=color, alpha=alpha, **kwargs)
+        if showvs: vs.show(self.axdepth['VS'], color=color, alpha=alpha, **kwargs)
+        if showrh: rh.show(self.axdepth['RH'], color=color, alpha=alpha, **kwargs)
+
 
     def plotm96(self, m96, **kwargs):
         dm = depthmodel_from_mod96(m96)
@@ -117,23 +125,23 @@ class DepthDispDisplay(object):
 
     def plotdisp(self, waves, types, modes, freqs, values, dvalues=None, color="k", alpha=0.2, **kwargs):
         for law in mklaws(waves, types, modes, freqs, values, dvalues=dvalues):
-            ax = eval("self.ax%s%s%d" % (law.wave.lower(), law.type.lower(), law.mode))
+            ax = self.axdisp["%s%s%d" % (law.wave.upper(), law.type.upper(), law.mode)]
             law.show(ax, period=True, showdvalue=True, color=color, alpha=alpha, **kwargs)
 
     def plotvspdf(self, vspdf, **kwargs):
-        vspdf.show(self.axvs, **kwargs)
+        vspdf.show(self.axdepth['VS'], **kwargs)
 
     def plotvppdf(self, vppdf, **kwargs):
-        vppdf.show(self.axvp, **kwargs)
+        vppdf.show(self.axdepth['VP'], **kwargs)
 
     def plotrhpdf(self, rhpdf, **kwargs):
-        rhpdf.show(self.axrh, **kwargs)
+        rhpdf.show(self.axdepth['RH'], **kwargs)
 
     def plotprpdf(self, prpdf, **kwargs):
-        prpdf.show(self.axpr, **kwargs)
+        prpdf.show(self.axdepth['PR'], **kwargs)
 
     def plotru0pdf(self, ru0pdf, **kwargs):
-        ru0pdf.show(self.axru0, **kwargs)
+        ru0pdf.show(self.axdisp['RU0'], **kwargs)
 
     def plotru1pdf(self, ru1pdf, **kwargs):
         ru1pdf.show(self.axru1, **kwargs)
@@ -144,49 +152,123 @@ class DepthDispDisplay(object):
         self.plotdisp(waves, types, modes, freqs, values, dvalues=dvalues, **kwargs)
 
     def set_plim(self, plim):
-        for ax in self.axdisp:
+        for _, ax in self.axdisp.items():
             ax.set_xlim(plim)
 
     def set_vlim(self, vlim):
-        for ax in self.axdisp:
+        for _, ax in self.axdisp.items():
             ax.set_ylim(vlim)
 
     def set_vplim(self, lim):
-        self.axvp.set_xlim(lim)
+        self.axdepth['VP'].set_xlim(lim)
 
     def set_vslim(self, lim):
-        self.axvs.set_xlim(lim)
+        self.axdepth['VS'].set_xlim(lim)
 
     def set_prlim(self, lim):
-        self.axpr.set_xlim(lim)
+        self.axdepth['PR'].set_xlim(lim)
 
     def set_rhlim(self, lim):
-        self.axrh.set_xlim(lim)
+        self.axdepth['RH'].set_xlim(lim)
 
     def set_zlim(self, zlim):
-        for ax in self.axdepth:
-            ax.set_ylim(max(abs(zlim)), min(abs(zlim)))
+        self.axdepth['VS'].set_ylim(max(abs(zlim)), min(abs(zlim)))
+
+    def clear_collections(self):
+        self.deptcoll = {}
+        self.dispcoll = {}
+        for k in self.axdepth.keys():
+            self.deptcoll[k] = {'segments': [], 'colorvalues': []}
+        for k in self.axdisp.keys():
+            self.dispcoll[k] = {'segments': [], 'colorvalues': []}
+
+    def addmodel(self, ztop, vp, vs, rh, colorvalue,
+                 showvp=True, showvs=True, showrh=True, showpr=True):
+        """same as plotmodel but the data are added to self.depthcoll for display as LineCollections
+        :param self:
+        :param ztop:
+        :param vp:
+        :param vs:
+        :param rh:
+        :param colorvalue:
+        :param showvp:
+        :param showvs:
+        :param showrh:
+        :param showpr:
+        :return:
+        """
+        if showpr:
+            pr = depthmodel1D(ztop, vp / vs)
+            self.deptcoll['PR']['segments'].append(np.column_stack(pr.dontshow()))
+            self.deptcoll['PR']['colorvalues'].append(colorvalue)
+        if showvp:
+            vp = depthmodel1D(ztop, vp)
+            self.deptcoll['VP']['segments'].append(np.column_stack(vp.dontshow()))
+            self.deptcoll['VP']['colorvalues'].append(colorvalue)
+        if showvs:
+            vs = depthmodel1D(ztop, vs)
+            self.deptcoll['VS']['segments'].append(np.column_stack(vs.dontshow()))
+            self.deptcoll['VS']['colorvalues'].append(colorvalue)
+        if showrh:
+            rh = depthmodel1D(ztop, rh)
+            self.deptcoll['RH']['segments'].append(np.column_stack(rh.dontshow()))
+            self.deptcoll['RH']['colorvalues'].append(colorvalue)
+
+    def adddisp(self, waves, types, modes, freqs, values, colorvalue, period=True):
+        assert period
+        """add dispsersion curve to the right collection for massive display"""
+        for law in mklaws(waves, types, modes, freqs, values, dvalues=None):
+            key = "%s%s%d" % (law.wave.upper(), law.type.upper(), law.mode)
+            coll = self.dispcoll[key]
+            if period:
+                coll['segments'].append(np.column_stack((1. / law.freq, law.value)))
+            else:
+                coll['segments'].append(np.column_stack((law.freq, law.value)))
+
+            coll['colorvalues'].append(colorvalue)
+
+    def showdepthcoll(self, vmin, vmax, cmap, **kwargs):
+        for key, ax in self.axdepth.items():
+            if ax is None :
+                # compact
+                continue
+            segments = np.asarray(self.deptcoll[key]['segments'])
+            if not len(segments):
+                continue
+            colorvalues = np.asarray(self.deptcoll[key]['colorvalues'])
+            lc = LineCollection(segments, array=colorvalues, norm=plt.Normalize(vmin, vmax), cmap=cmap, **kwargs)
+            ax.add_collection(lc)
+
+    def showdispcoll(self, vmin, vmax, cmap, **kwargs):
+        for key, ax in self.axdisp.items():
+            coll = self.dispcoll[key]
+            segments = np.asarray(coll['segments'])
+            colorvalues = np.asarray(coll['colorvalues'])
+            lc = LineCollection(segments, array=colorvalues, norm=plt.Normalize(vmin, vmax), cmap=cmap, **kwargs)
+            ax.add_collection(lc)
+
 
 # _____________________________________________
 class DepthDispDisplayCompact(DepthDispDisplay):
     """display only vs and the dispersion curves"""
     def __init__(self, fig=None, targetfile=None):
+
         if fig is None:
             self.fig = plt.figure(figsize=(5, 6))#figsize=(18, 10))
             self.fig.subplots_adjust(wspace=0.05)
         else:
             self.fig = fig
 
-        self.axvs = self.fig.add_subplot(1, 2, 1, title="$V_S\,(km/s)$", ylabel="depth (km)")
-        self.axvp = self.axpr = self.axrh = None
+        self.axdepth = {}
+        self.axdepth['VS'] = self.fig.add_subplot(1, 2, 1, title="$V_S\,(km/s)$", ylabel="depth (km)")
+        self.axdepth['VP'] = self.axdepth['PR'] = self.axdepth['RH'] = None
 
         if targetfile is None:
-            self.axru0 = self.fig.add_subplot(3, 2, 2, title="RU0", ylabel="grpvel (km/s)")
-            self.axru1 = self.fig.add_subplot(3, 2, 4, title="RU1", ylabel="grpvel (km/s)", sharex=self.axru0, sharey=self.axru0)
-            # self.axrc0 = self.fig.add_subplot(4, 2, 6, title="RC0", ylabel="phsvel (km/s)", sharex=self.axru0, sharey=self.axru0)
-            # self.axrc1 = self.fig.add_subplot(4, 2, 8, title="RC1", ylabel="phsvel (km/s)", sharex=self.axru0, sharey=self.axru0)
-            self.axdisp = [self.axru0, self.axru1] #, self.axrc0, self.axrc1]
-            for ax in self.axdisp:
+            self.axdisp = {}
+            self.axdisp['RU0'] = self.fig.add_subplot(3, 2, 2, title="RU0", ylabel="grpvel (km/s)")
+            self.axdisp['RU1'] = self.fig.add_subplot(3, 2, 4, title="RU1", ylabel="grpvel (km/s)", sharex=self.axdisp['RU0'], sharey=self.axdisp['RU0'])
+
+            for _, ax in self.axdisp.items():
                 ax.loglog([1.],[1.]) #fuck matplotlib v2
                 ax.yaxis.set_label_position("right")
                 ax.yaxis.tick_right()
@@ -195,7 +277,7 @@ class DepthDispDisplayCompact(DepthDispDisplay):
             s = surf96reader(targetfile)
             Ndisp = max([3, len(list(s.wtm()))])
 
-            self.axdisp = []
+            self.axdisp = {}
             share = None
             for n, (w, t, m)  in enumerate(s.wtm()):
                 ax = self.fig.add_subplot(Ndisp, 2, (n+1)*2,
@@ -206,23 +288,21 @@ class DepthDispDisplayCompact(DepthDispDisplay):
                 ax.yaxis.set_label_position("right")
                 ax.yaxis.tick_right()
                 share=ax
-                self.__setattr__("ax%s%s%d" % (w.lower(), t.lower(), m), ax)
-                self.axdisp.append(eval("self.ax%s%s%d" % (w.lower(), t.lower(), m)))
+                self.axdisp["%s%s%d" % (w.upper(), t.upper(), m)] = share = ax
                 plt.setp(ax.get_xticklabels(), visible = False)
             plt.setp(ax.get_xticklabels(), visible=True)
             ax.set_xlabel('$period\,(s)$')
 
-        pos = self.axdisp[-1].get_position()
-        #self.cax = self.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-        self.cax = self.fig.add_axes((pos.x0, pos.y0 - 0.12, pos.width, 0.01))
+        pos = ax.get_position()
 
-        # plt.setp(self.axvs.get_yticklabels(), visible=False)
+        self.cax = self.fig.add_axes((pos.x0, np.max([0.12, pos.y0 - 0.12]), pos.width, 0.01))
+        # plt.setp(self.axdepth['VS'].get_yticklabels(), visible=False)
         self.axconv = None #Not needed here
 
-        self.axdepth = [self.axvs]
-        if not self.axvs.yaxis_inverted():
-            self.axvs.invert_yaxis()
+        if not self.axdepth['VS'].yaxis_inverted():
+            self.axdepth['VS'].invert_yaxis()
 
+        self.clear_collections()
     # _____________________________________________
     def plotmodel(self, *args, **kwargs):
         kwargs.setdefault('showpr', False)
@@ -230,3 +310,11 @@ class DepthDispDisplayCompact(DepthDispDisplay):
         kwargs.setdefault('showrh', False)
 
         DepthDispDisplay.plotmodel(self, *args, **kwargs)
+
+    # _____________________________________________
+    def addmodel(self, *args, **kwargs):
+        kwargs.setdefault('showpr', False)
+        kwargs.setdefault('showvp', False)
+        kwargs.setdefault('showrh', False)
+
+        DepthDispDisplay.addmodel(self, *args, **kwargs)
