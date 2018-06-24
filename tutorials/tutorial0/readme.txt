@@ -1,8 +1,8 @@
 to run the tutorial
 
-1/ activate the environment created for tetedenoeud (assume that jupyter notebook for python 2 was installed)
+1/ activate the environment created for srfpython (assume that jupyter notebook for python 2 was installed)
 
-source activate tetedenoeud
+source activate srfpython
 
 2/ run jupyter notebook in this directory
 
