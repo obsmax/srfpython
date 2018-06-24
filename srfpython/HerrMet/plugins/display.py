@@ -145,7 +145,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         raise Exception('unexpected plot mode %s' % plot_mode)
 
                     vmin, vmax = llks.min(), llks.max()
-                    colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
+                    # colors = values2colors(llks, vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
 
                     if "-overdisp" in argv.keys():
                         """note : recomputing dispersion with another frequency array might
@@ -158,18 +158,19 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                                      xrange(len(overwaves))]
                         overwaves, overtypes, overmodes, overfreqs = \
                             igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
-                        for clr, (mms, dds) in zip(colors[::-1],
+                        for llk, (mms, dds) in zip(llks[::-1],
                                                    overdisp(ms[::-1],
                                                             overwaves, overtypes, overmodes, overfreqs,
                                                             verbose=verbose, **mapkwargs)):
-                            rd.plotmodel(color=clr, alpha=1.0, linewidth=3, *mms)
+                            # rd.plotmodel(color=clr, alpha=1.0, linewidth=3, *mms)
+                            rd.addmodel(colorvalue=llk, *mms)
                             try:
-                                rd.plotdisp(color=clr, alpha=1.0, linewidth=3, *dds)
+                                # rd.plotdisp(color=clr, alpha=1.0, linewidth=3, *dds)
+                                rd.adddisp(colorvalue=llk, *dds)
                             except KeyboardInterrupt:
                                 raise
                             except Exception as e:
-                                pass # wtf
-                                # print "Error : could not plot dispersion curve (%s)" % str(e)
+                                print "Error : could not plot dispersion curve (%s)" % str(e)
 
                         # cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
                         # pos = rd.axdisp[-1].get_position()
@@ -180,16 +181,20 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                     else:
                         "display the dispersion curves as stored in the database"
                         for i in range(len(llks))[::-1]:
-                            rd.plotmodel(color=colors[i], alpha=1.0, linewidth=3, *ms[i])
-                            rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
-
+                            # rd.plotmodel(color=colors[i], alpha=1.0, linewidth=3, *ms[i])
+                            # rd.plotdisp(color=colors[i], alpha=1.0, linewidth=3, *ds[i])
+                            rd.addmodel(colorvalue=llks[i], *ms[i])
+                            rd.adddisp(colorvalue=llks[i], *ds[i])
                         # cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
                         # pos = rd.axdisp[-1].get_position()
                         # cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
                         # rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
                         # cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
+                    rd.showdispcoll(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], alpha=1.0, linewidth=3)
+                    rd.showdepthcoll(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], alpha=1.0, linewidth=3)
                     rd.colorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], label="log likelyhood", orientation="horizontal")
+                    print rd.cax.get_position()
                     rd.cax.set_xticklabels(rd.cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
                 # ---- display posterior pdf

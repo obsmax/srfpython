@@ -1,6 +1,7 @@
 from srfpython.standalone.display import plt, gcf, gca, pause, showme, Ntick, logtick, makecolorbar
 from srfpython.depthdisp.dispcurves import surf96reader, mklaws
 from srfpython.depthdisp.depthmodels import depthmodel1D, depthmodel_from_mod96
+from matplotlib.collections import LineCollection
 import numpy as np
 
 
@@ -52,9 +53,8 @@ class DepthDispDisplay(object):
             plt.setp(ax.get_xticklabels(), visible=True)
             ax.set_xlabel('$period\,(s)$')
 
-        pos = self.axdisp[self.axdisp.keys()[-1]].get_position()
-        # self.cax = self.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-        self.cax = self.fig.add_axes((pos.x0, pos.y0 - 0.12, pos.width, 0.01))
+        pos = ax.get_position()
+        self.cax = self.fig.add_axes((pos.x0, np.max([0.12, pos.y0 - 0.12]), pos.width, 0.01))
 
         plt.setp(self.axdepth['VS'].get_yticklabels(), visible=False)
         plt.setp(self.axdepth['PR'].get_yticklabels(), visible=False)
@@ -65,13 +65,7 @@ class DepthDispDisplay(object):
             self.axdepth['VP'].invert_yaxis()
 
         # initiate collections data
-        # self.clear_collections()
-
-    def clear_collections(self):
-        for k in self.axdepth.keys():
-            self.deptcoll[k] = []
-        for k in self.axdisp.keys():
-            self.dispcoll[k] = []
+        self.clear_collections()
 
     def colorbar(self, vmin, vmax, cmap, **kwargs):
         cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=cmap)
@@ -98,15 +92,20 @@ class DepthDispDisplay(object):
 
     def grid(self):
         for _, ax in self.axdisp.items():  ax.grid(True, linestyle=":")
-        for _, ax in self.axdepth.items(): ax.grid(True, linestyle=":")
+        for _, ax in self.axdepth.items():
+            if ax is not None:
+                ax.grid(True, linestyle=":")
         if self.axconv is not None:
             self.axconv.grid(True, linestyle=":")
 
     def tick(self):
         for _, ax in self.axdisp.items():  logtick(ax, "xy")
-        for _, ax in self.axdepth.items(): Ntick(ax, 4, "x")
+        for _, ax in self.axdepth.items():
+            if ax is not None:
+                Ntick(ax, 4, "x")
 
-    def plotmodel(self, ztop, vp, vs, rh, color="k", alpha=0.2, showvp=True, showvs=True, showrh=True, showpr=True,
+    def plotmodel(self, ztop, vp, vs, rh, color="k", alpha=0.2,
+                  showvp=True, showvs=True, showrh=True, showpr=True,
                   **kwargs):
         if showpr: pr = depthmodel1D(ztop, vp / vs)
         if showvp: vp = depthmodel1D(ztop, vp)
@@ -117,6 +116,7 @@ class DepthDispDisplay(object):
         if showvp: vp.show(self.axdepth['VP'], color=color, alpha=alpha, **kwargs)
         if showvs: vs.show(self.axdepth['VS'], color=color, alpha=alpha, **kwargs)
         if showrh: rh.show(self.axdepth['RH'], color=color, alpha=alpha, **kwargs)
+
 
     def plotm96(self, m96, **kwargs):
         dm = depthmodel_from_mod96(m96)
@@ -172,19 +172,94 @@ class DepthDispDisplay(object):
         self.axdepth['RH'].set_xlim(lim)
 
     def set_zlim(self, zlim):
-        for _, ax in self.axdepth.items():
-            ax.set_ylim(max(abs(zlim)), min(abs(zlim)))
+        self.axdepth['VS'].set_ylim(max(abs(zlim)), min(abs(zlim)))
+
+    def clear_collections(self):
+        self.deptcoll = {}
+        self.dispcoll = {}
+        for k in self.axdepth.keys():
+            self.deptcoll[k] = {'segments': [], 'colorvalues': []}
+        for k in self.axdisp.keys():
+            self.dispcoll[k] = {'segments': [], 'colorvalues': []}
+
+    def addmodel(self, ztop, vp, vs, rh, colorvalue,
+                 showvp=True, showvs=True, showrh=True, showpr=True):
+        """same as plotmodel but the data are added to self.depthcoll for display as LineCollections
+        :param self:
+        :param ztop:
+        :param vp:
+        :param vs:
+        :param rh:
+        :param colorvalue:
+        :param showvp:
+        :param showvs:
+        :param showrh:
+        :param showpr:
+        :return:
+        """
+        if showpr:
+            pr = depthmodel1D(ztop, vp / vs)
+            self.deptcoll['PR']['segments'].append(np.column_stack(pr.dontshow()))
+            self.deptcoll['PR']['colorvalues'].append(colorvalue)
+        if showvp:
+            vp = depthmodel1D(ztop, vp)
+            self.deptcoll['VP']['segments'].append(np.column_stack(vp.dontshow()))
+            self.deptcoll['VP']['colorvalues'].append(colorvalue)
+        if showvs:
+            vs = depthmodel1D(ztop, vs)
+            self.deptcoll['VS']['segments'].append(np.column_stack(vs.dontshow()))
+            self.deptcoll['VS']['colorvalues'].append(colorvalue)
+        if showrh:
+            rh = depthmodel1D(ztop, rh)
+            self.deptcoll['RH']['segments'].append(np.column_stack(rh.dontshow()))
+            self.deptcoll['RH']['colorvalues'].append(colorvalue)
+
+    def adddisp(self, waves, types, modes, freqs, values, colorvalue, period=True):
+        assert period
+        """add dispsersion curve to the right collection for massive display"""
+        for law in mklaws(waves, types, modes, freqs, values, dvalues=None):
+            key = "%s%s%d" % (law.wave.upper(), law.type.upper(), law.mode)
+            coll = self.dispcoll[key]
+            if period:
+                coll['segments'].append(np.column_stack((1. / law.freq, law.value)))
+            else:
+                coll['segments'].append(np.column_stack((law.freq, law.value)))
+
+            coll['colorvalues'].append(colorvalue)
+
+    def showdepthcoll(self, vmin, vmax, cmap, **kwargs):
+        for key, ax in self.axdepth.items():
+            if ax is None :
+                # compact
+                continue
+            segments = np.asarray(self.deptcoll[key]['segments'])
+            if not len(segments):
+                continue
+            colorvalues = np.asarray(self.deptcoll[key]['colorvalues'])
+            lc = LineCollection(segments, array=colorvalues, norm=plt.Normalize(vmin, vmax), cmap=cmap, **kwargs)
+            ax.add_collection(lc)
+
+    def showdispcoll(self, vmin, vmax, cmap, **kwargs):
+        for key, ax in self.axdisp.items():
+            coll = self.dispcoll[key]
+            segments = np.asarray(coll['segments'])
+            colorvalues = np.asarray(coll['colorvalues'])
+            lc = LineCollection(segments, array=colorvalues, norm=plt.Normalize(vmin, vmax), cmap=cmap, **kwargs)
+            ax.add_collection(lc)
+
 
 # _____________________________________________
 class DepthDispDisplayCompact(DepthDispDisplay):
     """display only vs and the dispersion curves"""
     def __init__(self, fig=None, targetfile=None):
+
         if fig is None:
             self.fig = plt.figure(figsize=(5, 6))#figsize=(18, 10))
             self.fig.subplots_adjust(wspace=0.05)
         else:
             self.fig = fig
 
+        self.axdepth = {}
         self.axdepth['VS'] = self.fig.add_subplot(1, 2, 1, title="$V_S\,(km/s)$", ylabel="depth (km)")
         self.axdepth['VP'] = self.axdepth['PR'] = self.axdepth['RH'] = None
 
@@ -218,16 +293,16 @@ class DepthDispDisplayCompact(DepthDispDisplay):
             plt.setp(ax.get_xticklabels(), visible=True)
             ax.set_xlabel('$period\,(s)$')
 
-        pos = self.axdisp[self.axdisp.keys()[-1]].get_position()
-        #self.cax = self.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-        self.cax = self.fig.add_axes((pos.x0, pos.y0 - 0.12, pos.width, 0.01))
+        pos = ax.get_position()
 
+        self.cax = self.fig.add_axes((pos.x0, np.max([0.12, pos.y0 - 0.12]), pos.width, 0.01))
         # plt.setp(self.axdepth['VS'].get_yticklabels(), visible=False)
         self.axconv = None #Not needed here
 
         if not self.axdepth['VS'].yaxis_inverted():
             self.axdepth['VS'].invert_yaxis()
 
+        self.clear_collections()
     # _____________________________________________
     def plotmodel(self, *args, **kwargs):
         kwargs.setdefault('showpr', False)
@@ -235,3 +310,11 @@ class DepthDispDisplayCompact(DepthDispDisplay):
         kwargs.setdefault('showrh', False)
 
         DepthDispDisplay.plotmodel(self, *args, **kwargs)
+
+    # _____________________________________________
+    def addmodel(self, *args, **kwargs):
+        kwargs.setdefault('showpr', False)
+        kwargs.setdefault('showvp', False)
+        kwargs.setdefault('showrh', False)
+
+        DepthDispDisplay.addmodel(self, *args, **kwargs)
