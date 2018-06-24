@@ -168,7 +168,8 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             except KeyboardInterrupt:
                                 raise
                             except Exception as e:
-                                print "Error : could not plot dispersion curve (%s)" % str(e)
+                                pass # wtf
+                                # print "Error : could not plot dispersion curve (%s)" % str(e)
 
                         # cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
                         # pos = rd.axdisp[-1].get_position()

@@ -108,7 +108,7 @@ def manage(argv, verbose, mapkwargs):
                         NITER = np.asarray(NITER.split(','), int)
                         LLK = np.asarray(LLK.split(','), float)
                         ax0.plot(NITER, LLK)
-                        ax0.text(NITER[-1], LLK[-1], CHAINID)
+                        ax0.text(NITER[-1], LLK[-1], CHAINID).set_clip_on(True)
                         LLKs = np.concatenate((LLKs, LLK))
 
                     ax1.plot(np.sort(LLKs)[::-1])
