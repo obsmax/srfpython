@@ -1,7 +1,7 @@
 from srfpython.depthdisp.dispcurves import Claw, freqspace
 from scipy.fftpack import fftfreq, fft, ifft
 from signalfuncs import detrend, taperwidth, gaussbandpass, bandpass
-
+import numpy as np
 """
 compute synthetic seismograms or correlation functions
 in both cases, the Greens functions determines the time array according to the source and receiver(s) positions

@@ -11,7 +11,7 @@ rh = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63]  # g/cm3
 dm = depthmodel_from_arrays(ztop, vp, vs, rh)
 
 # dipsersion parameters
-f = np.logspace(np.log10(0.2), np.log10(3.5), 35) # frequency array, km/s
+f = np.logspace(np.log10(0.1), np.log10(50), 100) # frequency array, km/s
 
 # dispersion curves
 curves = [('R', 'C', 0, f),
