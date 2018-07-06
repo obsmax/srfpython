@@ -8,4 +8,5 @@ from srfpython.inversion.metropolis2 import metropolis
 from srfpython.utils import Timer
 from srfpython.standalone.display import plt, gcf, gca, pause, showme, logtick
 from srfpython.standalone.asciifile import AsciiFile
+from srfpython.synthetics.synthetics2 import Green
 import numpy as np
