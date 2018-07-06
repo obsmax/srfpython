@@ -17,10 +17,14 @@ f = np.logspace(np.log10(0.2), np.log10(3.5), 35) # frequency array, km/s
 curves = [('R', 'C', 0, f),
           ('R', 'C', 1, f),
           ('R', 'C', 2, f),
-          ('R', 'C', 3, f)]
+          ('R', 'C', 3, f),
+          ('R', 'C', 4, f),
+          ('R', 'C', 5, f),
+          ('R', 'C', 6, f)]
 
 # compute dispersion laws
 Waves, Types, Modes, Freqs = zip(*curves)
 waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
 values = dispersion(ztop, vp, vs, rh, waves, types, modes, freqs)
-c0, c1, c2, c3 = mklaws(waves, types, modes, freqs, values, dvalues=None)
+laws = mklaws(waves, types, modes, freqs, values, dvalues=None)
+c0, c1, c2, c3 = laws[:4]

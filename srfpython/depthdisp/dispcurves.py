@@ -229,6 +229,15 @@ class Claw(freqinterpolator):
     mode = -1  # mode number, 0 = fundamental
     wave = ""  # wave type R, L
 
+    def to_llaw(self):
+        under_freqs = self.freq.copy()
+        upper_freqs = self.freq.copy()
+        under_freqs[1:]  -= .05 * (under_freqs[1:] - under_freqs[:-1])
+        upper_freqs[:-1] += .05 * (upper_freqs[1:] - upper_freqs[:-1])
+        lvalue = (np.log10(self(upper_freqs)) - np.log10(self(under_freqs))) / (np.log10(upper_freqs) - np.log10(under_freqs))
+        return Llaw(freq = self.freq, value = lvalue,
+            mode = self.mode, wave = self.wave, extrapolationmode = self.extrapolationmode)
+
     def to_ulaw_old(self):
         gfreq, gvelo = C2U(self.freq, self.value)
         return Ulaw(freq=gfreq, value=gvelo,
@@ -268,6 +277,11 @@ class nanUlaw(Ulaw):
 
     def __call__(self, freq):
         return np.nan * np.ones(len(freq))
+
+#-------------------------------------------------
+class Llaw(freqinterpolator):
+    "dlog10(c) / dlog10(f)"
+    require_positive_values = False
 
 
 # -------------------------------------------------

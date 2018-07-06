@@ -3,7 +3,7 @@ from scipy.fftpack import fftfreq, fft, ifft
 from signalfuncs import detrend, taperwidth, gaussbandpass, bandpass
 import numpy as np
 
-
+raise Exception('see synthetics2')
 # ---------------------------------------
 class Green(object):
     """
