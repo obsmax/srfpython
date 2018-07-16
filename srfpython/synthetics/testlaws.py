@@ -5,13 +5,15 @@ from srfpython.Herrmann.Herrmann import dispersion
 
 # depth model
 ztop = [0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80]  # km, top layer depth
-vp = [1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80]  # km/s
-vs = [0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31]  # km/s
-rh = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63]  # g/cm3
+vp = [1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80]    # km/s
+vs = [0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31]    # km/s
+rh = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63]    # g/cm3
+
 dm = depthmodel_from_arrays(ztop, vp, vs, rh)
 
 # dipsersion parameters
-f = np.logspace(np.log10(0.1), np.log10(50), 100) # frequency array, km/s
+# f = np.logspace(np.log10(0.1), np.log10(500.), 100) # frequency array, km/s : ERROR : example of missing modes as reported by Herrmann !!!!!
+f = np.logspace(np.log10(0.1), np.log10(10.), 100) # frequency array, km/s
 
 # dispersion curves
 curves = [('R', 'C', 0, f),
@@ -28,3 +30,16 @@ waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
 values = dispersion(ztop, vp, vs, rh, waves, types, modes, freqs)
 laws = mklaws(waves, types, modes, freqs, values, dvalues=None)
 c0, c1, c2, c3 = laws[:4]
+
+if __name__ == "__main__":
+    from srfpython import *
+
+    plt.figure()
+    dm.show(gca())
+    plt.legend()
+
+    plt.figure()
+    for law in laws:
+        law.show(gca())
+    plt.legend()
+    showme()
