@@ -4,6 +4,12 @@
 - compute, display, invert 1D depth models
 - based on Herrmann codes Computer Program in seismology
 
+if you use this program, reference would be greatly appreciated
+how to cite :
+
+> Lehujeur, M., Vergne, J., Schmittbuhl, J., Zigone, D., Le Chenadec, A., and EstOF team, (2018), *Reservoir imaging using ambient noise correlation from a dense seismic network*, JGR Solid Earth, 10.1029/2018JB015440
+
+
 install
 
 > move to the installation path (e.g. "~/git") and get srfpython
