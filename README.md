@@ -7,8 +7,7 @@
 if you use this program, reference would be greatly appreciated  
 how to cite :
 
-> Lehujeur, M., Vergne, J., Schmittbuhl, J., Zigone, D., Le Chenadec, A., and EstOF team, (2018), *Reservoir imaging using ambient noise correlation from a dense seismic network*, JGR Solid Earth, 10.1029/2018JB015440
-
+> Lehujeur, M., Vergne, J., Schmittbuhl, J.,Zigone, D., Le Chenadec, A., & EstOF Team (2018). Reservoir imaging using ambient noise correlation from a dense seismic network. Journal of Geophysical Research: Solid Earth, 123. https://doi.org/10.1029/2018JB015440
 
 install
 
