@@ -24,6 +24,7 @@ def depthspace(zbot, n):
     z = zbot * (z - z.min()) / (z.max() - z.min())
     return z
 
+
 # -------------------------------------------------
 class depthmodel1D(object):
     """self.z = ztop !!!
@@ -204,7 +205,6 @@ class depthmodel1D(object):
         self.__init__(newztop, newv)
         #self.show(gca(), '+-')
         #showme()
-
 
         #z = np.unique(np.sort(np.concatenate((self.ztop(), self.zmid()[:-1], self.zbot()[:-1]))))
         #v = self.interp(z)
@@ -387,6 +387,7 @@ class depthmodel(object):
         hdls.append(self.rh.show(ax, label=r"$ \rho (g/cm^3) $", *args, **kwargs))
         ax.set_ylabel('$ depth (km) $')
         return hdls
+
 
 # -------------------------------------------------
 class depthmodel_from_arrays(depthmodel):

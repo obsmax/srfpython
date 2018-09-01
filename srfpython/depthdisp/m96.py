@@ -155,9 +155,10 @@ if __name__ == "__main__":
                 for w, t, m, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs):
                     axdsp.loglog(1. / F, V, label="%s%s%d" % (w, t, m))
 
-                logtick(axdsp, "xy")
-                plt.legend()
-                showme()
+        if "save" not in argv.keys():
+            logtick(axdsp, "xy")
+            plt.legend()
+            showme()
         sys.exit()
 
 

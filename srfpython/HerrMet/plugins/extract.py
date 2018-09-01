@@ -5,7 +5,7 @@ from srfpython.depthdisp.depthmodels import depthmodel, depthmodel_from_arrays
 from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.disppdfs import dispstats
-from srfpython.HerrMet.files import  RunFile
+from srfpython.HerrMet.files import RunFile
 
 
 # ------------------------------ defaults
@@ -15,8 +15,12 @@ default_extract_limit = 0
 default_extract_llkmin = 0
 default_extract_step = 1
 
+default_top_limit = 10
+default_top_llkmin = 0.
+default_top_step = 1
+
 # ------------------------------ autorized_keys
-authorized_keys = ["-pdf"]
+authorized_keys = ["-pdf", "-top"]
 
 # ------------------------------ help messages
 short_help = "--extract    compute and write posterior pdf"
@@ -29,12 +33,20 @@ long_help = """\
                      third argument = lowest log likelyhood value to include (<=0.0, 0.0 means all)
                      fourth argument = include only one model over "step" (>=1)
                      default {default_extract_mode} {default_extract_limit} {default_extract_llkmin} {default_extract_step}
+    -top     [i f i] extract best models 
+                     first argument = highest model number to include (>=0, 0 means all)
+                     second argument = lowest log likelyhood value to include (<=0.0, 0.0 means all)  
+                     third argument = include only one model over "step" (>=1)
+                     default {default_top_limit} {default_top_llkmin} {default_top_step}
                      """.format(\
            default_rootnames=default_rootnames,
            default_extract_mode=default_extract_mode,
            default_extract_limit=default_extract_limit,
            default_extract_llkmin=default_extract_llkmin,
-           default_extract_step=default_extract_step)
+           default_extract_step=default_extract_step,
+           default_top_limit=default_top_limit,
+           default_top_llkmin=default_top_llkmin,
+           default_top_step=default_top_step)
 
 
 # ------------------------------ example usage
@@ -42,12 +54,12 @@ example = """\
 ## EXTRACT
 # compute pdf using the best 1000 models 
 
-HerrMet --extract -pdf last 1000 0. 1
+HerrMet --extract -pdf last 1000 0. 1 -top 10 0. 1
 """
 
 
 # -------------------------------------
-def _extract_function(rootname, extract_mode, extract_limit, extract_llkmin, extract_step, verbose, percentiles, mapkwargs):
+def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_step, verbose, percentiles, mapkwargs):
     """private"""
     percentiles = np.array(percentiles, float)
     assert len(np.unique(percentiles)) == len(percentiles)
@@ -92,8 +104,6 @@ def _extract_function(rootname, extract_mode, extract_limit, extract_llkmin, ext
         except Exception as e:
             print "Error", str(e)
 
-
-    # display the disp pdf
     for p in percentiles:
         out = '%s/_HerrMet.p%.2f.surf96' % (rootname, p)
         os.system('trash %s' % out)
@@ -117,6 +127,36 @@ def _extract_function(rootname, extract_mode, extract_limit, extract_llkmin, ext
             print "Error", str(e)
 
 
+# -------------------------------------
+def _extract_top(rootname, extract_limit, extract_llkmin, extract_step, verbose):
+    """private"""
+
+    runfile = "%s/_HerrMet.run" % rootname
+    with RunFile(runfile, verbose=verbose) as rundb:
+        print "extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step),
+
+        modelids, chainids, weights, llks, nlayers, dms, srs = zip(*list(
+            rundb.getpack(limit=extract_limit,
+                         llkmin=extract_llkmin,
+                         step=extract_step,
+                         algo="METROPOLIS")))
+        if len(modelids) > 100:
+            raise ValueError('too many models to extract')
+
+    for rank, (modelid, chainid, weight, llk, nlayer, dm, sr) in \
+            enumerate(zip(modelids, chainids, weights, llks, nlayers, dms, srs)):
+        try:
+            out = '{}/_HerrMet.rank{}.modelid{}.chainid{}.llk{}.mod96'.format(
+                rootname, rank, modelid, chainid, llk)
+            if verbose:
+                print "writing %s" % out
+            dm.write96(out)  # , overwrite=True)
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            print "Error", str(e)
+
+
 # ------------------------------
 def extract(argv, verbose, mapkwargs):
     for k in argv.keys():
@@ -124,7 +164,7 @@ def extract(argv, verbose, mapkwargs):
             continue  # private keys
 
         if k not in authorized_keys:
-            raise Exception('option %s is not recognized' % k)
+            raise ValueError('option %s is not recognized' % k)
 
     rootnames = argv['main']
     if rootnames == []:
@@ -133,23 +173,38 @@ def extract(argv, verbose, mapkwargs):
 
     for rootname in rootnames:
         if not os.path.isdir(rootname):
-            raise Exception('%s does not exist' % rootname)
+            raise ValueError('%s does not exist' % rootname)
         elif not rootname.startswith('_HerrMet_'):
-            raise Exception('%s does not starts with _HerrMet_' % rootname)
+            raise ValueError('%s does not starts with _HerrMet_' % rootname)
 
-    assert "-pdf" not in argv.keys() or len(argv["-pdf"]) == 4  # unexpected argument number
-    if "-pdf" not in argv.keys():
-        extract_mode, extract_limit, extract_llkmin, extract_step = \
-            default_extract_mode, default_extract_limit, \
-            default_extract_llkmin, default_extract_step
-    elif len(argv['-pdf']) == 4:
-        extract_mode, extract_limit, extract_llkmin, extract_step = argv['-pdf']
+    if "-pdf" in argv.keys():
+        if len(argv['-pdf']) == 0:
+            extract_mode, extract_limit, extract_llkmin, extract_step = \
+                default_extract_mode, default_extract_limit, \
+                default_extract_llkmin, default_extract_step
+        elif len(argv['-pdf']) == 4:
+            extract_mode, extract_limit, extract_llkmin, extract_step = argv['-pdf']
+        else:
+            raise ValueError('unexpected number of arguments for option -pdf')
 
-    def gen():
+        def gen():
+            for rootname in rootnames:
+                yield Job(rootname, extract_mode, extract_limit, extract_llkmin, extract_step, verbose,
+                          percentiles=[.16,.5,.84], mapkwargs=mapkwargs)
+
+        with MapAsync(_extract_pdf, gen(), **mapkwargs) as ma:
+            for _ in ma:
+                pass
+
+    if "-top" in argv.keys():
+        if len(argv['-top']) == 0:
+            top_limit, top_llkmin, top_step = \
+                default_top_limit, \
+                default_top_llkmin, default_top_step
+        elif len(argv['-top']) == 3:
+            top_limit, top_llkmin, top_step = argv['-top']
+        else:
+            raise ValueError('unexpected number of arguments for option -top')
+
         for rootname in rootnames:
-            yield Job(rootname, extract_mode, extract_limit, extract_llkmin, extract_step, verbose,
-                      percentiles=[.16,.5,.84], mapkwargs=mapkwargs)
-
-    with MapAsync(_extract_function, gen(), **mapkwargs) as ma:
-        for _ in ma:
-            pass
+            _extract_top(rootname, top_limit, top_llkmin, top_step, verbose)

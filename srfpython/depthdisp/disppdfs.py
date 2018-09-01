@@ -74,6 +74,15 @@ class disppdf(object):
 
 # ------------------------------------------------
 def dispstats(ds, percentiles=[0.16, 0.5, 0.84], Ndisp=100, weights=None, **mapkwargs):
+    """
+    compute statistics on a set of dispersion curves
+    :param ds:
+    :param percentiles:
+    :param Ndisp:
+    :param weights:
+    :param mapkwargs:
+    :return:
+    """
     assert np.all([0 < p < 1 for p in percentiles])
     assert len(percentiles) == len(np.unique(percentiles))
     if weights is None:
