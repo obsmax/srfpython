@@ -337,7 +337,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
         # plot data on top
         rd.plotdisp(d.waves, d.types, d.modes, d.freqs, d.inv(dobs),
                     dvalues=d.dvalues,
-                    alpha=1.0,
+                    alpha=.5,
                     color="r",
                     linewidth=2)
 

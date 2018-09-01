@@ -8,7 +8,7 @@ default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRz
 default_parameterization = default_parameterization_list[0]
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-basedon", "-t", "-dvp", "-dvs", "-drh", "-growing", "-op"]
+authorized_keys = ["-basedon", "-t", "-dvp", "-dvs", "-drh", "-dpr", "-growing", "-op"]
 
 # ------------------------------ help messages
 short_help = "--param      create a template parameterization file"
@@ -25,17 +25,17 @@ long_help = """\
                      - VS in each layer (VS0 = first layer, ...), 
                      - VP/VS in each layer (PR0, PR1, ...), 
                      - Density in each layer (RH0, RH1, ...)
-          mZVSVPRH = parameterize with depth interface, VP in each layer, 
+          mZVSVPRH = parameterize with  
                      - depth interface (mZ1 = first interface, mZ2, ...), 
                      - VS in each layer (VS0 = first layer, ...), 
                      - VP in each layer (VP0, VP1, ...), 
                      - Density in each layer (RH0, RH1, ...)
-       mZVSPRzRHvp = parameterize with depth interface, use fixed 
+       mZVSPRzRHvp = parameterize with  
                      - depth interface (mZ1 = first interface, mZ2, ...), 
                      - VS in each layer (VS0 = first layer, ...), 
                      - use a fixed relation between VP/VS = f(z)
                      - use a fixed relation between RH = f(VP)
-        mZVSPRzRHz = parameterize with depth interface, use fixed 
+        mZVSPRzRHz = parameterize with  
                      - depth interface (mZ1 = first interface, mZ2, ...), 
                      - VS in each layer (VS0 = first layer, ...), 
                      - use a fixed relation between VP/VS = f(z)
