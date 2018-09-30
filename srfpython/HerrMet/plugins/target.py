@@ -115,7 +115,7 @@ def target(argv, verbose):
         elif "-unc" in argv.keys():
             # set uncertainties to constant in lin domain
             unc = float(argv["-unc"][0])
-            s.data['DVALUE'] = unc
+            s.data['DVALUE'] = np.ones(len(s.data['VALUE'])) * unc
         # -------------------
         if verbose:
             print "writing %s/_HerrMet.target" % rootname
