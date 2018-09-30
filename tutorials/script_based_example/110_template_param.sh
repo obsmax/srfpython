@@ -1,8 +1,9 @@
-HerrMet --param 5 3. -t mZVSPRRH -op \
-    -dvp -2. 2. \
-    -dvs -2. 2. \
-    -drh -.5 .5 \
-    -dpr -.5 .5
+#!/usr/bin/env bash
+HerrMet --param 9 3. -t mZVSPRRH -op \
+    -dvp -.5 1.5 \
+    -dvs -.5 1.5 \
+    -drh -0. 1. \
+    -dpr -1.0 0.
 
 #--param      i f     generate a template parameter file to custom in .
 #                     need the number of layers and bottom depth in km

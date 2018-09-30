@@ -1,6 +1,22 @@
+#!/usr/bin/env bash
+
+for n in 10 100 1000 10000
+do
+    HerrMet --display _HerrMet_data010 \
+        -plot best $n 0 1 \
+        -m96 model000.mod96 \
+        -overdisp -png
+        # -pdf  best $n 0 1 \
+
+    mv _HerrMet_data010/_HerrMet.png  _HerrMet_data010/_HerrMet_best$n.png
+done
+
 #HerrMet --display _HerrMet_data010 -plot best 1 0 1 -m96 model000.mod96
+#HerrMet --display _HerrMet_data010 -plot best 100 0 1 -m96 model000.mod96 -overdisp
 #HerrMet --display _HerrMet_data010 -plot best 1000 0 1 -m96 model000.mod96 -overdisp
-HerrMet --display _HerrMet_data010 -plot best 2000 0 1 -m96 model000.mod96 -overdisp -png
+#HerrMet --display _HerrMet_data010 -plot best 2000 0 1 -m96 model000.mod96 -overdisp -png
+#HerrMet --display _HerrMet_data010 -plot best 0 -10 1 -m96 model000.mod96 -overdisp -png
+
 #HerrMet --display _HerrMet_data010 -plot best 10000 0 1 -m96 model000.mod96  
 #HerrMet --display _HerrMet_data010 -plot best 10000 0 1 -m96 model000.mod96  -png # -pdf best 10000 0 1 
 #--display   s [s...] display param, target, and run outputs for the required rootnames, default _HerrMet_*

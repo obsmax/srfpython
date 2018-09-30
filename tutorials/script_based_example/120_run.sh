@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #--run        s [s..] start inversion for the required rootnames, default _HerrMet_*
 #    -mode    s       set the running mode, default skip
 #                     restart  : overwrite the current run file(s) if any   
