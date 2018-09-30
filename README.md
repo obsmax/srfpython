@@ -22,7 +22,8 @@ install
 >
 > ```
 > conda create -n srfpython python=2.7
-> source activate srfpython
+> conda activate srfpython
+> # source activate srfpython # on old versions of anaconda
 > ```
 >
 > move to the repository, install the requirements and install the package
