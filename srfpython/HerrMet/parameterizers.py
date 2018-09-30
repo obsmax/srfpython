@@ -31,6 +31,24 @@ Datacoder     : object to convert output from Herrmann.dispersion to an array of
 """
 
 
+def check_parameter_file(A):
+    """
+    :param A: a read AsciiFile object corresponding to a parameter file
+    :return:
+    """
+    metakeys = A.metadata.keys()
+    if not "NLAYER" in metakeys:
+        raise ValueError('NLAYER not found in file metadata')
+    if not "TYPE" in metakeys:
+        raise ValueError('TYPE not found in file metadata')
+    if not len(A.data['KEY']) == len(np.unique(A.data['KEY'])):
+        raise ValueError('there are repeated entries in column KEYS')
+    if np.any(A.data['VINF'] > A.data['VSUP']):
+        raise ValueError('VSUP cannot be lower than VINF')
+
+    # TODO add more verifications in common to all parameterizers here
+
+
 # -------------------------------------
 class Parameterizer(object):
     """the parameterizer object links the model array (m) to a set of variables that can
@@ -52,6 +70,7 @@ class Parameterizer(object):
         self.MSUP = array, upper boundary for each parameter, masked by self.I
         self.MSTD = array, markov proposal for each parameter, masked by self.I
         """
+        check_parameter_file(A)
         raise Exception('Never used : please custom subclasses')
 
     # ------------------
@@ -144,6 +163,7 @@ class Parameterizer_mZVSPRRH(Parameterizer):
 
     def __init__(self, A):
         """see Parameterizer"""
+        check_parameter_file(A)
         assert A.metadata['TYPE'] == "mZVSPRRH"
         assert np.all(A.data['VINF'] <= A.data['VSUP'])
         if np.all(A.data['VINF'] == A.data['VSUP']):
@@ -231,6 +251,7 @@ class Parameterizer_mZVSPRRH(Parameterizer):
 class Parameterizer_mZVSVPRH(Parameterizer):
     """see Parameterizer_mZVSPRRH for doc"""
     def __init__(self, A):
+        check_parameter_file(A)
         assert A.metadata['TYPE'] == "mZVSVPRH"
         assert np.all(A.data['VINF'] <= A.data['VSUP'])
         if np.all(A.data['VINF'] == A.data['VSUP']):
@@ -317,6 +338,7 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
 
     def __init__(self, A):
         """see Parameterizer"""
+        check_parameter_file(A)
         assert A.metadata['TYPE'] == "mZVSPRzRHvp"
         assert np.all(A.data['VINF'] <= A.data['VSUP'])
         if np.all(A.data['VINF'] == A.data['VSUP']):
@@ -392,6 +414,7 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
 
     def __init__(self, A):
         """see Parameterizer"""
+        check_parameter_file(A)
         assert A.metadata['TYPE'] == "mZVSPRzRHz"
         assert np.all(A.data['VINF'] <= A.data['VSUP'])
         if np.all(A.data['VINF'] == A.data['VSUP']):
