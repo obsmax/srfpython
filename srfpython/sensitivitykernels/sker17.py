@@ -243,8 +243,7 @@ if __name__ == "__main__":
     else:
         fig1.show()
 
-
-    # ##sensitivity kernels
+    # ## sensitivity kernels
     norm = "norm" in argv.keys()
     fig = plt.figure()
     fig.subplots_adjust(wspace=0.1, hspace=0.2)
@@ -257,6 +256,7 @@ if __name__ == "__main__":
                      dz=0.001, dlogvs=.01, dlogpr=.01, dlogrh=.01, norm=norm,
                      h=0.005, dcl=0.005, dcr=0.005):
 
+        # print (w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH)
         fig.clf()
         # ------
         _depth_ = np.concatenate((ztop, [1.1 * ztop[-1]]))
