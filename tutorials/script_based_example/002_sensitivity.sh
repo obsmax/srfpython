@@ -6,6 +6,6 @@
 
 sker17 -m96 model000.mod96 \
         -RU0 .2 2. 50 plog \
-        -RC0 .2 2. 50 plog \
+        -RU1 .2 2. 50 plog \
         -png
         # -norm  # use only for irregular depth sampling

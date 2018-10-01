@@ -5,7 +5,7 @@ from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, Timer, groupby
 from srfpython.utils import minmax
 from srfpython.standalone.cmaps import cccfcmap3, tomocmap1
 from srfpython.standalone.multipro8 import MapSync, Job
-from srfpython.standalone.display import logtick
+from srfpython.standalone.display import logtick, textonly
 
 """
 srfker17, Maximilien Lehujeur, 01/11/2017
@@ -15,7 +15,6 @@ use __main__ for demo
 
 see also Herrmann.dispersion.dispersion
 """
-
 
 # _____________________________________
 def lognofail(x):
@@ -102,7 +101,7 @@ def sker17(ztop, vp, vs, rh, \
         n = len(ztopi)
         ilayer = i % n
         if ilayer == n-1:
-            Hi = 1.e50 # thickness of the half-space
+            Hi = 1.e50  # thickness of the half-space
         else:
             Hi = ztopi[ilayer + 1] - ztopi[ilayer]
 
@@ -219,36 +218,27 @@ if __name__ == "__main__":
 
     # -----------------------------------
     # ##compute dispersion curves
-    fig1 = plt.figure(figsize=(8,4))
+    fig1 = plt.figure(figsize=(8,8))
     fig1.subplots_adjust(wspace=0.3)
     with Timer('dispersion'):
         out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
-    ax1 = fig1.add_subplot(121)
+    ax1 = fig1.add_subplot(223)
     dm.show(ax1)
     ax1.grid(True, linestyle=":", color="k")
     plt.legend()
-    ax2 = fig1.add_subplot(122)
+    ax2 = fig1.add_subplot(222)
     for w, t, m, fs, us in out:
         ax2.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
-    ax2.set_xlabel('period (s)')
     ax2.set_ylabel('velocity (km/s)')
     ax2.grid(True, which="major")
     ax2.grid(True, which="minor")
     logtick(ax2, "xy")
     plt.legend()
-    if "png" in argv.keys():
-        fout = "sker17_depthdisp.png"
-        print fout
-        fig1.savefig(fout, dpi=300)
-    else:
-        fig1.show()
 
     # ## sensitivity kernels
     norm = "norm" in argv.keys()
-    fig = plt.figure()
-    fig.subplots_adjust(wspace=0.1, hspace=0.2)
     if "png" not in argv.keys():
-        fig.show()
+        fig1.show()
 
     for w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH in \
             sker17_1(ztop, vp, vs, rh,
@@ -256,12 +246,9 @@ if __name__ == "__main__":
                      dz=0.001, dlogvs=.01, dlogpr=.01, dlogrh=.01, norm=norm,
                      h=0.005, dcl=0.005, dcr=0.005):
 
-        # print (w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH)
-        fig.clf()
         # ------
         _depth_ = np.concatenate((ztop, [1.1 * ztop[-1]]))
         _F_ = np.concatenate(([F[0] * 0.95], F * 1.05))
-        fig.suptitle('%s%s%d' % (w, t, m))
 
         # ------
         vmax = abs(DLOGVADLOGVS).max()#np.max([abs(DLOGVADZ).max(), abs(DLOGVADLOGVS).max(), abs(DLOGVADLOGPR).max(), abs(DLOGVADLOGRH).max()])
@@ -276,62 +263,50 @@ if __name__ == "__main__":
                 _[-1, :] = np.nan
             DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH = \
                 [np.ma.masked_where(np.isnan(_), _) \
-                 for _ in DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH]
+                 for _ in [DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH]]
 
-        vmin, vmax, cmap = -vmax, vmax, tomocmap1(W=.25) #cccfcmap3() #plt.cm.RdBu
-        ax1 = fig.add_subplot(221)
-        plt.pcolormesh(1. / _F_, _depth_, DLOGVADZ,
-                       vmin=vmin, vmax=vmax, cmap=cmap)
+        vmin, vmax, cmap = -vmax, vmax, tomocmap1(W=.25)  #cccfcmap3() #plt.cm.RdBu
+        for M, p, q in zip([DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH],
+                           ["Z^{top}_i", "ln Vs_i", "ln (Vp/Vs)_i", r"ln \rho _i"],
+                           ["Ztop", "lnVs", "lnVpaVs", "lnrho"]):
+            ax3 = fig1.add_subplot(224, sharex=ax2, sharey=ax1)
+            ax3.set_title('%s%s%d' % (w, t, m))
 
-        ax2 = fig.add_subplot(222, sharex=ax1, sharey=ax1)
-        plt.pcolormesh(1. / _F_, _depth_, DLOGVADLOGVS,
-                       vmin=vmin, vmax=vmax, cmap=cmap)
+            coll = plt.pcolormesh(1. / _F_, _depth_, M,
+                           vmin=vmin, vmax=vmax, cmap=cmap)
+            cax = fig1.add_axes((.91, .2, .01, .2))
+            plt.colorbar(coll, cax=cax)
 
-        ax3 = fig.add_subplot(223, sharex=ax1, sharey=ax1)
-        plt.pcolormesh(1. / _F_, _depth_, DLOGVADLOGPR,
-                       vmin=vmin, vmax=vmax, cmap=cmap)
-
-        ax4 = fig.add_subplot(224, sharex=ax1, sharey=ax1)
-        plt.pcolormesh(1. / _F_, _depth_, DLOGVADLOGRH,
-                       vmin=vmin, vmax=vmax, cmap=cmap)
-
-        cax = fig.add_axes((.91, .3, .01, .4))
-        cb = plt.cm.ScalarMappable(norm=None, cmap=cmap)
-        cb.set_array([vmin, vmax])
-        fig.colorbar(cb, cax=cax)
-
-        #  ------
-        for ax, p in zip([ax1, ax2, ax3, ax4], ["Z^{top}_i", "ln Vs_i", "ln (Vp/Vs)_i", r"ln \rho _i"]):
-            ax.set_xlim(minmax(1. / _F_))
-            ax.set_ylim(minmax(_depth_))
-            ax.set_xscale('log')
-            if ax in [ax1, ax3]:
-                ax.set_ylabel('depth (km)')
-            if ax in [ax3, ax4]:
-                ax.set_xlabel('period (s)')
+            ax3.set_xlabel('period (s)')
+            ax3.set_xlim(minmax(1. / _F_))
+            ax3.set_ylim(minmax(_depth_))
+            ax3.set_xscale('log')
 
             if norm:
-                ax.set_title(r'$ \frac{1}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p))
+                textonly(ax3, txt=r'$ \frac{1}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p), loc=3, fontsize=16)
             else:
-                ax.set_title(r'$ \frac{d ln%s_j}{d %s} $' % (t, p))
+                textonly(ax3, txt=r'$ \frac{d ln%s_j}{d %s} $' % (t, p), loc=3, fontsize=16)
 
-            if not ax.yaxis_inverted(): ax.invert_yaxis()
-            logtick(ax, "x")
+            if not ax3.yaxis_inverted():
+                ax3.invert_yaxis()
+            logtick(ax3, "x")
 
-        # ------
-        plt.setp(ax1.get_xticklabels(), visible=False)
-        plt.setp(ax2.get_xticklabels(), visible=False)
-        plt.setp(ax2.get_yticklabels(), visible=False)
-        plt.setp(ax4.get_yticklabels(), visible=False)
-        fig.canvas.draw()
+            # ------
+            # plt.setp(ax1.get_xticklabels(), visible=False)
+            # plt.setp(ax2.get_xticklabels(), visible=False)
+            # plt.setp(ax2.get_yticklabels(), visible=False)
+            # plt.setp(ax4.get_yticklabels(), visible=False)
+            fig1.canvas.draw()
 
-        if "png" in argv.keys():
-            k = "%s%s%d" % (w, t, m)
-            fout = 'sker17_%s_%s_%s_%s_%s%s.png' % (k, argv[k][0], argv[k][1], argv[k][2], argv[k][3], "_norm" if norm else "")
-            print fout
-            fig.savefig(fout, dpi=300)
-        else:
-            raw_input('pause : press enter to plot the next wave type and mode')
+            if "png" in argv.keys():
+                k = "%s%s%d" % (w, t, m)
+                fout = 'sker17_%s_%s_%s_%s_%s_%s%s.png' % (k, argv[k][0], argv[k][1], argv[k][2], argv[k][3], q, "_norm" if norm else "")
+                print fout
+                fig1.savefig(fout, dpi=300)
+            else:
+                raw_input('pause : press enter to plot the next wave type and mode')
+            cax.cla()
+            ax3.cla()
     # --------------------
     if "png" not in argv.keys():
         raw_input('bye')

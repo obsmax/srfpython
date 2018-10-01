@@ -111,3 +111,17 @@ def legendtext(ax, txt, fontsize = 14, loc = 2, multialignment = "left", frameon
     at.patch.set_alpha(framealpha)
     ax.add_artist(at)
     return at
+
+
+# _____________________________________
+def textonly(ax, txt, fontsize = 14, loc = 2, multialignment = "left", frameon=True, framealpha=0.5, **kwargs):
+    "create a legend with text only"
+    at = AnchoredText(txt,
+                      prop=dict(size=fontsize, multialignment = multialignment, **kwargs),
+                      frameon=frameon,
+                      loc=loc)
+    at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
+    at.patch.set_alpha(framealpha)
+    ax.add_artist(at)
+    return at
+
