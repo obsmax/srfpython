@@ -31,22 +31,39 @@ def neldermead(M0, DM, G, ND, logRHOD, logRHOM,
                verbose=True,
                debug=False):
     """
-    simplex method for maximization
-    M0      = array, starting point
-    DM      = float, the length of the simplex edge when initializing
-    G       = theory function, callable : np.ndarray (model) -> np.ndarray (data)
-    ND      = integer, number of dimensions in the data space
-    logRHOD = data prior pdf, callable  : np.ndarray (data) -> float (log(pdf(data)))
-    logRHOM = model prior pdf, callable : np.ndarray (model) -> float (log(pdf(model)))
-    alpha   = float, reflection coefficient, a factor for moving the worst point of the simplex toward the maximum
-    beta    = float, contraction coefficient, the coeff for moving backward
-    gamma   = float, expansion  coefficient, if the slope is long enough, then the step is increased
-    maxiter = int, maximum number of iteration that can be done
-    interrupt = float, if the relative improvement is below interrupt 10 times in a raw, then the inversion is interrupted
-    verbose = bool
-    debug   = bool,  raise Exception in case of theory failure
+    :param M0: starting point, shape (NM, ) where NM is the number of dimensions in the model space
+    :type M0:  numpy.ndarray
+    :param DM: the length of the simplex edge when initializing
+    :type DM: float
+    :param G: theory function, callable : np.ndarray (model) -> np.ndarray (data)
+    :type G: function
+    :param ND: number of dimensions in the data space
+    :type ND: integer
+    :param logRHOD: data prior pdf, callable  : np.ndarray (data) -> float (log(pdf(data)))
+    :type logRHOD: function
+    :param logRHOM: model prior pdf, callable : np.ndarray (model) -> float (log(pdf(model)))
+    :type logRHOM:  function
+    :param alpha: reflection coefficient, a factor for moving the worst point of the simplex toward the maximum
+    :type alpha: float
+    :param beta: contraction coefficient, the coeff for moving backward
+    :type beta:  float
+    :param gamma: expansion  coefficient, if the slope is long enough, then the step is increased
+    :type gamma: float
+    :param maxiter: int, maximum number of iteration that can be done
+    :type maxiter: int
+    :param interrupt: float, if the relative improvement is below interrupt 10 times in a raw, then the inversion is interrupted
+    :type interrupt: float
+    :param verbose: to print message about the convergence
+    :type verbose: bool
+    :param debug: bool,  raise Exception in case of theory failure
+    :type debug:
+    :return models, datas, llks:
+        models : 2D array with the best model in each simplex tested (1 per line)
+                 all tested models are not returned
+        datas  : 2D array with the data array corresponding to each line of models
+        llks   : 1D array, the log likelihood values corresponding to each model in models
     """
-
+    
     # ----
     def call(M):
         try:
@@ -80,7 +97,7 @@ def neldermead(M0, DM, G, ND, logRHOD, logRHOM,
         DM *= np.ones(Ndim, float)
 
     # ----------------- first simplex
-    # 1 point per column, 1 line per dimension
+    # 1 point per column, 1 line per dimension (example in 3D)
     #      M0    DM     Mis
     # x   [a]   [dx]   [a   a+dx   a      a   ]
     # y   [b]   [dy]   [b   b      b+dy   b   ]
@@ -113,7 +130,8 @@ def neldermead(M0, DM, G, ND, logRHOD, logRHOM,
         # bestpoint = Mis[:, l]
         # bestvalue = -Lis[l] #- because we evaluated -llk
         # # yield the best point of the simplex
-        # yield bestpoint, bestvalue, (Mis, Dis, Lis)
+        # yield bestpoint, bestvalue, (Mis, Dis, Lis)  # use this to see the simplexes tested
+        # simplices.append(np.concatenate((Mis.T, [Mis[:, 0]]), axis=0))
         models[niter, :] = Mis[:, l]
         datas[niter, :] = Dis[:, l]
         llks[niter] = -Lis[l]
