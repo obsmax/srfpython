@@ -57,12 +57,18 @@ class PhaseDispersionLaw(object):
         ax.set_xlabel('period (s)')
         ax.set_ylabel('velocity (km/s)')
 
+    def to_ulaw(self):
+        return GroupDispersionLaw(self)
 
 class GroupDispersionLaw(PhaseDispersionLaw):
     def __init__(self, phasedispersionlaw):
         self.pdl = phasedispersionlaw
         self.df = 0.01
-        
+
+    def expr1(self):
+        fmt = r"$ u(f) = c(f) / (1. - \frac{ln\,c(f+ \delta f) - ln\,c(f)}{ln(f+\delta f)-ln(f)})$"
+        return fmt
+
     def __call__(self, freq):
         return self.pdl(freq) / (1. - (np.log(self.pdl(freq+self.df) / self.pdl(freq)) / np.log((freq+self.df)/freq)))
 
@@ -75,5 +81,4 @@ if __name__ == '__main__':
     c.show(plt.gca(), 0.05, 1.0, label=c.expr1())
     f = np.logspace(np.log10(0.05), 0., 100, 'plog')
     plt.gca().plot(1./f, c(f), label=c.expr2())
-    plt.gca().legend()
     plt.show()
