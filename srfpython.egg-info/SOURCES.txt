@@ -51,6 +51,7 @@ srfpython/depthdisp/dispcurves.py
 srfpython/depthdisp/disppdfs.py
 srfpython/depthdisp/m96.py
 srfpython/depthdisp/mod96.py
+srfpython/depthdisp/parametricdispcurves.py
 srfpython/depthdisp/s96.py
 srfpython/depthdisp/surf96.py
 srfpython/inversion/__init__.py
