@@ -272,8 +272,10 @@ if __name__ == "__main__":
             ax3 = fig1.add_subplot(224, sharex=ax2, sharey=ax1)
             ax3.set_title('%s%s%d' % (w, t, m))
 
+            # M = np.sign(M) * np.abs(M) ** 0.6
             coll = plt.pcolormesh(1. / _F_, _depth_, M,
                            vmin=vmin, vmax=vmax, cmap=cmap)
+
             cax = fig1.add_axes((.91, .2, .01, .2))
             plt.colorbar(coll, cax=cax)
 
