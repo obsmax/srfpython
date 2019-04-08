@@ -4,6 +4,7 @@ requirements.txt
 setup.py
 srfpython/__init__.py
 srfpython/utils.py
+srfpython/version.py
 srfpython.egg-info/PKG-INFO
 srfpython.egg-info/SOURCES.txt
 srfpython.egg-info/dependency_links.txt
@@ -52,6 +53,7 @@ srfpython/depthdisp/disppdfs.py
 srfpython/depthdisp/m96.py
 srfpython/depthdisp/mod96.py
 srfpython/depthdisp/parametricdispcurves.py
+srfpython/depthdisp/parametricdispcurves1.py
 srfpython/depthdisp/s96.py
 srfpython/depthdisp/surf96.py
 srfpython/inversion/__init__.py
@@ -65,6 +67,7 @@ srfpython/inversion/tester32.py
 srfpython/inversion/tester33.py
 srfpython/inversion/tester40.py
 srfpython/inversion/tester41.py
+srfpython/inversion/tester50.py
 srfpython/sensitivitykernels/__init__.py
 srfpython/sensitivitykernels/sker17.py
 srfpython/testbox/tester.py
