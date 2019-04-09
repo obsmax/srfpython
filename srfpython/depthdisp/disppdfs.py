@@ -53,9 +53,10 @@ class disppdf(object):
             I[i] = discrete_time_primitive(self.v, self.H[:, i], area = True)
         I = discrete_time_primitive(self.f, I, area = True)
         H = np.ma.masked_where(self.H == 0., self.H)
-        ax.pcolormesh1(1. / self.f, self.v, H / I, **kwargs)
+        coll, cax = ax.pcolormesh1(1. / self.f, self.v, H / I, **kwargs)
         ax.set_xscale('log')
         ax.set_yscale('log')
+        return coll, cax
 
     # ------------------------------------------------
     def purcentile(self, p):
