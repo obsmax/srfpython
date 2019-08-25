@@ -47,13 +47,15 @@ class disppdf(object):
             self.H[j, i] += float(Ntimes)
 
     # ------------------------------------------------
-    def show(self, ax, **kwargs):
-        I = np.zeros(len(self.f))
-        for i in xrange(len(self.f)):
-            I[i] = discrete_time_primitive(self.v, self.H[:, i], area = True)
-        I = discrete_time_primitive(self.f, I, area = True)
+    def show(self, ax, norm=True, **kwargs):
         H = np.ma.masked_where(self.H == 0., self.H)
-        coll, cax = ax.pcolormesh1(1. / self.f, self.v, H / I, **kwargs)
+        if norm:
+            I = np.zeros(len(self.f))
+            for i in xrange(len(self.f)):
+                I[i] = discrete_time_primitive(self.v, self.H[:, i], area = True)
+            I = discrete_time_primitive(self.f, I, area = True)
+            H /= I
+        coll, cax = ax.pcolormesh1(1. / self.f, self.v, H, **kwargs)
         ax.set_xscale('log')
         ax.set_yscale('log')
         return coll, cax
@@ -72,6 +74,24 @@ class disppdf(object):
         I = ~np.isnan(P)
         return self.f[I], P[I]
 
+    # ------------------------------------------------
+    def percentile(self, p, return_count=False):
+        assert 0. <= p <= 1.
+        v_percentile = np.zeros_like(self.f) * np.nan
+
+        count = np.asarray(np.sum(self.H, axis=0), int)
+        for j, f in enumerate(self.f):
+            x = self.v
+            y = np.cumsum(self.H[:, j])
+            ymin, ymax = y.min(), y.max()
+            if ymax > ymin:
+                y = (y - y.min()) / (y.max() - y.min())
+                v_percentile[j] = np.interp(p, xp = y, fp = x)
+
+        I = ~np.isnan(v_percentile)
+        if return_count:
+            return self.f[I], v_percentile[I], count[I]
+        return self.f[I], v_percentile[I]
 
 # ------------------------------------------------
 def dispstats(ds, percentiles=[0.16, 0.5, 0.84], Ndisp=100, weights=None, **mapkwargs):
