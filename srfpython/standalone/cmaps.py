@@ -189,40 +189,62 @@ def jetwk():
     cmap.set_under('w')
     cmap.set_over('k')
     return cmap
-###########################################################################################
+
+import warnings
 def yarg():
-    return array2cmap(plt.cm.gray(np.arange(256)[::-1]))
-###########################################################################################
+    warnings.warn('obsolet use plt.get_cmap')
+    return plt.get_cmap('gray_r')
+
+
 def toh():
-    return array2cmap(plt.cm.hot(np.arange(256)[::-1]))
-###########################################################################################
+    warnings.warn('obsolet use plt.get_cmap')
+    return plt.get_cmap('hot_r')
+
+
 def pamRMC():
-    return array2cmap(plt.cm.CMRmap(np.arange(256)[::-1]))
-###########################################################################################
+    warnings.warn('obsolet use plt.get_cmap')
+    return plt.get_cmap('CMRmap_r')
+
+
 def cimsies():
-    return array2cmap(plt.cm.seismic(np.arange(256)[::-1]))
-###########################################################################################
+    warnings.warn('obsolet use plt.get_cmap')
+    return plt.get_cmap("seismic_r")
+
+
 def tej():
-    return array2cmap(plt.cm.jet(np.arange(256)[::-1]))
-###########################################################################################
+    warnings.warn('obsolet use plt.get_cmap')
+    return plt.get_cmap('jet_r')
+
+
 def lartceps():
-    return array2cmap(plt.cm.spectral(np.arange(256)[::-1]))
-###########################################################################################
+    warnings.warn('obsolet use plt.get_cmap')
+    return plt.get_cmap('nipy_spectral_r')
+
+
 def racn_tsig():
-    return array2cmap(plt.cm.gist_ncar(np.arange(256)[::-1]))
-###########################################################################################
+    warnings.warn('obsolet use plt.get_cmap')
+    return plt.get_cmap('gist_ncar_r')
+
+
 def spectralwide():
-    l1 = plt.cm.spectral(np.arange(246))
-    l2 = plt.cm.Set1(np.arange(5, 256))#[::-1])
+    l1 = plt.get_cmap('nipy_spectral')(np.arange(246))
+    l2 = plt.get_cmap('Set1')(np.arange(5, 256))#[::-1])
     l = np.concatenate((l1, l2))    
     return array2cmap(l)
-###########################################################################################
+
+
 def ediwlartceps():
     return array2cmap(spectralwide()(np.arange(246 + 256 - 5)[::-1]))
-###########################################################################################
+
+
 def tomocmap(w = .2, g = 0.5):
-#        w = .2 #largeur de la bande grise
-#        g = 1. #paleur du gris
+    """
+
+    :param w:.2 #largeur de la bande grise
+    :param g: 1. #paleur du gris
+    :return:
+    """
+
     cdict = {'red':    ((0.0,     0.0, 1.0),
                         (.5 - w,  1.0, 1.0),                                     
                         (0.5,     g,   g),
@@ -239,7 +261,8 @@ def tomocmap(w = .2, g = 0.5):
                         (.5 + w,  0.5, 0.5),
                         (1.0,     1.0, 0.0))}
     return colors.LinearSegmentedColormap('my_colormap', cdict, 256)
-###########################################################################################
+
+
 def tomocmap1(w=0.05, W=.30, Wsat = 0.48, sat=.2, Ncolor = 256, reverse = True):
         """
         w     = witdh of the green area near 0
@@ -277,10 +300,12 @@ def tomocmap1(w=0.05, W=.30, Wsat = 0.48, sat=.2, Ncolor = 256, reverse = True):
         cmap = colors.LinearSegmentedColormap('my_colormap', cdict, 256)
         if reverse: return array2cmap(cmap(np.arange(256)[::-1]))
         return cmap
-###########################################################################################
+
+
 def pamcomot():
     return array2cmap(tomocmap()(np.arange(256)[::-1]))
-###########################################################################################
+
+
 def cccfcmap(w=0.05, W=.4, g=.2, Ncolor = 256):
     cdict = {'red':    ((0.0,     0.0, 0.0),
                         (.5 - W,  0.0, 0.0),  
@@ -301,7 +326,8 @@ def cccfcmap(w=0.05, W=.4, g=.2, Ncolor = 256):
                         (.5 + W,  0.0, 0.0),
                         (1.0,     0.0, 0.0))}
     return colors.LinearSegmentedColormap('my_colormap', cdict, Ncolor)
-###########################################################################################
+
+
 def cccfcmap2(w=0.05, W=.25, g=.2, Ncolor = 256):
     cdict = {'red':    ((0.0,     0.0, 0.0),
                         (.5 - W,  0.0, 0.0),  
@@ -322,7 +348,8 @@ def cccfcmap2(w=0.05, W=.25, g=.2, Ncolor = 256):
                         (.5 + W,  0.0, 0.0),
                         (1.0,     0.0, 0.0))}
     return colors.LinearSegmentedColormap('my_colormap', cdict, Ncolor)
-###########################################################################################
+
+
 def cccfcmap3(w=0.02, W=.25, g=.0, Ncolor = 256):
     cdict = {'red':    ((0.0,     0.0, 0.0),
                         (.5 - W,  0.0, 0.0),  
@@ -343,7 +370,8 @@ def cccfcmap3(w=0.02, W=.25, g=.0, Ncolor = 256):
                         (.5 + W,  0.0, 0.0),
                         (1.0,     0.0, 0.0))}
     return colors.LinearSegmentedColormap('my_colormap', cdict, 256)
-###########################################################################################
+
+
 def cccfcmap4(w=0.02, W=.15, Wsat = 0.45, g=0., Ncolor = 256, reverse = False):
     cdict = {'red':    ((0.0,     0.0, 0.0),
                         (.5 - Wsat, 0., 0.),
@@ -373,7 +401,8 @@ def cccfcmap4(w=0.02, W=.15, Wsat = 0.45, g=0., Ncolor = 256, reverse = False):
     if reverse:
         return array2cmap(cmap(np.arange(256)[::-1]))
     return cmap
-###########################################################################################
+
+
 def rdcmap():
     cdict = {'red':    ((0.0,       0.5, 0.5),
                         (0.05,       1.0, 1.0),
@@ -389,7 +418,8 @@ def rdcmap():
                         (1.0,       1.0, 1.0))}
 
     return colors.LinearSegmentedColormap('my_colormap', cdict, 256)
-###########################################################################################
+
+
 def decorrcmap():
     cdict = {'red':    ((0.0,       0.0, 0.0),
                         (0.5,       1.0, 1.0),
@@ -404,7 +434,8 @@ def decorrcmap():
                         (0.75,      0.0, 0.0),
                         (1.0,       1.0, 1.0))}
     return colors.LinearSegmentedColormap('my_colormap', cdict, 256)
-###########################################################################################
+
+
 def graysat(w=0.1):
     """saturated gray scale
     """
@@ -414,7 +445,8 @@ def graysat(w=0.1):
          (1.0,       1.0,  1.0))
     cdict = {'red': d, 'green': d, 'blue': d}
     return colors.LinearSegmentedColormap('my_colormap', cdict, 500)
-###########################################################################################
+
+
 def R_B(w = 0.7):
     cdict = {'red':    ((0.0,       0.0, 0.0),
                         (0.5,       w, 0.0),
@@ -434,7 +466,8 @@ def R_B(w = 0.7):
                         (0.5,       0.0, w),
                         (1.0,       0.0, 0.0))}
     return colors.LinearSegmentedColormap('my_colormap', cdict, 256)
-###########################################################################################
+
+
 def daylight(morning = 7., evening = 20.):
     m, e = morning / 24., evening / 24.
 
@@ -454,13 +487,15 @@ def daylight(morning = 7., evening = 20.):
                         (e,         1.0, 1.0),
                         (1.0,       0.0, 0.0))}
     return colors.LinearSegmentedColormap('my_colormap', cdict, 256)
-###########################################################################################
+
+
 def bazcmap():
     return None
-###########################################################################################
+
+
 def megawide():
    
-    lsup = plt.cm.spectral(np.arange(10, 256))
+    lsup = plt.get_cmap('nipy_spectral')(np.arange(10, 256))
     linf = plt.cm.jet(np.arange(230)[::4])
     linf = 0.33 * (linf - linf.min()) / (linf.max() - linf.min())#np.clip(linf - 0.4, 0., 1.)
     Ntra = 30
@@ -480,16 +515,17 @@ def megawide():
 
 
     return array2cmap(l)
-###########################################################################################
+
+
 def gistncarb(reverse=False):
     X = plt.cm.gist_ncar(np.arange(256))
     X[:13,2] = 0.
     if reverse: X = X[::-1, :]
     return array2cmap(X)
 
+
 def bracntsig():
     return gistncarb(reverse=True)
-
 
 
 def test():
@@ -500,39 +536,38 @@ def test():
     return array2cmap(X)
 
 
-# -------------------------------
-allcmaps = {"linecmap" : linecmap(),
-            "jetwk" : jetwk(),
-            "yarg" : yarg(),
-            "toh" : toh(),
-            "pamRMC" : pamRMC(),
-            "cimsies" : cimsies(),
-            "tej" : tej(),
-            "lartceps" : lartceps(),
-            "racn_tsig" : racn_tsig(),
-            "spectralwide" : spectralwide(),
-            "ediwlartceps" : ediwlartceps(),
-            "tomocmap" : tomocmap(),
-            "tomocmap1" : tomocmap1(),
-            "pamcomot" : pamcomot(),
-            "cccfcmap" : cccfcmap(),
-            "cccfcmap2" : cccfcmap2(),
-            "cccfcmap3" : cccfcmap3(),
-            "cccfcmap4" : cccfcmap4(),
-            "rdcmap" : rdcmap(),
-            "decorrcmap" : decorrcmap(),
-            "graysat" : graysat(),
-            "R_B" : R_B(),
-            "daylight" : daylight(),
-            "bazcmap" : bazcmap(),
-            "megawide" : megawide(),
-            "gistncarb" : gistncarb(),
-            "bracntsig" : bracntsig(),
-            "test" : test()}
-
-
-
 if __name__ == "__main__":
+
+    # -------------------------------
+    allcmaps = {"linecmap": linecmap(),
+                "jetwk": jetwk(),
+                "yarg": yarg(),
+                "toh": toh(),
+                "pamRMC": pamRMC(),
+                "cimsies": cimsies(),
+                "tej": tej(),
+                "lartceps": lartceps(),
+                "racn_tsig": racn_tsig(),
+                "spectralwide": spectralwide(),
+                "ediwlartceps": ediwlartceps(),
+                "tomocmap": tomocmap(),
+                "tomocmap1": tomocmap1(),
+                "pamcomot": pamcomot(),
+                "cccfcmap": cccfcmap(),
+                "cccfcmap2": cccfcmap2(),
+                "cccfcmap3": cccfcmap3(),
+                "cccfcmap4": cccfcmap4(),
+                "rdcmap": rdcmap(),
+                "decorrcmap": decorrcmap(),
+                "graysat": graysat(),
+                "R_B": R_B(),
+                "daylight": daylight(),
+                "bazcmap": bazcmap(),
+                "megawide": megawide(),
+                "gistncarb": gistncarb(),
+                "bracntsig": bracntsig(),
+                "test": test()}
+
     from srfpython.standalone.display import *
 
     # ############ demo display_cmap

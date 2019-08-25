@@ -75,7 +75,7 @@ def test2D():
     ax0 = gca()
     ax1 = gcf().add_subplot(122)
 
-    ax0.pcolormesh(X, Y, Z, vmin=Z.min(), vmax=Z.max(), cmap=plt.cm.spectral)
+    ax0.pcolormesh(X, Y, Z, vmin=Z.min(), vmax=Z.max(), cmap=plt.get_cmap('nipy_spectral'))
     #ax0.contour(X, Y, Z, vmin=Z.min(), vmax=Z.max(), colors="gray")
 
     ax0.set_aspect(1.0)
