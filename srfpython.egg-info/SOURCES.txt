@@ -2,6 +2,10 @@
 README.md
 requirements.txt
 setup.py
+./srfpython/bin/HerrMet
+./srfpython/bin/m96
+./srfpython/bin/s96
+./srfpython/bin/sker17
 srfpython/__init__.py
 srfpython/utils.py
 srfpython/version.py
@@ -41,7 +45,6 @@ srfpython/Herrmann/src90/max_srfpre96.f90
 srfpython/Herrmann/src90/readme.txt
 srfpython/Herrmann/src90/test.sh
 srfpython/bin/HerrMet
-srfpython/bin/add_me_to_the_path
 srfpython/bin/m96
 srfpython/bin/s96
 srfpython/depthdisp/__init__.py

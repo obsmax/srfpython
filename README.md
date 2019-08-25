@@ -48,15 +48,6 @@ install
 > python ~/git/srfpython/srfpython/Herrmann/Herrmann.py
 > ```
 
-add the bin directory to the path (recommended)
-
-> custom the following line and add it to
-> your .bashrc or .bash_path (linux) or .profile (mac)
->
-> ```
-> export PATH=$PATH:"~/git/srfpython/srfpython/bin"
-> ```
-
 if you plan to use jupyter notebooks with python2 (optional)
 
 > make sure the environment is activated

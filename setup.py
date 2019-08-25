@@ -10,6 +10,8 @@ setup(
     license='',
     author='Maximilien Lehujeur',
     author_email='maximilien.lehujeur@gmail.com',
-    description=''
-)
-
+    description='',
+    scripts=["./srfpython/bin/m96",
+             "./srfpython/bin/s96",
+             "./srfpython/bin/sker17",
+             "./srfpython/bin/HerrMet"])
