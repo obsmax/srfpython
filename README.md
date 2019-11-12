@@ -69,6 +69,12 @@ cd ~/git/srfpython/tutorials/simple_dispersion_example
 # follow instructions in readme.txt 
 ```
 
+for an depth inversion example 
+```
+cd ~/git/srfpython/tutorials/inversion_example
+# follow instructions in readme.txt 
+```
+
 more in the jupyter notebooks
 ```
 cd ~/git/srfpython/tutorials/tutorial0
