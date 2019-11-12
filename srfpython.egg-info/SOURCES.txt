@@ -47,6 +47,7 @@ srfpython/Herrmann/src90/test.sh
 srfpython/bin/HerrMet
 srfpython/bin/m96
 srfpython/bin/s96
+srfpython/bin/sker17
 srfpython/depthdisp/__init__.py
 srfpython/depthdisp/depthdispdisplay.py
 srfpython/depthdisp/depthmodels.py
