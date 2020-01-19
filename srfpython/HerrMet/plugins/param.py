@@ -88,7 +88,7 @@ def param(argv):
 
     nlayer = int(argv["main"][0])
     zbot = float(argv["main"][1])
-    type = argv['-t'][0] if "t" in argv.keys() else default_parameterization
+    type = argv['-t'][0] if "-t" in argv.keys() else default_parameterization
     basedon = argv['-basedon'][0] if "-basedon" in argv.keys() else None
     if "-growing" in argv.keys():
         assert "-dvs" not in argv.keys()  # not compatible with -growing

@@ -28,7 +28,8 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
 
     # ------
     def write_priortype_header(fid, dvp, dvs, drh):
-        if which is None: pass
+        if which is None:
+            pass
         elif which is LogRhoM_DVS:
             fid.write('#met PRIORTYPE = "DVS"\n')
             fid.write('#met DVSMIN = %f\n' % dvs[0])
@@ -51,7 +52,8 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
             fid.write('#met DRHMAX = %f\n' % drh[1])
             fid.write('#met DPRMIN = %f\n' % dpr[0])
             fid.write('#met DPRMAX = %f\n' % dpr[1])
-        else:  raise Exception('programming error')
+        else:
+            raise Exception('programming error')
 
     # ------
     if type == "mZVSPRRH":
@@ -127,7 +129,6 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
             rhinf = b.rh.values.copy()
             rhsup = b.rh.values.copy()
 
-
         keys = ["-Z%d" % i for i in xrange(1, nlayer)] + \
                ["VS%d" % i for i in xrange(nlayer)] + \
                ["VP%d" % i for i in xrange(nlayer)] + \
@@ -177,8 +178,8 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         with open('_HerrMet.param', 'w') as fid:
             fid.write('#met TYPE = "mZVSPRzRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
-            fid.write('#met PRz  = "1.0335 * np.exp(-Z / 0.5408) + 1.7310  #some function of Z, Z is in km and growing downward"\n')
-            fid.write('#met RHvp = "1.74 * VP ** 0.25 #some function of VP, VP is in km/s, RH is in g/cm3"\n')
+            fid.write('#met PRz  = "1.0335 * np.exp(-Z / 0.5408) + 1.7310"  #some function of Z, Z is in km and growing downward\n')
+            fid.write('#met RHvp = "1.74 * VP ** 0.25" #some function of VP, VP is in km/s, RH is in g/cm3\n')
             write_priortype_header(fid, dvp, dvs, drh)
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
@@ -217,8 +218,8 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         with open('_HerrMet.param', 'w') as fid:
             fid.write('#met TYPE = "mZVSPRzRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
-            fid.write('#met PRz  = "1.0335 * np.exp(-Z / 0.5408) + 1.7310  #some function of Z, Z is in km and growing downward"\n')
-            fid.write('#met RHz  = "Z * 0. + 2.67 #some function of Z, Z is in km and growing downward"\n')
+            fid.write('#met PRz  = "1.0335 * np.exp(-Z / 0.5408) + 1.7310"  #some function of Z, Z is in km and growing downward\n')
+            fid.write('#met RHz  = "Z * 0. + 2.67" #some function of Z, Z is in km and growing downward\n')
             write_priortype_header(fid, dvp, dvs, drh)
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
@@ -724,8 +725,7 @@ class RunFile(Database):
                 delete from MODELS 
                     {sql}
                     '''.format(sql=sql))
-        except:
-            raise
+
         finally:
             self.cursor.execute('''PRAGMA FOREIGN_KEYS = ON; ''')
 
