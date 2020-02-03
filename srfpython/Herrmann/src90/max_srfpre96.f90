@@ -5,7 +5,7 @@
 !     sinon : creation interactive (i.e. STDIN) du fichier sobs.d, du modele de profondeur et du fichier de dispersion
 !     le modele de profondeur sert a encadrer les vitesses de phase
 !     le modele de dispersion sert a donner les type d'onde et modes desires
-!     les parametres de dispersion donnent le nmbre max de mode a calculer ssi ils apparaissent dans le fichier de dispersion
+!     les parametres de dispersion donnent le nmbre max de modes a calculer si ils apparaissent dans le fichier de dispersion
 !  sorties d'origine (merdier)
 !     le fichier sobs.d
 !     le fichier modele si cree, le fichier de dispersion si cree

@@ -57,8 +57,19 @@ example = """\
 HerrMet --extract -pdf last 1000 0. 1 -top 10 0. 1
 """
 
+RUNFILE = "{rootname}/_HerrMet.run"
+EXTRACTMODELFILE = '{rootname}/_HerrMet.p{percentile:.2f}.mod96'
+EXTRACTDISPFILE = '{rootname}/_HerrMet.p{percentile:.2f}.surf96'
 
-# -------------------------------------
+
+def _find_runfile(rootname):
+    runfile = RUNFILE.format(rootname=rootname)
+    if not os.path.isfile(runfile):
+        err = '{} not found'.format(runfile)
+        raise IOError(err)
+    return runfile
+
+
 def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_step, verbose, percentiles, mapkwargs):
     """private"""
     percentiles = np.array(percentiles, float)
@@ -67,7 +78,22 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
     assert np.all(1 > percentiles)
     assert np.all(percentiles[1:] > percentiles[:-1])
 
-    runfile = "%s/_HerrMet.run" % rootname
+    for p in percentiles:
+        extract_disp_file = EXTRACTDISPFILE.format(rootname=rootname, percentile=p)
+        extract_model_file = EXTRACTMODELFILE.format(rootname=rootname, percentile=p)
+        if os.path.isfile(extract_disp_file) and os.path.isfile(extract_model_file):
+            continue
+        break
+    else:
+        # did not break => means all files exist already
+        print('found existing extraction files in {}, skip'.format(rootname))
+        return
+
+    try:
+        runfile = _find_runfile(rootname)
+    except IOError:
+        return
+
     with RunFile(runfile, verbose=verbose) as rundb:
         print "extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step),
         if extract_mode == "best":
@@ -95,18 +121,19 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
                      **mapkwargs):
         try:
             dmout = depthmodel(vppc, vspc, rhpc)
-            out = '%s/_HerrMet.p%.2f.mod96' % (rootname, p)
+            extract_model_file = EXTRACTMODELFILE.format(rootname=rootname, percentile=p)
             if verbose:
-                print "writing %s" % out
-            dmout.write96(out)  # , overwrite=True)
+                print "writing %s" % extract_model_file
+            dmout.write96(extract_model_file)  # , overwrite=True)
         except KeyboardInterrupt:
             raise
         except Exception as e:
             print "Error", str(e)
 
     for p in percentiles:
-        out = '%s/_HerrMet.p%.2f.surf96' % (rootname, p)
-        os.system('trash %s' % out)
+        extract_disp_file = EXTRACTDISPFILE.format(rootname=rootname, percentile=p)
+        os.system('trash {}'.format(extract_disp_file))
+
     for p, (wpc, tpc, mpc, fpc, vpc) in \
             dispstats(ds,
                       percentiles=percentiles,
@@ -115,10 +142,10 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
                       **mapkwargs):
         try:
             srout = surf96reader_from_arrays(wpc, tpc, mpc, fpc, vpc)
-            out = '%s/_HerrMet.p%.2f.surf96' % (rootname, p)
+            extract_disp_file = EXTRACTDISPFILE.format(rootname=rootname, percentile=p)
             if verbose:
-                print "writing to %s" % out
-            with open(out, 'a') as fid:
+                print "writing to {}".format(extract_disp_file)
+            with open(extract_disp_file, 'a') as fid:
                 fid.write(srout.__str__())
                 fid.write('\n')
         except KeyboardInterrupt:
@@ -127,11 +154,14 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
             print "Error", str(e)
 
 
-# -------------------------------------
 def _extract_top(rootname, extract_limit, extract_llkmin, extract_step, verbose):
     """private"""
 
-    runfile = "%s/_HerrMet.run" % rootname
+    try:
+        runfile = _find_runfile(rootname)
+    except IOError:
+        return
+
     with RunFile(runfile, verbose=verbose) as rundb:
         print "extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step),
 
@@ -167,7 +197,7 @@ def extract(argv, verbose, mapkwargs):
             raise ValueError('option %s is not recognized' % k)
 
     rootnames = argv['main']
-    if rootnames == []:
+    if not len(rootnames):
         rootnames = glob.glob(default_rootnames)
     assert len(rootnames)
 
@@ -175,13 +205,15 @@ def extract(argv, verbose, mapkwargs):
         if not os.path.isdir(rootname):
             raise ValueError('%s does not exist' % rootname)
         elif not rootname.startswith('_HerrMet_'):
-            raise ValueError('%s does not starts with _HerrMet_' % rootname)
+            raise ValueError('%s does not start with _HerrMet_' % rootname)
 
     if "-pdf" in argv.keys():
         if len(argv['-pdf']) == 0:
-            extract_mode, extract_limit, extract_llkmin, extract_step = \
-                default_extract_mode, default_extract_limit, \
-                default_extract_llkmin, default_extract_step
+            extract_mode = default_extract_mode
+            extract_limit = default_extract_limit
+            extract_llkmin = default_extract_llkmin
+            extract_step = default_extract_step
+
         elif len(argv['-pdf']) == 4:
             extract_mode, extract_limit, extract_llkmin, extract_step = argv['-pdf']
         else:
@@ -189,8 +221,12 @@ def extract(argv, verbose, mapkwargs):
 
         def gen():
             for rootname in rootnames:
-                yield Job(rootname, extract_mode, extract_limit, extract_llkmin, extract_step, verbose,
-                          percentiles=[.16,.5,.84], mapkwargs=mapkwargs)
+                yield Job(
+                    rootname, extract_mode, extract_limit,
+                    extract_llkmin, extract_step,
+                    verbose,
+                    percentiles=[.16, .5, .84],
+                    mapkwargs=mapkwargs)
 
         with MapAsync(_extract_pdf, gen(), **mapkwargs) as ma:
             for _ in ma:
