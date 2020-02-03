@@ -132,7 +132,8 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
 
     for p in percentiles:
         extract_disp_file = EXTRACTDISPFILE.format(rootname=rootname, percentile=p)
-        os.system('trash {}'.format(extract_disp_file))
+        if os.path.isfile(extract_disp_file):
+            os.system('trash {}'.format(extract_disp_file))
 
     for p, (wpc, tpc, mpc, fpc, vpc) in \
             dispstats(ds,
