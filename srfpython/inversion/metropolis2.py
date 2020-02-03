@@ -302,14 +302,14 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         models  = 2D array, each line is a model retained, each model appears only once
         datas   = 2D array, corresponding data arrays, nans means theory failure
         weights = 1D array, number of times each model was retained
-        llks    = 1D array, log likelyhood associated to each model
+        llks    = 1D array, log likelihood associated to each model
 
         !! use !!
             models.repeat(weights, axis = 0) if you need each model to be repeated the correct number of times (also for datas, llks)
         !! notes !!
             * for parallel computing avoid passing functions G, logRHOD and logRHOM through pipes for pickling reasons
             * use thread safe random functions, numpy onces are not thread safe
-            * failure during call to G are treated as non fatal, if the theory fails to produce data, the likelyhood is penalyzed so that the chain should run
+            * failure during call to G are treated as non fatal, if the theory fails to produce data, the likelihood is penalyzed so that the chain should run
               away from that zones. If all models are failing, the chain will sample the prior pdf only (with very low llks)
     notations :
         IK = instantaneous keep ratio
@@ -317,7 +317,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
         IS = instantaneous speed
         AS = average speed
         MP = master proposal
-        LI = log likelyhood
+        LI = log likelihood
     #-------------------
     variables:
         ntest    = number of tested models since chain start

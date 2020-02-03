@@ -44,7 +44,7 @@ long_help = """\
     -plot  [s i f i] show the best models on the figure, arguments are :  
                      first argument = selection mode, last or best
                      second argument = highest model number to include (>=0, 0 means all)  
-                     third argument = lowest log likelyhood value to include (<=0.0, 0.0 means all)
+                     third argument = lowest log likelihood value to include (<=0.0, 0.0 means all)
                      fourth argument = include only one model over "step" (>=1)
                      default {default_plot_mode} {default_plot_limit} {default_plot_llkmin} {default_plot_step}             
     -overdisp        recompute dispersion curves of the best models selected with higher resolution
@@ -175,7 +175,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         # cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
                         # pos = rd.axdisp[-1].get_position()
                         # cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-                        # rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+                        # rd.fig.colorbar(cb, cax=cax, label="log likelihood", orientation="horizontal")
 
 
                     else:
@@ -188,12 +188,12 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         # cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
                         # pos = rd.axdisp[-1].get_position()
                         # cax = rd.fig.add_axes((pos.x0, 0.12, pos.width, 0.01))
-                        # rd.fig.colorbar(cb, cax=cax, label="log likelyhood", orientation="horizontal")
+                        # rd.fig.colorbar(cb, cax=cax, label="log likelihood", orientation="horizontal")
                         # cax.set_xticklabels(cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
                     rd.showdispcoll(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], alpha=1.0, linewidth=3)
                     rd.showdepthcoll(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], alpha=1.0, linewidth=3)
-                    rd.colorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], label="log likelyhood", orientation="horizontal")
+                    rd.colorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], label="log likelihood", orientation="horizontal")
                     print rd.cax.get_position()
                     rd.cax.set_xticklabels(rd.cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 

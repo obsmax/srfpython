@@ -30,12 +30,12 @@ long_help = """\
     -pdf   [s i f i] extract posterior distribution of the models, save them as mod96files
                      first argument = selection mode, last or best
                      second argument = highest model number to include (>=0, 0 means all)  
-                     third argument = lowest log likelyhood value to include (<=0.0, 0.0 means all)
+                     third argument = lowest log likelihood value to include (<=0.0, 0.0 means all)
                      fourth argument = include only one model over "step" (>=1)
                      default {default_extract_mode} {default_extract_limit} {default_extract_llkmin} {default_extract_step}
     -top     [i f i] extract best models 
                      first argument = highest model number to include (>=0, 0 means all)
-                     second argument = lowest log likelyhood value to include (<=0.0, 0.0 means all)  
+                     second argument = lowest log likelihood value to include (<=0.0, 0.0 means all)  
                      third argument = include only one model over "step" (>=1)
                      default {default_top_limit} {default_top_llkmin} {default_top_step}
                      """.format(\

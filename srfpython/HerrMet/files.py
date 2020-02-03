@@ -327,7 +327,7 @@ class RunFile(Database):
             CHAINID       int not null references CHAINS(CHAINID),
             WEIGHT        int not null default 1, --weight of the model in the posterior pdf
             NLAYER        int not null, --number of layers including halfspace
-            LLK           real not null, --log likelyhood of the model
+            LLK           real not null, --log likelihood of the model
             NITER         int not null default 1) --iteration number for neldermead
             ''')
 

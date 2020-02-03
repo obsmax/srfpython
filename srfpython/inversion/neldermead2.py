@@ -110,7 +110,7 @@ def neldermead(M0, DM, G, ND, logRHOD, logRHOM,
     Lis = np.zeros(Npoints, float) * np.nan # log likelihood at simplex points
     Dis = np.zeros((ND, Npoints), float) * np.nan # Data corresponding to Mis
     for j in xrange(Ndim + 1):
-        # compute the data and likelyhood of all the points in the simplex
+        # compute the data and likelihood of all the points in the simplex
         Dis[:, j], Lis[j] = call(Mis[:, j])
 
     # -----------------
@@ -197,6 +197,6 @@ def neldermead(M0, DM, G, ND, logRHOD, logRHOM,
                 Lis[h] = Lstar
 
     models, datas, llks = models[:niter, :], datas[:niter, :], llks[:niter]
-    # I = np.argsort(llks) #reorder by loglikelyhood
+    # I = np.argsort(llks) #reorder by loglikelihood
     #return models[I, :], datas[I, :], llks[I]
     return models, datas, llks
