@@ -19,6 +19,15 @@ class DefaultLogRhoM(LogUniND):
                       k=self.k,
                       nanbehavior=self.nanbehavior)
 
+    @staticmethod
+    def header(dvp=None, dvs=None, drh=None, dpr=None):
+        """ a method to write the apropriate header lines in the parameter file, see subclasses"""
+        assert dvp is None
+        assert dvs is None
+        assert drh is None
+        assert dpr is None
+        return ""
+
 
 # -------------------------------------
 class LogRhoM_DVS(DefaultLogRhoM):
@@ -42,6 +51,16 @@ class LogRhoM_DVS(DefaultLogRhoM):
         DVS = VS[1:] - VS[:-1]
         extended_m = np.concatenate((m, DVS))
         return LogUniND.__call__(self, extended_m)
+
+    @staticmethod
+    def header(dvp=None, dvs=None, drh=None, dpr=None):
+        assert dvp is None
+        assert drh is None
+        assert dpr is None
+        header = '#met PRIORTYPE = "DVS"\n'
+        header += '#met DVSMIN = {}\n'.format(dvs[0])
+        header += '#met DVSMAX = {}\n'.format(dvs[1])
+        return header
 
 
 # -------------------------------------
@@ -75,6 +94,18 @@ class LogRhoM_DVPDVSDRH(DefaultLogRhoM):
         DRH = RH[1:] - RH[:-1]
         extended_m = np.concatenate((m, DVP, DVS, DRH))
         return LogUniND.__call__(self, extended_m)
+
+    @staticmethod
+    def header(dvp=None, dvs=None, drh=None, dpr=None):
+        assert dpr is None
+        header  = '#met PRIORTYPE = "DVPDVSDRH"\n'
+        header += '#met DVPMIN = {}\n'.format(dvp[0])
+        header += '#met DVPMAX = {}\n'.format(dvp[1])
+        header += '#met DVSMIN = {}\n'.format(dvs[0])
+        header += '#met DVSMAX = {}\n'.format(dvs[1])
+        header += '#met DRHMIN = {}\n'.format(drh[0])
+        header += '#met DRHMAX = {}\n'.format(drh[1])
+        return header
 
 
 # -------------------------------------
@@ -115,3 +146,17 @@ class LogRhoM_DVPDVSDRHDPR(DefaultLogRhoM):
         DPR = PR[1:] - PR[:-1]
         extended_m = np.concatenate((m, DVP, DVS, DRH, DPR))
         return LogUniND.__call__(self, extended_m)
+
+    @staticmethod
+    def header(dvp=None, dvs=None, drh=None, dpr=None):
+
+        header  = '#met PRIORTYPE = "DVPDVSDRH"\n'
+        header += '#met DVPMIN = {}\n'.format(dvp[0])
+        header += '#met DVPMAX = {}\n'.format(dvp[1])
+        header += '#met DVSMIN = {}\n'.format(dvs[0])
+        header += '#met DVSMAX = {}\n'.format(dvs[1])
+        header += '#met DRHMIN = {}\n'.format(drh[0])
+        header += '#met DRHMAX = {}\n'.format(drh[1])
+        header += '#met DPRMIN = {}\n'.format(dpr[0])
+        header += '#met DPRMAX = {}\n'.format(dpr[1])
+        return header

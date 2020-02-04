@@ -14,52 +14,24 @@ import time, os
 # -------------------------------------
 # param file
 # -------------------------------------
-def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=None, dvs=None, drh=None, dpr=None):
+def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedon=None, dvp=None, dvs=None, drh=None, dpr=None):
     """create a default parameter file to be customized by user"""
     # ------
 
     if np.all([_ is None for _ in dvs, dvp, drh, dpr]):
-        which = None
+        which_prior = DefaultLogRhoM
     elif dvs is not None and dvp is None and drh is None and dpr is None:
-        which = LogRhoM_DVS
+        which_prior = LogRhoM_DVS
     elif dvs is not None and dvp is not None and drh is not None and dpr is None:
-        which = LogRhoM_DVPDVSDRH
+        which_prior = LogRhoM_DVPDVSDRH
     elif dvs is not None and dvp is not None and drh is not None and dpr is not None:
-        which = LogRhoM_DVPDVSDRHDPR
+        which_prior = LogRhoM_DVPDVSDRHDPR
     else:
         raise NotImplementedError('please specify either dvs alone, or dvp, dvs and drh, or dvp, dvs, drh and dpr')
 
     # ------
-    def write_priortype_header(fid, dvp, dvs, drh):
-        if which is None:
-            pass
-        elif which is LogRhoM_DVS:
-            fid.write('#met PRIORTYPE = "DVS"\n')
-            fid.write('#met DVSMIN = %f\n' % dvs[0])
-            fid.write('#met DVSMAX = %f\n' % dvs[1])
-        elif which is LogRhoM_DVPDVSDRH:
-            fid.write('#met PRIORTYPE = "DVPDVSDRH"\n')
-            fid.write('#met DVPMIN = %f\n' % dvp[0])
-            fid.write('#met DVPMAX = %f\n' % dvp[1])
-            fid.write('#met DVSMIN = %f\n' % dvs[0])
-            fid.write('#met DVSMAX = %f\n' % dvs[1])
-            fid.write('#met DRHMIN = %f\n' % drh[0])
-            fid.write('#met DRHMAX = %f\n' % drh[1])
-        elif which is LogRhoM_DVPDVSDRHDPR:
-            fid.write('#met PRIORTYPE = "DVPDVSDRHDPR"\n')
-            fid.write('#met DVPMIN = %f\n' % dvp[0])
-            fid.write('#met DVPMAX = %f\n' % dvp[1])
-            fid.write('#met DVSMIN = %f\n' % dvs[0])
-            fid.write('#met DVSMAX = %f\n' % dvs[1])
-            fid.write('#met DRHMIN = %f\n' % drh[0])
-            fid.write('#met DRHMAX = %f\n' % drh[1])
-            fid.write('#met DPRMIN = %f\n' % dpr[0])
-            fid.write('#met DPRMAX = %f\n' % dpr[1])
-        else:
-            raise Exception('programming error')
-
-    # ------
-    if type == "mZVSPRRH":
+    # TODO : attach this to the parameterizers via the default_param_file method
+    if which_parameterizer == "mZVSPRRH":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
             ztopinf = -ztop[1:]  # deepest side
@@ -94,7 +66,9 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         with open('_HerrMet.param', 'w') as fid:
             fid.write('#met TYPE = "mZVSPRRH"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
-            write_priortype_header(fid, dvp, dvs, drh)
+
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
             fid.write('#fmt %5s %16f %16f\n')
@@ -105,7 +79,7 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         A.write() #to screen
         A.write('_HerrMet.param') #to file
     # ----------------------------
-    elif type == "mZVSVPRH":
+    elif which_parameterizer == "mZVSVPRH":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
             ztopinf = -ztop[1:]  # deepest side
@@ -143,7 +117,9 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         with open('_HerrMet.param', 'w') as fid:
             fid.write('#met TYPE = "mZVSVPRH"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
-            write_priortype_header(fid, dvp, dvs, drh)
+
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
             fid.write('#fmt %5s %16f %16f\n')
@@ -154,7 +130,7 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         A.write() #to screen
         A.write('_HerrMet.param') #to file
     # ----------------------------
-    elif type == "mZVSPRzRHvp":
+    elif which_parameterizer == "mZVSPRzRHvp":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
             ztopinf = -ztop[1:]  # deepest side
@@ -183,7 +159,9 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
             fid.write('#met NLAYER = %d\n' % nlayer)
             fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
             fid.write('#met RHvp = "def RHvp(VP): return 1.74 * VP ** 0.25"\n')
-            write_priortype_header(fid, dvp, dvs, drh)
+
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
             fid.write('#fmt %5s %16f %16f\n')
@@ -194,7 +172,7 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         A.write() #to screen
         A.write('_HerrMet.param') #to file
     # ----------------------------
-    elif type == "mZVSPRzRHz":
+    elif which_parameterizer == "mZVSPRzRHz":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
             ztopinf = -ztop[1:]  # deepest side
@@ -223,7 +201,9 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
             fid.write('#met NLAYER = %d\n' % nlayer)
             fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
             fid.write('#met RHz  = "def RHz(Z): return Z * 0. + 2.67"\n')
-            write_priortype_header(fid, dvp, dvs, drh)
+
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
             fid.write('#fmt %5s %16f %16f\n')
@@ -234,7 +214,7 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         A.write() #to screen
         A.write('_HerrMet.param') #to file
     # ----------------------------
-    elif type == "mZVSVPvsRHvp":
+    elif which_parameterizer == "mZVSVPvsRHvp":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
             ztopinf = -ztop[1:]  # deepest side
@@ -269,7 +249,9 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
                 '+ 0.0671 * VP ** 3.0 '
                 '- 0.0043 * VP ** 4.0 '
                 '+ 0.000106 * VP ** 5.0" \n')
-            write_priortype_header(fid, dvp, dvs, drh)
+
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
             fid.write('#fmt %5s %16f %16f\n')
@@ -281,7 +263,7 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         A.write('_HerrMet.param')  # to file
     # ----------------------------
     else:
-        raise NotImplementedError('no such parameter file type implemented %s' % type)
+        raise NotImplementedError('no such parameter file type implemented %s' % which_parameterizer)
 
 
 # -------------------------------------
@@ -812,7 +794,7 @@ class RunFile(Database):
 # --------------------
 if __name__ == "__main__":
     write_default_paramfile(nlayer=7, zbot=3,
-                            type="mZVSPRRH", basedon=None,
+                            which_parameterizer="mZVSPRRH", basedon=None,
                             dvp=None, dvs=None, drh=None, dpr=None)
     A = load_paramfile("_HerrMet.param")
     print A

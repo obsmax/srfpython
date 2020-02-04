@@ -193,6 +193,13 @@ class Parameterizer(object):
         """
         raise Exception('never used, please custom subclasses')
 
+    @staticmethod
+    def default_param_file(zbot, nlayer, basedon=None):
+        """a method to help writing the default parameter file
+        if this parameterizer is used
+        """
+        raise Exception('never used, please custom subclasses')
+
 
 # -------------------------------------
 class Parameterizer_mZVSPRRH(Parameterizer):
