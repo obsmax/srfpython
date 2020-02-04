@@ -46,7 +46,9 @@ class AsciiFile_fromstring(object):
             elif l.startswith("#"):
                 if l.startswith("#met"):
                     l = l.lstrip('#met').split('#')[0]
-                    key, value = [_.strip() for _ in l.split('=')]
+                    #key, value = [_.strip() for _ in l.split('=')]
+                    key = l.split('=')[0].strip()
+                    value = "=".join(l.split('=')[1:])
                     self.metadata[key] = eval(value)
                 elif l.startswith('#fld'):
                     self.fields = np.asarray(l.lstrip("#fld").split(), str)

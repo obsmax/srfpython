@@ -49,6 +49,42 @@ def check_parameter_file(A):
     # TODO add more verifications in common to all parameterizers here
 
 
+class Relation(object):
+    # I need a pickable object to pass a function that was defined from a string...
+    def __init__(self, name, string):
+        self.name = name
+        self.string = string
+        assert self.string.strip().startswith('def {}('.format(name))
+        self.fun = None
+
+    def __getstate__(self):
+        return self.name, self.string
+
+    def __setstate__(self, state):
+        name, string = state
+        Relation.__init__(self, name=name, string=string)
+
+    def __call__(self, *args, **kwargs):
+        try:
+            return self.fun(*args, **kwargs)
+        except TypeError as e:
+            if str(e) == "'NoneType' object is not callable":
+
+                import imp
+                modulename = "{}".format(self.name)
+                pyfilename = "./{}.py".format(modulename)
+                funcname = self.name
+                if not os.path.isfile(pyfilename):
+                    with open(pyfilename, 'w') as fid:
+                        fid.write(self.string + "\n")
+
+                self.fun = getattr(imp.load_source(modulename, pyfilename), funcname)
+                return self.fun(*args, **kwargs)
+
+            else:
+                raise e
+
+
 # -------------------------------------
 class Parameterizer(object):
     """the parameterizer object links the model array (m) to a set of variables that can
@@ -353,17 +389,8 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
         self.MSUP = A.data['VSUP'][self.I]
         self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.I]
         # --------
-        # e.g. "1.0335 * np.exp(-Z / 0.5408) + 1.7310"
-        self.PRzName=A.metadata['PRz'].split('#')[0].replace('np.', '')
-        if "return" not in self.PRzName:
-            self.PRz = string2func("import numpy as np\ndef PR(Z): return %s" % A.metadata['PRz'])
-        else:
-            self.PRz = string2func("import numpy as np\ndef PR(Z): %s" % A.metadata['PRz'])
-            self.PRzName = ""
-        # --------
-        # e.g. "1.0335 * np.exp(-Z / 0.5408) + 1.7310"
-        self.RHvpName = A.metadata['RHvp'].split('#')[0].replace('np.', '')
-        self.RHvp = string2func("import numpy as np\ndef RH(VP): return %s" % A.metadata['RHvp'])
+        self.PRz = Relation('PRz', A.metadata['PRz'])
+        self.RHvp = Relation('RHvp', A.metadata['RHvp'])
         # --------
 
     # ------------------
@@ -429,22 +456,8 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
         self.MSUP = A.data['VSUP'][self.I]
         self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.I]
         # --------
-        # e.g. "1.0335 * np.exp(-Z / 0.5408) + 1.7310"
-        self.PRzName=A.metadata['PRz'].split('#')[0].replace('np.', '')
-        if "return" not in self.PRzName:
-            self.PRz = string2func("import numpy as np\ndef PR(Z): return %s" % A.metadata['PRz'])
-        else:
-            self.PRz = string2func("import numpy as np\ndef PR(Z): %s" % A.metadata['PRz'])
-            self.PRzName = ""
-        # --------
-        # e.g. "1.0335 * np.exp(-Z / 0.5408) + 1.7310"
-        self.RHzName = A.metadata['RHz'].split('#')[0].replace('np.', '')
-        if "return" not in self.RHzName:
-            self.RHz = string2func("import numpy as np\ndef RH(Z): return %s" % A.metadata['RHz'])
-        else:
-            self.RHz = string2func("import numpy as np\ndef RH(Z): %s" % A.metadata['RHz'])
-            self.RHzName = ""
-        # --------
+        self.PRz = Relation('PRz', A.metadata['PRz'])
+        self.RHz = Relation('RHz', A.metadata['RHz'])
 
     # ------------------
     def boundaries(self):
@@ -476,8 +489,8 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
 
         #infer VP and RH from VS and input laws
         ZMID = np.concatenate((0.5 * (ZTOP[1:] + ZTOP[:-1]), [1.5 * ZTOP[-1]]))
-        VP = VS * self.PRz(Z = ZMID)
-        RH = self.RHz(Z = ZMID)
+        VP = VS * self.PRz(Z=ZMID)
+        RH = self.RHz(Z=ZMID)
 
         return ZTOP, VP, VS, RH
 
@@ -507,16 +520,22 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
         self.MSUP = A.data['VSUP'][self.I]
         self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.I]
         # --------
-        # e.g. "1.0335 * np.exp(-Z / 0.5408) + 1.7310"
-        self.VPvsName = A.metadata['VPvs'].split('#')[0].replace('np.', '')
+        self.VPvs = Relation('VPvs', A.metadata['VPvs'])
+        self.RHvp = Relation('RHvp', A.metadata['RHvp'])
 
-        self.VPvs = string2func("import numpy as np\ndef VP(VS): return %s" % A.metadata['VPvs'])
+        try:
+            vs = self.VPvs(VS=1.0)
+            assert isinstance(vs, float)
+            assert vs > 0.0
+        except Exception as e:
+            raise ValueError('could not execute VP=f(VS), ', str(e))
 
-        # --------
-        # e.g. "1.0335 * np.exp(-Z / 0.5408) + 1.7310"
-        self.RHvpName = A.metadata['RHvp'].split('#')[0].replace('np.', '')
-        self.RHvp = string2func("import numpy as np\ndef RH(VP): return %s" % A.metadata['RHvp'])
-
+        try:
+            rh = self.RHvp(VP=1.0)
+            assert isinstance(rh, float)
+            assert rh >= 1.0
+        except Exception as e:
+            raise ValueError('could not execute RH=f(VP), ', str(e))
     # ------------------
     def boundaries(self):
 
@@ -539,7 +558,7 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
         vphgh = depthmodel1D(z, self.VPvs(VS=vshgh.values))
 
         prlow = depthmodel1D(z, vplow.values / vslow.values)
-        prhgh = depthmodel1D(z, vshgh.values / vshgh.values)
+        prhgh = depthmodel1D(z, vphgh.values / vshgh.values)
 
         rhlow = depthmodel1D(z, self.RHvp(VP=vplow.values))
         rhhgh = depthmodel1D(z, self.RHvp(VP=vphgh.values))
@@ -570,7 +589,7 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
         VS = M[1 * nlayer - 1: 2 * nlayer - 1]
 
         # infer VP and RH from VS and input laws
-        VP = VS * self.VPvs(VS=VS)
+        VP = self.VPvs(VS=VS)
         RH = self.RHvp(VP=VP)
 
         return ZTOP, VP, VS, RH

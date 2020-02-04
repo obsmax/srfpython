@@ -181,8 +181,8 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         with open('_HerrMet.param', 'w') as fid:
             fid.write('#met TYPE = "mZVSPRzRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
-            fid.write('#met PRz  = "1.0335 * np.exp(-Z / 0.5408) + 1.7310"  #some function of Z, Z is in km and growing downward\n')
-            fid.write('#met RHvp = "1.74 * VP ** 0.25" #some function of VP, VP is in km/s, RH is in g/cm3\n')
+            fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
+            fid.write('#met RHvp = "def RHvp(VP): return 1.74 * VP ** 0.25"\n')
             write_priortype_header(fid, dvp, dvs, drh)
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
@@ -221,8 +221,8 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         with open('_HerrMet.param', 'w') as fid:
             fid.write('#met TYPE = "mZVSPRzRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
-            fid.write('#met PRz  = "1.0335 * np.exp(-Z / 0.5408) + 1.7310"  #some function of Z, Z is in km and growing downward\n')
-            fid.write('#met RHz  = "Z * 0. + 2.67" #some function of Z, Z is in km and growing downward\n')
+            fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
+            fid.write('#met RHz  = "def RHz(Z): return Z * 0. + 2.67"\n')
             write_priortype_header(fid, dvp, dvs, drh)
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
@@ -254,20 +254,21 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         with open('_HerrMet.param', 'w') as fid:
             fid.write('#met TYPE = "mZVSVPvsRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
+            fid.wrtite('# BROCHER2005\n')
             fid.write(
-                '#met VPvs ="'
+                '#met VPvs = "def VPvs(VS):'
                 '  0.9409 '
                 '+ 2.0947 * VS '
                 '- 0.8206 * VS ** 2.0 '
                 '+ 0.2683 * VS ** 3.0 '
-                '- 0.0251 * VS ** 4.0"  # BROCHER2005\n')
+                '- 0.0251 * VS ** 4.0"  \n')
             fid.write(
-                '#met RHvp ="'
+                '#met RHvp = "def RHvp(VP):'
                 '  1.6612 * VP '
                 '- 0.4721 * VP ** 2.0 '
                 '+ 0.0671 * VP ** 3.0 '
                 '- 0.0043 * VP ** 4.0 '
-                '+ 0.000106 * VP ** 5.0"  # BROCHER2005\n')
+                '+ 0.000106 * VP ** 5.0" \n')
             write_priortype_header(fid, dvp, dvs, drh)
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')

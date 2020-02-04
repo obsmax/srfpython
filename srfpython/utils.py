@@ -92,9 +92,12 @@ def cosTaperwidth(data, sampling_rate, width):
 
 # -------------------------------------
 def string2func(s):
+    raise Exception('obsolet; not safe')
     "converts string into callable function using temporary python file"
     pyfilename = "/tmp/%s.py" % randstr(10)
-    with open(pyfilename, 'w') as fid: fid.write(s)
+    with open(pyfilename, 'w') as fid:
+        fid.write(s)
+
     funcname = s.split('def ')[-1].split('(')[0].strip()
     func = getattr(imp.load_source(pyfilename.split('/')[-1].split('.py')[0], pyfilename), funcname)
     os.remove(pyfilename)
@@ -118,7 +121,7 @@ def randstr(n):
 # -------------------------------------
 def string2func(s):
     "converts string into callable function using temporary python file"
-    pyfilename = "/tmp/%s.py" % randstr(10)
+    pyfilename = "_string2func_tmpfile_%s.py" % randstr(10)
     with open(pyfilename, 'w') as fid: fid.write(s)
     funcname = s.split('def ')[-1].split('(')[0].strip()
     func = getattr(imp.load_source(pyfilename.split('/')[-1].split('.py')[0], pyfilename), funcname)
