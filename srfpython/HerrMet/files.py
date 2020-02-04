@@ -254,7 +254,7 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
         with open('_HerrMet.param', 'w') as fid:
             fid.write('#met TYPE = "mZVSVPvsRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
-            fid.wrtite('# BROCHER2005\n')
+            fid.write('# BROCHER2005\n')
             fid.write(
                 '#met VPvs = "def VPvs(VS):'
                 '  0.9409 '

@@ -194,7 +194,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                     rd.showdispcoll(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], alpha=1.0, linewidth=3)
                     rd.showdepthcoll(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], alpha=1.0, linewidth=3)
                     rd.colorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], label="log likelihood", orientation="horizontal")
-                    print rd.cax.get_position()
+                    # print rd.cax.get_position()
                     rd.cax.set_xticklabels(rd.cax.get_xticklabels(), rotation=90., horizontalalignment="center")
 
                 # ---- display posterior pdf
