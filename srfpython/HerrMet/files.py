@@ -1,7 +1,10 @@
 from srfpython.standalone.database import Database
 from srfpython.standalone.asciifile import AsciiFile
 from priorpdf import DefaultLogRhoM, LogRhoM_DVS, LogRhoM_DVPDVSDRH, LogRhoM_DVPDVSDRHDPR
-from parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, Parameterizer_mZVSPRzRHvp, Parameterizer_mZVSPRzRHz
+from parameterizers import \
+    Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, \
+    Parameterizer_mZVSPRzRHvp, Parameterizer_mZVSPRzRHz, \
+    Parameterizer_mZVSVPvsRHvp
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthspace
 from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
 import numpy as np
@@ -230,6 +233,52 @@ def write_default_paramfile(nlayer, zbot, type = "mZVSPRRH", basedon=None, dvp=N
 
         A.write() #to screen
         A.write('_HerrMet.param') #to file
+    # ----------------------------
+    elif type == "mZVSVPvsRHvp":
+        if basedon is None:
+            ztop = np.linspace(0, zbot, nlayer)
+            ztopinf = -ztop[1:]  # deepest side
+            ztopsup = -ztop[:-1]  # shallow side
+            ztopsup[0] -= 0.001
+            vsinf = 0.1 * np.ones(nlayer)
+            vssup = 3.5 * np.ones(nlayer)
+        else:
+            raise NotImplementedError('option -basedon not implemented for mZVSVPvsRHvp')
+
+        keys = ["-Z%d" % i for i in xrange(1, nlayer)] + \
+               ["VS%d" % i for i in xrange(nlayer)]
+
+        vinfs = np.concatenate((ztopinf, vsinf))
+        vsups = np.concatenate((ztopsup, vssup))
+
+        with open('_HerrMet.param', 'w') as fid:
+            fid.write('#met TYPE = "mZVSVPvsRHvp"\n')
+            fid.write('#met NLAYER = %d\n' % nlayer)
+            fid.write(
+                '#met VPvs ="'
+                '  0.9409 '
+                '+ 2.0947 * VS '
+                '- 0.8206 * VS ** 2.0 '
+                '+ 0.2683 * VS ** 3.0 '
+                '- 0.0251 * VS ** 4.0"  # BROCHER2005\n')
+            fid.write(
+                '#met RHvp ="'
+                '  1.6612 * VP '
+                '- 0.4721 * VP ** 2.0 '
+                '+ 0.0671 * VP ** 3.0 '
+                '- 0.0043 * VP ** 4.0 '
+                '+ 0.000106 * VP ** 5.0"  # BROCHER2005\n')
+            write_priortype_header(fid, dvp, dvs, drh)
+            fid.write('#fld KEY VINF VSUP\n')
+            fid.write('#unt - - -\n')
+            fid.write('#fmt %5s %16f %16f\n')
+            for k, vinf, vsup in zip(keys, vinfs, vsups):
+                fid.write('%s %s %s\n' % (k, vinf, vsup))
+        A = AsciiFile('_HerrMet.param')
+
+        A.write()  # to screen
+        A.write('_HerrMet.param')  # to file
+    # ----------------------------
     else:
         raise NotImplementedError('no such parameter file type implemented %s' % type)
 
@@ -240,19 +289,28 @@ def load_paramfile(paramfile):
     A = AsciiFile(paramfile)
 
     # ------------------------
-    if A.metadata['TYPE'] == "mZVSVPRH":      p = Parameterizer_mZVSVPRH(A)
-    elif A.metadata['TYPE'] == "mZVSPRRH":    p = Parameterizer_mZVSPRRH(A)
-    elif A.metadata['TYPE'] == "mZVSPRzRHvp": p = Parameterizer_mZVSPRzRHvp(A)
-    elif A.metadata['TYPE'] == "mZVSPRzRHz":  p = Parameterizer_mZVSPRzRHz(A)
-    else: raise Exception('could not load %s (TYPE not recognized)' % paramfile)
+    if A.metadata['TYPE'] == "mZVSVPRH":
+        p = Parameterizer_mZVSVPRH(A)
+    elif A.metadata['TYPE'] == "mZVSPRRH":
+        p = Parameterizer_mZVSPRRH(A)
+    elif A.metadata['TYPE'] == "mZVSPRzRHvp":
+        p = Parameterizer_mZVSPRzRHvp(A)
+    elif A.metadata['TYPE'] == "mZVSPRzRHz":
+        p = Parameterizer_mZVSPRzRHz(A)
+    elif A.metadata['TYPE'] == "mZVSVPvsRHvp":
+        p = Parameterizer_mZVSVPvsRHvp(A)
+    else:
+        raise Exception('could not load %s (TYPE not recognized)' % paramfile)
 
     # ------------------------
     if not "PRIORTYPE" in A.metadata.keys():
         logRHOM = DefaultLogRhoM(p)
+
     elif A.metadata['PRIORTYPE'] == "DVS":
         logRHOM = LogRhoM_DVS(p,
                     dvsmin=A.metadata['DVSMIN'],
                     dvsmax=A.metadata['DVSMAX'])
+
     elif A.metadata['PRIORTYPE'] == "DVPDVSDRH":
         logRHOM = LogRhoM_DVPDVSDRH(p,
                     dvpmin=A.metadata['DVPMIN'],
@@ -261,6 +319,7 @@ def load_paramfile(paramfile):
                     dvsmax=A.metadata['DVSMAX'],
                     drhmin=A.metadata['DRHMIN'],
                     drhmax=A.metadata['DRHMAX'])
+
     elif A.metadata['PRIORTYPE'] == "DVPDVSDRHDPR":
         logRHOM = LogRhoM_DVPDVSDRHDPR(p,
                     dvpmin=A.metadata['DVPMIN'],
@@ -275,8 +334,8 @@ def load_paramfile(paramfile):
         raise Exception('could not load %s (PRIORTYPE not recognized)' % paramfile)
 
     # ------------------------
-    # print "parameter type : ", p.__class__.__name__
-    # print "prior type     : ", logRHOM.__class__.__name__
+    print "parameter type : ", p.__class__.__name__
+    print "prior type     : ", logRHOM.__class__.__name__
     return p, logRHOM
 
 

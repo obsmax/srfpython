@@ -486,3 +486,96 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
         """see Parameterizer"""
         raise NotImplementedError('')
 
+
+class Parameterizer_mZVSVPvsRHvp(Parameterizer):
+    """see Parameterizer_mZVSPRRH for doc"""
+
+    def __init__(self, A):
+        """see Parameterizer"""
+        check_parameter_file(A)
+        assert A.metadata['TYPE'] == "mZVSVPvsRHvp"
+        assert np.all(A.data['VINF'] <= A.data['VSUP'])
+        if np.all(A.data['VINF'] == A.data['VSUP']):
+            print "Warning : all parameters are locked"
+        # --------
+        self.NLAYER = A.metadata['NLAYER']
+        self.I = A.data['VINF'] < A.data['VSUP']
+        # --------
+        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
+        self.MMEAN = self.MDEFAULT[self.I]
+        self.MINF = A.data['VINF'][self.I]
+        self.MSUP = A.data['VSUP'][self.I]
+        self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.I]
+        # --------
+        # e.g. "1.0335 * np.exp(-Z / 0.5408) + 1.7310"
+        self.VPvsName = A.metadata['VPvs'].split('#')[0].replace('np.', '')
+
+        self.VPvs = string2func("import numpy as np\ndef VP(VS): return %s" % A.metadata['VPvs'])
+
+        # --------
+        # e.g. "1.0335 * np.exp(-Z / 0.5408) + 1.7310"
+        self.RHvpName = A.metadata['RHvp'].split('#')[0].replace('np.', '')
+        self.RHvp = string2func("import numpy as np\ndef RH(VP): return %s" % A.metadata['RHvp'])
+
+    # ------------------
+    def boundaries(self):
+
+        # default behavior, to be customized if needed
+        Ztopsup, VPlow, VSlow, RHlow = self.inv(self.MINF)
+        Ztopinf, VPhgh, VShgh, RHhgh = self.inv(self.MSUP)
+        z = np.sort(np.unique(np.concatenate((Ztopinf, Ztopsup))))
+
+        # --------------------
+        def f(Zinf, Zsup, V, which):
+            v1 = depthmodel1D(Zinf, V).interp(z, interpmethod="stairs")
+            v2 = depthmodel1D(Zsup, V).interp(z, interpmethod="stairs")
+            return depthmodel1D(z, which(np.concatenate(([v1], [v2]), axis=0), axis=0))
+
+        # --------------------
+        vslow = f(Ztopinf, Ztopsup, VSlow, np.min)
+        vshgh = f(Ztopinf, Ztopsup, VShgh, np.max)
+
+        vplow = depthmodel1D(z, self.VPvs(VS=vslow.values))
+        vphgh = depthmodel1D(z, self.VPvs(VS=vshgh.values))
+
+        prlow = depthmodel1D(z, vplow.values / vslow.values)
+        prhgh = depthmodel1D(z, vshgh.values / vshgh.values)
+
+        rhlow = depthmodel1D(z, self.RHvp(VP=vplow.values))
+        rhhgh = depthmodel1D(z, self.RHvp(VP=vphgh.values))
+
+        return vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh
+
+    # ------------------
+    def keys(self):
+        """see Parameterizer"""
+        k = ["-Z%d" % i for i in xrange(1, self.NLAYER)] + \
+            ['VS%d' % i for i in xrange(self.NLAYER)]
+        return np.asarray(k)[self.I]
+
+    # ------------------
+    def __call__(self, ZTOP, VP, VS, RH):
+        """VP and RH are ignored since they are not parameters of the model"""
+        m = np.concatenate((-1.0 * ZTOP[1:], VS))[self.I]
+        return m
+
+    # ------------------
+    def inv(self, m):
+        """see Parameterizer"""
+        M = self.MDEFAULT.copy()
+        M[self.I] = m  # overwrites default values with the one provided in m
+
+        nlayer = self.NLAYER  # (len(M) + 1) / 4
+        ZTOP = np.concatenate(([0.], -1.0 * M[: 1 * nlayer - 1]))
+        VS = M[1 * nlayer - 1: 2 * nlayer - 1]
+
+        # infer VP and RH from VS and input laws
+        VP = VS * self.VPvs(VS=VS)
+        RH = self.RHvp(VP=VP)
+
+        return ZTOP, VP, VS, RH
+
+    # ------------------
+    def prior(self, ZTOP_apr, VP_apr, VS_apr, RH_apr, **kwargs):
+        """see Parameterizer"""
+        raise NotImplementedError('')

@@ -4,7 +4,7 @@ from srfpython.utils import minmax
 from srfpython.HerrMet.files import write_default_paramfile
 
 # ------------------------------ defaults
-default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRzRHz']
+default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRzRHz', 'mZVSVPvsRHvp']
 default_parameterization = default_parameterization_list[0]
 
 # ------------------------------ autorized_keys
@@ -40,6 +40,11 @@ long_help = """\
                      - VS in each layer (VS0 = first layer, ...), 
                      - use a fixed relation between VP/VS = f(z)
                      - use a fixed relation between RH = f(z) 
+      mZVSVPvsRHvp = parameterize with                     
+                     - depth interface (mZ1 = first interface, mZ2, ...), 
+                     - VS in each layer (VS0 = first layer, ...),
+                     - use a fixed relation between VP = f(VS)
+                     - use a fixed relation between RH = f(VP)
     -dvp     f f     add prior constraint on the vp offset between layers, 
                      requires the extremal values, km/s
     -dvs     f f     add prior constraint on the vs offset between layers, idem

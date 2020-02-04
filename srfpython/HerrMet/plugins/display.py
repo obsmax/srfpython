@@ -14,7 +14,7 @@ from srfpython.HerrMet.files import load_paramfile, RunFile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import overdisp
 from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, \
-    Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp
+    Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp, Parameterizer_mZVSVPvsRHvp
 
 
 # ------------------------------ defaults
@@ -278,8 +278,10 @@ def _display_function(rootname, argv, verbose, mapkwargs):
             showvp = showpr = showrh = False
         elif isinstance(p, Parameterizer_mZVSPRzRHz):
             showvp = showpr = showrh = False
+        elif isinstance(p, Parameterizer_mZVSVPvsRHvp):
+            showvp = showpr = showrh = False
         else:
-            raise Exception('')
+            raise NotImplementedError('type {} not implemented'.format(type(p)))
 
         #
         vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh = p.boundaries()
@@ -325,12 +327,12 @@ def _display_function(rootname, argv, verbose, mapkwargs):
             except :#Exception as e:
                 print 'could not read or display %s (reason : %s)' % (m96, str(e))
             rd.axdepth['VP'].legend(loc=3)
-    if "-ritt" in argv.keys():
-        a = AsciiFile('/mnt/labex2/home/max/data/boreholes/GRT1/GRT1.logsonic')
-
-        for what, where in zip([a.data['VS'], a.data['VP'], a.data['VP']/a.data['VS']], [rd.axdepth['VS'], rd.axdepth['VP'], rd.axdepth['PR']]):
-            if where is not None:
-                where.plot(what, a.data['TVD']/1000., "m", alpha=0.5)
+    # if "-ritt" in argv.keys():
+    #     a = AsciiFile('/mnt/labex2/home/max/data/boreholes/GRT1/GRT1.logsonic')
+    #
+    #     for what, where in zip([a.data['VS'], a.data['VP'], a.data['VP']/a.data['VS']], [rd.axdepth['VS'], rd.axdepth['VP'], rd.axdepth['PR']]):
+    #         if where is not None:
+    #             where.plot(what, a.data['TVD']/1000., "m", alpha=0.5)
 
     # --------------------
     if os.path.exists(targetfile):
