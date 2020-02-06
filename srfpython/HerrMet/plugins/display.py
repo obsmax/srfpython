@@ -240,7 +240,9 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                                      **mapkwargs):
                         try:
                             l = 3 if p == 0.5 else 1
-                            for what, where in zip([vppc, vspc, rhpc, prpc], [rd.axdepth['VP'], rd.axdepth['VS'], rd.axdepth['RH'], rd.axdepth['PR']]):
+                            for what, where in zip(
+                                    [vppc, vspc, rhpc, prpc],
+                                    [rd.axdepth['VP'], rd.axdepth['VS'], rd.axdepth['RH'], rd.axdepth['PR']]):
                                 if where is not None:
                                     what.show(where, color=clr, linewidth=l, alpha=alp)
 
@@ -286,11 +288,31 @@ def _display_function(rootname, argv, verbose, mapkwargs):
         #
         vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh = p.boundaries()
 
-        for what, where in zip(\
+        for what, where in zip(
                 [vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh],
-                [rd.axdepth['VP'], rd.axdepth['VP'], rd.axdepth['VS'], rd.axdepth['VS'], rd.axdepth['RH'], rd.axdepth['RH'], rd.axdepth['PR'], rd.axdepth['PR']]):
+                [rd.axdepth['VP'], rd.axdepth['VP'],
+                 rd.axdepth['VS'], rd.axdepth['VS'],
+                 rd.axdepth['RH'], rd.axdepth['RH'],
+                 rd.axdepth['PR'], rd.axdepth['PR']]):
+
             if where is not None:
-                what.show(where, alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
+                what.show(
+                    where,
+                    alpha=1.0, color="k", marker="o--",
+                    linewidth=1, markersize=3)
+
+        vpmean, vsmean, prmean, rhmean = p.meanmodel()
+        for what, where in zip(
+                [vpmean, vsmean, prmean, rhmean],
+                [rd.axdepth['VP'], rd.axdepth['VS'],
+                 rd.axdepth['PR'], rd.axdepth['RH']]):
+
+            if where is not None:
+                what.show(
+                    where,
+                    alpha=1.0, color="r", marker="o--",
+                    linewidth=1, markersize=3)
+
         zmax = 1.1 * p.inv(p.MINF)[0][-1]
 
         if isinstance(p, Parameterizer_mZVSPRzRHvp):

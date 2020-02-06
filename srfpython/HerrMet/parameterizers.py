@@ -110,6 +110,16 @@ class Parameterizer(object):
         raise Exception('Never used : please custom subclasses')
 
     # ------------------
+    def meanmodel(self):
+        Ztopmean, VPmean, VSmean, RHmean = self.inv(self.MMEAN)
+
+        vp=depthmodel1D(Ztopmean, VPmean)
+        vs=depthmodel1D(Ztopmean, VSmean)
+        rh=depthmodel1D(Ztopmean, RHmean)
+        pr = depthmodel1D(Ztopmean, VPmean/VSmean)
+
+        return vp, vs, pr, rh
+
     def boundaries(self):
         """
         a method to determine the lowest and highest models, no arguments
@@ -396,6 +406,8 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
         self.MSUP = A.data['VSUP'][self.I]
         self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.I]
         # --------
+        self.PRzName = 'VP/VS=f(Z)'
+        self.RHvpName = 'RH=f(VP)'
         self.PRz = Relation('PRz', A.metadata['PRz'])
         self.RHvp = Relation('RHvp', A.metadata['RHvp'])
         # --------
@@ -463,6 +475,8 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
         self.MSUP = A.data['VSUP'][self.I]
         self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.I]
         # --------
+        self.PRzName = 'VP/VS=f(Z)'
+        self.RHzName = 'RH=f(Z)'
         self.PRz = Relation('PRz', A.metadata['PRz'])
         self.RHz = Relation('RHz', A.metadata['RHz'])
 
@@ -527,6 +541,8 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
         self.MSUP = A.data['VSUP'][self.I]
         self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.I]
         # --------
+        self.VPvsName = 'VP=f(VS)'
+        self.RHvpName = 'RH=f(VP)'
         self.VPvs = Relation('VPvs', A.metadata['VPvs'])
         self.RHvp = Relation('RHvp', A.metadata['RHvp'])
 

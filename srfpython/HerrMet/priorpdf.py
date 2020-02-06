@@ -6,11 +6,10 @@ import numpy as np
 # Prior probability density functions
 # -------------------------------------
 class DefaultLogRhoM(LogUniND):
-    """build the prior pdf, include constraints on the model paramters and eventually on some relations between them
+    """build the prior pdf, include constraints on the model parameters and eventually on some relations between them
     """
     k, nanbehavior = 1000., 2
 
-    # -------
     def __init__(self, parameterizer):
         """no more constraints than parameters"""
         LogUniND.__init__(self,
@@ -29,7 +28,6 @@ class DefaultLogRhoM(LogUniND):
         return ""
 
 
-# -------------------------------------
 class LogRhoM_DVS(DefaultLogRhoM):
     """add new constraitns on the vs offsets on interfaces"""
     # -------
@@ -45,7 +43,6 @@ class LogRhoM_DVS(DefaultLogRhoM):
                       k=self.k,
                       nanbehavior=self.nanbehavior)
 
-    # -------
     def __call__(self, m):
         _, _, VS, _ = self.p.inv(m)
         DVS = VS[1:] - VS[:-1]
@@ -63,7 +60,6 @@ class LogRhoM_DVS(DefaultLogRhoM):
         return header
 
 
-# -------------------------------------
 class LogRhoM_DVPDVSDRH(DefaultLogRhoM):
     """add new constraitns on the vs offsets on interfaces"""
     # -------
@@ -86,7 +82,7 @@ class LogRhoM_DVPDVSDRH(DefaultLogRhoM):
                       vsups=MSUP,
                       k=self.k,
                       nanbehavior=self.nanbehavior)
-    # -------
+
     def __call__(self, m):
         _, VP, VS, RH = self.p.inv(m)
         DVP = VS[1:] - VS[:-1]
@@ -108,11 +104,9 @@ class LogRhoM_DVPDVSDRH(DefaultLogRhoM):
         return header
 
 
-# -------------------------------------
 class LogRhoM_DVPDVSDRHDPR(DefaultLogRhoM):
     """add new constraitns on the vs offsets on interfaces"""
 
-    # -------
     def __init__(self, parameterizer, dvpmin, dvpmax, dvsmin, dvsmax, drhmin, drhmax, dprmin, dprmax):
         assert dvsmin < dvsmax
         assert dvpmin < dvpmax
@@ -136,7 +130,6 @@ class LogRhoM_DVPDVSDRHDPR(DefaultLogRhoM):
                           k=self.k,
                           nanbehavior=self.nanbehavior)
 
-    # -------
     def __call__(self, m):
         _, VP, VS, RH = self.p.inv(m)
         DVP = VS[1:] - VS[:-1]
