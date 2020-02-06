@@ -3,12 +3,12 @@ from numpy import log
 import time
 
 
-# ########################################################
 class LogUni(object):
     """logarithm of a 1D, uniform, non normalized pdf (pseudo-uniform)
         I nead a pdf approaching a uniform distribution
-        I want "bad" models to keep comparable, so I add a penalty that increases with increasing distance to the target
-        zone
+        I want "bad" models to keep comparable,
+        so I add a penalty that increases with increasing
+        distance to the target zone
 
         f(x) =  | 0                          if     vinf <= x <= vsup
                 | -1/2 * (x - vinf) / vstd   if     x < vinf
@@ -16,7 +16,6 @@ class LogUni(object):
                 | nanpenalty  or exception   if     x is nan or inf
                 where vstd is (vsup - vinf) / k, k > 1
     """
-    # ------------------------------------------------------
     def __init__(self, vinf, vsup, k=1000.0, nanbehavior=0):
         """
         :param vinf: float, lowest bound for uni pdf
@@ -28,7 +27,7 @@ class LogUni(object):
             1 means add a gentle penalty to models which include nans
             2 means add a severe penalty to models which include nans
         """
-        #vinf, vsup = floats
+        # vinf, vsup = floats
         assert not np.any(np.isnan([vinf, vsup, k]))
         assert not np.any(np.isinf([vinf, vsup, k]))
         assert vinf < vsup
@@ -53,7 +52,6 @@ class LogUni(object):
             self.nanpenalty = self.call1(self.vinf - 10000. * (self.vsup - self.vinf))  # take the pdf value away from the 0 area
         else: raise ValueError('no such nan behavior implemented')
 
-    # ------------------------------------------------------
     def __str__(self):
         return "{name}(vinf={vinf}, vsup={vsup}, k={k}, nanbehavior={nanbehavior})".format(
             name=self.__class__.__name__,
@@ -62,17 +60,17 @@ class LogUni(object):
             k=self.k,
             nanbehavior=self.nanbehavior)
 
-    # ------------------------------------------------------
     def calln(self, v):
         """v is an array with undefined length"""
         y = np.zeros_like(v)
-        # -----------------------
+
         GOOD = ~(np.isnan(v) | np.isinf(v))
         if not GOOD.all():
-            if self.raiseifnan: raise Exception('pdf got innapropriate values')
-            else: y[~GOOD] = self.nanpenalty
+            if self.raiseifnan:
+                raise Exception('pdf got innapropriate values')
+            else:
+                y[~GOOD] = self.nanpenalty
 
-        # -----------------------
         I = J = np.zeros_like(GOOD)
 
         I[GOOD] = (v[GOOD] < self.vinf)
@@ -81,14 +79,12 @@ class LogUni(object):
         J[GOOD] = (self.vsup < v[GOOD])
         y[J] += -0.5 * ((v[J] - self.vsup) / self.std) ** 2.
 
-        # -----------------------
         return y
 
-    # ------------------------------------------------------
     def call1(self, v):
         """v is a scalar"""
         assert not hasattr(v, "__len__")
-        #return self.calln(np.asarray([v]))[0]  #too slow
+        # return self.calln(np.asarray([v]))[0]  #too slow
         if np.isnan(v) or np.isinf(v):
             if self.raiseifnan: raise Exception('pdf got innapropriate value')
             else: return self.nanpenalty
@@ -99,13 +95,11 @@ class LogUni(object):
             return -0.5 * ((v - self.vsup) / self.std) ** 2.
         return 0.
 
-    # ------------------------------------------------------
     def __call__(self, v):
         """v is a scalar, see call1"""
         return self.call1(v)
 
 
-# ########################################################
 class LogGauss(object):
     """1D truncated gaussian, take the product of a gaussian and a pseudo-uniform distribution (see LogUni)
         the nan or inf behavior is handled by the pseudo uniform pdf
@@ -130,9 +124,10 @@ class LogGauss(object):
         self.vmean, self.vunc = vmean, vunc
         self.luni = LogUni(vinf, vsup, k, nanbehavior)
 
-    # ------------------------------------------------------
     def __str__(self):
-        return "{name}(vmean={vmean}, vunc={vunc}, vinf={vinf}, vsup={vsup}, k={k}, nanbehavior={nanbehavior})".format(
+        return "{name}(vmean={vmean}, vunc={vunc}, " \
+               "vinf={vinf}, vsup={vsup}, k={k}, " \
+               "nanbehavior={nanbehavior})".format(
             name=self.__class__.__name__,
             vmean=self.vmean,
             vunc=self.vunc,
@@ -141,29 +136,25 @@ class LogGauss(object):
             k=self.k,
             nanbehavior=self.nanbehavior)
 
-    # ------------------------------------------------------
     def calln(self, v):
         """v is an array with undefined length"""
-        y = self.luni.calln(v) #handles nans or infs according to nanbehavior
+        y = self.luni.calln(v)  # handles nans or infs according to nanbehavior
 
         K = ~(np.isnan(v) | np.isinf(v))
         y[K] += -0.5 * ((v[K] - self.vmean) / self.vunc) ** 2.
 
         return y
 
-    # ------------------------------------------------------
     def call1(self, v):
         """v is a scalar"""
         y = self.luni.call1(v)
         if np.isnan(v) or np.isinf(v): return y
         return y + -0.5 * ((v - self.vmean) / self.vunc) ** 2.
 
-    # ------------------------------------------------------
     def __call__(self, v):
         return self.call1(v)
 
 
-# ########################################################
 class LogUniND(object):
     """N uniform laws, assume independent variables, sum of LogUni objects"""
     def __init__(self, vinfs, vsups, k = 1000., nanbehavior = 0):
@@ -178,7 +169,6 @@ class LogUniND(object):
         self.N = len(vinfs)
         self.ls = [LogUni(vinf, vsup, k, nanbehavior) for vinf, vsup in zip(vinfs, vsups)]
 
-    # ------------------------------------------------------
     def callpoints(self, points):
         """points = 2D array : raws = list of points, columns = dimensions"""
         y = np.zeros_like(points.shape[0], float)
@@ -186,7 +176,6 @@ class LogUniND(object):
             y += l(points[:, n])
         return y
 
-    # ------------------------------------------------------
     def callargs(self, *args):
         """args is like (X0, X1, X2, ..., XM-1) where Xi are arrays with same shapes"""
         assert len(args) == self.N
@@ -198,23 +187,20 @@ class LogUniND(object):
             y += l.calln(arg)
         return y
 
-    # ------------------------------------------------------
     def call1(self, model):
-        #model like [x0, x1, x2, ..., xM-1] where xi are scalars
+        # model like [x0, x1, x2, ..., xM-1] where xi are scalars
         assert len(model) == self.N
         y = sum([l(model[j]) for j, l in enumerate(self.ls)])
         return y
 
-    # ------------------------------------------------------
     def __call__(self, model):
-        #model like [x0, x1, x2, ..., xM-1] where xi are scalars
+        # model like [x0, x1, x2, ..., xM-1] where xi are scalars
         return self.call1(model)
 
 
-# ########################################################
 class LogGaussND(LogUniND):
     """ND truncated gaussians, no covariance, sum of LogGauss objects"""
-    def __init__(self, vmeans, vuncs, vinfs, vsups, k = 1000., nanbehavior = 0):
+    def __init__(self, vmeans, vuncs, vinfs, vsups, k=1000., nanbehavior=0):
         """
         :param vmeans: list of floats, see LogGauss
         :param vuncs: list of floats, see LogGauss
@@ -230,7 +216,6 @@ class LogGaussND(LogUniND):
                         for vmean, vunc, vinf, vsup in zip(vmeans, vuncs, vinfs, vsups)]
 
 
-# ########################################################
 class LogGaussNDCov(LogUniND):
     """ND truncated gaussians, with covariance"""
     def __init__(self, vmeans, vuncs, vinfs, vsups, rho, k = 1000., nanbehavior = 0):
@@ -255,28 +240,24 @@ class LogGaussNDCov(LogUniND):
         self.CDinv = np.linalg.inv(rho * sX * sY)
         self.vmeans = np.asarray(vmeans)
 
-    # ------------------------------------------------------
     def callargs(self, *args):
-        #args like (X0, X1, X2, ..., XM-1) where Xi are arrays with same shapes
+        # args like (X0, X1, X2, ..., XM-1) where Xi are arrays with same shapes
         y = self.luni.callargs(*args) #includes penalty for nans or infs
         for n, model in enumerate(zip(*[arg.flat[:] for arg in args])):
             y.flat[n] += self.call1(model)
         return y
 
-    # ------------------------------------------------------
     def call1(self, model):
-        #model like [x0, x1, x2, ..., xM-1] where xi are scalars
+        # model like [x0, x1, x2, ..., xM-1] where xi are scalars
         M = np.asarray(model) - self.vmeans
         y = -.5 * np.dot(np.dot(M, self.CDinv), M.T) + self.luni.call1(model)
         return y
 
-    # ------------------------------------------------------
     def __call__(self, model):
-        #model like [x0, x1, x2, ..., xM-1] where xi are scalars
+        # model like [x0, x1, x2, ..., xM-1] where xi are scalars
         return self.call1(model)
 
 
-# ########################################################
 def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
                normallaw = np.random.randn, unilaw = np.random.rand,
                chainid=1, HL = 100, IK0 = 0.25,
@@ -321,7 +302,8 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
     #-------------------
     variables:
         ntest    = number of tested models since chain start
-        nfail    = number of models for which data could not be computed since chain start (the chain still samples the prior pdf)
+        nfail    = number of models for which data could not be computed since chain start
+                    (the chain still samples the prior pdf)
         nkept    = number of distinct(!) models retained since chain start
         nstay    = number of subsequent rejection (= current weight of the last generated model)
         icurrent = the position in array models of the last generated model
@@ -331,50 +313,53 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
     # ----
     nfail = 0
 
-    # ----
     def call(M, nfail):
         try:
             D = G(M)
             L = logRHOM(M) + logRHOD(D)
-        except KeyboardInterrupt: raise
-        except Exception:
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
             if debug:
                 # helps user to understand why the theory fails
-                raise
+                raise e
 
-            #could not compute data array, still sample the prior pdf to converge toward successfull regions, add constant penalty
+            # could not compute data array,
+            # still sample the prior pdf to converge toward successfull regions,
+            # add constant penalty
             nfail += 1
             D = np.zeros(ND, float) * np.nan
-            L = logRHOM(M) + -1e20 #bad models remain comparable, try to guide the chain away from these zones based on prior info
+            # bad models remain comparable,
+            # try to guide the chain away from these zones based on prior info
+            L = logRHOM(M) + -1e20
         return D, L, nfail
 
-    # ----
     MI = M0
     DI, LI, nfail = call(MI, nfail)
     BEST = LI
-    # ----
+
     ntest = nkept = nstay = 0
-    MP    = 1.0 #master proposal, used to scale the markov chain proposal stds
-    Ikept = np.zeros(HL, bool) #chain status history
+    MP = 1.0  # master proposal, used to scale the markov chain proposal stds
+    Ikept = np.zeros(HL, bool)  # chain status history
     start = time.time()
     lasttime, lastntest = start, 0
 
     # ---- chain data
     # store every distinct model and data of the chain
-    models  = np.empty((nkeep+1, len(MSTD)), float)
-    datas   = np.empty((nkeep+1, len(DI)), float)
-    llks    = np.zeros(nkeep+1, float) + -np.inf
+    models = np.empty((nkeep+1, len(MSTD)), float)
+    datas = np.empty((nkeep+1, len(DI)), float)
+    llks = np.zeros(nkeep+1, float) + -np.inf
     weights = np.zeros(nkeep+1, int)
 
-    icurrent            = 0
+    icurrent = 0
     models[icurrent, :] = MI
-    datas[icurrent, :]  = DI
-    llks[icurrent]      = LI
-    weights[icurrent]  += 1
-    # ----
+    datas[icurrent, :] = DI
+    llks[icurrent] = LI
+    weights[icurrent] += 1
+
     while nkept < nkeep:
         ntest += 1
-        # ----------------------
+
         if not ntest % HL and ntest:
             # reevaluate stats and master proposal
             IK  = Ikept.sum() / float(HL)  # instantaneous keep ratio, gives the recent acceptance of the chain
@@ -386,42 +371,46 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
             IS  = (ntest - lastntest) / (t - lasttime) # Instantaneous test speed
             lasttime, lastntest = t, ntest
 
-        # ----------------------
         if not ntest % (10 * HL) and ntest:
-            #reevaluate proposal stds
+            # reevaluate proposal stds
             I = np.arange(np.max([0, icurrent - 10 * HL]), icurrent + 1)
-            MSTD = np.std(models[I, :].repeat(weights[I], axis = 0), axis = 0)
+            MSTD = np.std(models[I, :].repeat(weights[I], axis=0), axis=0)
 
-        # ----------------------
         if nfail >= nkeep and nfail >= ntest and not nofail:
-            #all attempts to call G failed, it might be due to a programming error...
-            print (summary % (head, chainid, "ERROR", nkept, ntest, nfail, AK, MP, AS, BEST)) #PRESUMED ERROR IN THEORY
+            # all attempts to call G failed, it might be due to a programming error...
+            print(summary %
+                   (head, chainid, "ERROR", nkept, ntest, nfail, AK, MP, AS, BEST))  # PRESUMED ERROR IN THEORY
             while icurrent:
-                G(models[icurrent, :]) #run G to reproduce the error message
+                G(models[icurrent, :])  # run G to reproduce the error message
                 icurrent -= 1
             raise Exception('should never occur')
 
-        # ----------------------
         if nstay >= nkeep:
-            #stuck signal
-            print (summary % (head, chainid, "STUCK", nkept, ntest, nfail, AK, MP, AS, BEST))
+            # stuck signal
+            print(summary % (head, chainid, "STUCK", nkept, ntest, nfail, AK, MP, AS, BEST))
             return models[:icurrent, :], datas[:icurrent, :], weights[:icurrent], llks[:icurrent]
 
-        # ----------------------
-        if not ntest % (10 * HL) and ntest: #True
-            #report stats
+        if not ntest % (10 * HL) and ntest:
+            # report stats
             if verbose:
-                print \
-                ("%schainid %5d ntest %5d nfail %5d nkept %5d nstay %5d IK %5.2f AK %5.2f MP %.2f AS %6.2f/s IS %6.2f/s BST %f" %
-                    (head, chainid, ntest, nfail, nkept, nstay, IK, AK, MP, AS, IS, BEST))
+                print("%schainid %5d "
+                      "ntest %5d "  
+                      "nfail %5d "  
+                      "nkept %5d "
+                      "nstay %5d "
+                      "IK %5.2f "
+                      "AK %5.2f "
+                      "MP %.2f "
+                      "AS %6.2f/s "
+                      "IS %6.2f/s "
+                      "BST %f" % (head, chainid, ntest, nfail, nkept,
+                                  nstay, IK, AK, MP, AS, IS, BEST))
 
-        # ----------------------
         MII = MI + MP * MSTD * normallaw(len(M0))
         DII, LII, nfail = call(MII, nfail)
         if LII > BEST:
             BEST = LII
 
-        # ----------------------
         if LII > LI:
             MI, DI, LI = MII, DII, LII
 
@@ -434,11 +423,10 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
             datas[icurrent, :] = DI
             llks[icurrent] = LI
             weights[icurrent] += 1
-            #yield False, MI, DI, LI #improvement
+            # yield False, MI, DI, LI #improvement
 
-        # ----------------------
         else:
-            r =  unilaw()
+            r = unilaw()
             if r == 0. or log(r) < (LII - LI):
                 MI, DI, LI = MII, DII, LII
                 nkept += 1
@@ -451,15 +439,10 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
                 llks[icurrent] = LI
                 weights[icurrent] += 1
 
-                #yield False, MI, DI, LI #decay
             else:
                 nstay += 1
                 Ikept[ntest % HL] = False
                 weights[icurrent] += 1
-                #yield True, MI, DI, LI #stay
 
     print (summary % (head, chainid, "DONE", nkept, ntest, nfail, AK, MP, AS, BEST))
     return models, datas, weights, llks
-
-
-#
