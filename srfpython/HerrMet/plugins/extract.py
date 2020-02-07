@@ -111,6 +111,9 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
         else:
             raise Exception('unexpected extract mode %s' % extract_mode)
 
+    if not len(ms):
+        return
+
     dms = [depthmodel_from_arrays(ztop, vp, vs, rh) for ztop, vp, vs, rh in ms]
     for p, (vppc, vspc, rhpc, prpc) in \
             dmstats1(dms,
@@ -173,6 +176,9 @@ def _extract_top(rootname, extract_limit, extract_llkmin, extract_step, verbose)
                          algo="METROPOLIS")))
         if len(modelids) > 100:
             raise ValueError('too many models to extract')
+
+    if not len(dms):
+        return
 
     for rank, (modelid, chainid, weight, llk, nlayer, dm, sr) in \
             enumerate(zip(modelids, chainids, weights, llks, nlayers, dms, srs)):

@@ -4,26 +4,29 @@ import numpy as np
 from srfpython.standalone.multipro8 import Job, StackAsync
 
 
-# ----------------------------------------------------
 class depthpdf(object):
     def __init__(self, z, v):
-        assert np.all(z[1:] > z[:-1])
-        assert np.all(v[1:] > v[:-1])
+
+        if not np.all(z[1:] > z[:-1]):
+            raise ValueError(
+                'z bins must be strictly increasing : {}'.format(str(list(z))))
+
+        if not np.all(v[1:] > v[:-1]):
+            raise ValueError(
+                'v bins must be strictly increasing : {}'.format(str(list(v))))
+
         self.z = z
         self.v = v
         self.H = np.zeros((len(z), len(v)), float)
 
-    # ------------------------------------------------
     # def write(self, filename):
     #    assert filename.split('.')[-1] == "zpdf"
     #    pkl((self.z, self.v, self.H), filename)
 
-    # ------------------------------------------------
     def append(self, m1D, **kwargs):
         # kwargs are passed to m1D.interp
         self.appendN(m1D, Ntimes=1, **kwargs)
 
-    # ------------------------------------------------
     def appendN(self, m1D, Ntimes=1, **kwargs):
         """append the same model Ntimes times in the histogram"""
 
@@ -55,7 +58,8 @@ class depthpdf(object):
         #     zmin, zmax = zstairs[i], zstairs[i+1]
         #     i0 = search_sorted_nearest(self.z, zmin, lenz)#np.clip(np.searchsorted(self.z, zmin), 0, len(self.z) - 1)
         #     i1 = search_sorted_nearest(self.z, zmax, lenz) + 1#np.clip(np.searchsorted(self.z, zmax), 0, len(self.z))
-        #     jj = search_sorted_nearest(self.v, vstairs[i], lenv) #np.clip(np.searchsorted(self.v, vstairs[i]), 0,len(self.v) - 1)
+        #     jj = search_sorted_nearest(self.v, vstairs[i], lenv)
+        #     # np.clip(np.searchsorted(self.v, vstairs[i]), 0,len(self.v) - 1)
         #     self.H[i0:i1,jj] += float(Ntimes)
 
         for i in xrange(0, len(zstairs) - 1, 2):
@@ -66,7 +70,6 @@ class depthpdf(object):
                                        lenv)  # np.clip(np.searchsorted(self.v, vstairs[i]), 0,len(self.v) - 1)
             self.H[i0:i1, jj] += float(Ntimes)
 
-    # ------------------------------------------------
     def show(self, ax, **kwargs):
         I = np.zeros(len(self.z))
         for i in xrange(len(self.z)):
@@ -80,7 +83,6 @@ class depthpdf(object):
         if not ax.yaxis_inverted():
             ax.invert_yaxis()
 
-    # ------------------------------------------------
     def purcentile(self, p):
         assert 0. <= p <= 1.
         P = np.zeros_like(self.z) * np.nan
@@ -97,17 +99,31 @@ class depthpdf(object):
         return self.z, P
 
 
-# ------------------------------------------------
-#class depthpdf_from_zpdffile(depthpdf):
+# class depthpdf_from_zpdffile(depthpdf):
 #    def __init__(self, filename):
 #        self.z, self.v, self.H = unpkl(filename)
 
 
-# ------------------------------------------------
-def dmstats(dms, percentiles=[0.16, 0.5, 0.84], Ndepth=100, Nvalue=100, weights=None):
-    assert np.all([isinstance(dm, depthmodel) for dm in dms])
-    assert np.all([0 < p < 1 for p in percentiles])
-    assert len(percentiles) == len(np.unique(percentiles))
+def dmstats(dms, percentiles=None, Ndepth=100, Nvalue=100, weights=None):
+    """
+    see dmstats1
+    :param dms:
+    :param percentiles:
+    :param Ndepth:
+    :param Nvalue:
+    :param weights:
+    :return:
+    """
+    if not len(dms):
+        raise StopIteration
+    if percentiles is None:
+        percentiles = [0.16, 0.5, 0.84]
+    if not np.all([isinstance(dm, depthmodel) for dm in dms]):
+        raise TypeError
+    if not np.all([0 < p < 1 for p in percentiles]):
+        raise ValueError
+    if not len(percentiles) == len(np.unique(percentiles)):
+        raise ValueError('percentiles list must be unique')
     if weights is None:
         weights = np.ones(len(dms))
     else:
@@ -156,7 +172,6 @@ def dmstats(dms, percentiles=[0.16, 0.5, 0.84], Ndepth=100, Nvalue=100, weights=
         yield p, (vppc, vspc, rhpc, prpc)
 
 
-# ------------------------------------------------
 class UserStacker(object):
     def __init__(self, zmax, Ndepth, vpmin, vpmax, vsmin, vsmax, rhmin, rhmax, prmin, prmax, Nvalue):
         zbins = np.linspace(0., zmax, Ndepth)
@@ -182,10 +197,27 @@ class UserStacker(object):
         return self
 
 
-def dmstats1(dms, percentiles=[0.16, 0.5, 0.84], Ndepth=100, Nvalue=100, weights=None, **mapkwargs):
-    assert np.all([isinstance(dm, depthmodel) for dm in dms])
-    assert np.all([0 < p < 1 for p in percentiles])
-    assert len(percentiles) == len(np.unique(percentiles))
+def dmstats1(dms, percentiles=None, Ndepth=100, Nvalue=100, weights=None, **mapkwargs):
+    """
+    call in parallel
+    :param dms: Depthmodels
+    :param percentiles: percentile values to extract
+    :param Ndepth: number of depth bins
+    :param Nvalue: number of value bins
+    :param weights:
+    :param mapkwargs:
+    :return:
+    """
+    if not len(dms):
+        raise StopIteration
+    if percentiles is None:
+        percentiles = [0.16, 0.5, 0.84]
+    if not np.all([isinstance(dm, depthmodel) for dm in dms]):
+        raise TypeError
+    if not np.all([0 < p < 1 for p in percentiles]):
+        raise ValueError
+    if not len(percentiles) == len(np.unique(percentiles)):
+        raise ValueError('percentiles list must be unique')
     if weights is None:
         weights = np.ones(len(dms))
     else:
@@ -219,12 +251,10 @@ def dmstats1(dms, percentiles=[0.16, 0.5, 0.84], Ndepth=100, Nvalue=100, weights
         prmin *= 0.99
         prmax *= 1.01
 
-    # ----------------------
     def JobGen():
         for weight, dm in zip(weights, dms):
             yield Job(weight, dm)
 
-    # ----------------------
     s0 = UserStacker(zmax, Ndepth, vpmin, vpmax, vsmin, vsmax, rhmin, rhmax, prmin, prmax,
                      Nvalue)  # the stacker to be reproduced in each independent workspace (deep copy)
     with StackAsync(s0, JobGen(), Verbose=False, **mapkwargs) as sa:
