@@ -394,10 +394,12 @@ def dispersion(ztop, vp, vs, rh,
             pstdout, pstderr = SRFPRE96_SUBPROC.communicate(pstdin)
             qstdout, qstderr = SRFDIS96_SUBPROC.communicate(pstdout)
 
-    except TimeOutError as e:
+    except TimeOutError:
         os.killpg(os.getpgid(SRFPRE96_SUBPROC.pid), signal.SIGKILL)
         os.killpg(os.getpgid(SRFDIS96_SUBPROC.pid), signal.SIGKILL)
-        message = "Herrmann timed out for model:\n\tztop={}\n\tvp={}\n\tvs={}\n\trh={}\n".format(ztop, vp, vs, rh)
+        message = "Herrmann timed out for model:\n\t" \
+                  "ztop={}\n\tvp={}\n\t" \
+                  "vs={}\n\trh={}\n".format(ztop, vp, vs, rh)
         raise CPiSError(message)
 
     finally:
