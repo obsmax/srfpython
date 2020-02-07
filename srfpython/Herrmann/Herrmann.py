@@ -17,8 +17,8 @@ WARNING : This module calls fortran programs, make sure they are compiled correc
 """
 
 _pathfile = os.path.realpath(__file__)  # .../srfpyhon/HerrMann/dispersion.py
-_file     = _pathfile.split('/')[-1]
-_src      = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src90/"
+_file = _pathfile.split('/')[-1]
+_src = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src90/"
 srfpre96_exe = _pathfile.replace(_file, 'bin/max_srfpre96')
 srfdis96_exe = _pathfile.replace(_file, 'bin/max_srfdis96')
 
