@@ -125,7 +125,7 @@
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
 
-      INTEGER iunit,NL,LIN,LOT
+      INTEGER iunit,NL,LIN,LOT,i
       REAL onel,oner
       REAL*4 h,dcl,dcr
       CHARACTER*80 nmdisp
@@ -181,16 +181,36 @@
 !         not used         1 frequency (never)
 !-----
       REAL DL(200),RHO(200),VA(200),VB(200)
-      read(LIN,*) Nlayer
+      read(LIN,"(I3)") Nlayer
       read(LIN,*) DL(1:Nlayer-1)
       read(LIN,*) VA(1:Nlayer)
       read(LIN,*) VB(1:Nlayer)
       read(LIN,*) RHO(1:Nlayer)
-      write(LOT,*) Nlayer
-      write(LOT,*) DL(1:Nlayer-1)
-      write(LOT,*) VA(1:Nlayer)
-      write(LOT,*) VB(1:Nlayer)
-      write(LOT,*) RHO(1:Nlayer)
+
+      write(LOT,"(I3)") Nlayer
+
+      do i = 1, Nlayer
+        write(LOT,'(F8.3)', advance="no") DL(i)
+      end do
+      write(LOT,'(A1)') ""
+
+      do i = 1, Nlayer
+        write(LOT,'(F7.3)', advance="no") VA(i)
+      end do
+      write(LOT,'(A1)') ""
+
+      do i = 1, Nlayer
+        write(LOT,'(F7.3)', advance="no") VB(i)
+      end do
+      write(LOT,'(A1)') ""
+
+      do i = 1, Nlayer
+        write(LOT,'(F6.3)', advance="no") RHO(i)
+      end do
+      write(LOT,'(A1)') ""
+!      write(LOT,*) VA(1:Nlayer)
+!      write(LOT,*) VB(1:Nlayer)
+!      write(LOT,*) RHO(1:Nlayer)
 
 
       READ (LIN,*) h,dcl,dcr
@@ -202,8 +222,7 @@
 
       READ (LIN,*) NLC,NLU,NRC,NRU
 
-
-      WRITE(LOT,*) h
+      WRITE(LOT,"(F7.4)") h
       CALL GETDSP(nmdisp,&
               & NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
               & earthflat,dcl,dcr,onel,oner)
@@ -467,7 +486,7 @@
 !     fix up period count
 !-----
 !      WRITE (LOT,*) nper,nper,earthflat
-      WRITE (LOT,*) nper
+      WRITE (LOT,'(I4)') nper
 !-----
 !     adjust NLC, NLU, NRC, NRU for internal use
 !-----
@@ -509,8 +528,14 @@
 !           if(nmgr.gt.0 .and. nmph.gt.0 .and. nmgm.gt.0)igr=2
          IF ( nmgr.GT.0 .AND. nmph.GT.0 ) igr = 2
          nx = MAX(nmph,nmgr)
-         WRITE (LOT,*) kmax,nx,dc,one,igr!,H
-         WRITE (LOT,*) (per(i),i=1,kmax)
+!         WRITE (LOT,*) kmax,nx,dc,one,igr!,H
+         WRITE (LOT,"(I4,I4,F7.4,F7.4,I4)") kmax,nx,dc,one,igr!,H
+!        WRITE (LOT,*, advance="no") (per(i),i=1,kmax)
+         do i = 1, kmax
+             WRITE (LOT,"(F8.3)", advance="no") per(i)
+         end do
+         WRITE (LOT,"(A1)") ""
+
 
          DO iporg = 1,2
             DO nmod = 1,modemx(ilvry,iporg)
@@ -604,7 +629,7 @@
 !     output starting with the first mode
 !-----
       DO n = 1,md
-         WRITE (LOT,*) is(n),ie(n)
+         WRITE (LOT,"(I4,I4)") is(n),ie(n)
       ENDDO
       END
 
