@@ -147,12 +147,19 @@ def prep_srfpre96_3(waves,types,modes,freqs):
 
     for w,t,m,f in zip(waves,types,modes,freqs):
         out += fmt % (w,t,m,1./f)
+
         if w == "R":
-            if    t == "C": nrc = max([nrc, m + 1])
-            elif  t == "U": nru = max([nru, m + 1])
+            if t == "C":
+                nrc = max([nrc, m + 1])
+            elif t == "U":
+                nru = max([nru, m + 1])
+
         elif w == "L":
-            if    t == "C": nlc = max([nlc, m + 1])
-            elif  t == "U": nlu = max([nlu, m + 1])
+            if t == "C":
+                nlc = max([nlc, m + 1])
+
+            elif t == "U":
+                nlu = max([nlu, m + 1])
 
     out = "%d %d %d %d" %(nlc,nlu,nrc,nru) + out
     return out
