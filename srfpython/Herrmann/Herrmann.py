@@ -16,34 +16,39 @@ use __main__ for demo
 WARNING : This module calls fortran programs, make sure they are compiled correctly before calling
 """
 
-_pathfile = os.path.realpath(__file__) #.../srfpyhon/HerrMann/dispersion.py
+_pathfile = os.path.realpath(__file__)  # .../srfpyhon/HerrMann/dispersion.py
 _file     = _pathfile.split('/')[-1]
 _src      = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src90/"
 srfpre96_exe = _pathfile.replace(_file, 'bin/max_srfpre96')
 srfdis96_exe = _pathfile.replace(_file, 'bin/max_srfdis96')
 
 
-# #####################################
 def check_herrmann_codes():
-    "check successfull compilation"
+    """check successful compilation"""
+
     solution = "please recompile fortran codes using recompile_src90"
+
     if not os.path.isdir(_src):
         raise Exception('directory %s not found' % _src)
+
     if not os.path.exists(srfpre96_exe):
         raise Exception('could not find %s\n%s' % (srfpre96_exe, solution))
+
     if not os.path.exists(srfdis96_exe):
         raise Exception('could not find %s\n%s' % (srfdis96_exe, solution))
+
     # depth model
-    ztop = [0.00, 1.00] #km, top layer depth
-    vp   = [2.00, 3.00] #km/s
-    vs   = [1.00, 2.00] #km/s
-    rh   = [2.67, 2.67] #g/cm3
+    ztop = [0.00, 1.00]  # km, top layer depth
+    vp = [2.00, 3.00]  # km/s
+    vs = [1.00, 2.00]  # km/s
+    rh = [2.67, 2.67]  # g/cm3
 
     # dipsersion parameters
     curves = [('R', 'C', 0, np.array([1., 2.])),
               ('L', 'C', 0, np.array([2., 3.]))]
 
     g = dispersion_2(ztop, vp, vs, rh, curves)
+
     try:
         w, t, m, F, V = g.next()
         assert (w, t, m) == ("L", "C", 0)
@@ -51,11 +56,11 @@ def check_herrmann_codes():
         w, t, m, F, V = g.next()
         assert (w, t, m) == ("R", "C", 0)
         assert np.all(F == np.array([1., 2.]))
+
     except AssertionError:
         raise Exception('could not execute fortran codes\n%s' % solution)
 
 
-# ------------
 def recompile_src90(yes=False):
     script = """
 cd {_src}
@@ -70,14 +75,15 @@ cd {_src}
 
 
 # ##################################### MODIFIED HERRMANN'S CODES
-def prep_srfpre96_1(h = 0.005, dcl = 0.005, dcr = 0.005):
+
+def prep_srfpre96_1(h=0.005, dcl=0.005, dcr=0.005):
     """prepare input for modified srfpre96 (max_srfpre96)
     dcl, dcr are root search increment for loev and rayleigh waves respectively
     h, dcl,dcr : see srfpre96
     """
     return "%f %f %f" % (h, dcl, dcr)
 
-# _____________________________________
+
 def prep_srfpre96_2(z, vp, vs, rh):
     """prepare input for modified srfpre96 (max_srfpre96)
        z   = depth in km, z[0] must be 0
@@ -86,30 +92,44 @@ def prep_srfpre96_2(z, vp, vs, rh):
        rh  = density in g/cm3
     """
 
-    if z[0]: raise CPiSDomainError('Z0 must be 0')#assert z[0] == 0.
+    if z[0]:
+        raise CPiSDomainError('Z0 must be 0')  # assert z[0] == 0.
     n = len(z)
 
     if not (n == len(vp) == len(vs) == len(rh)):
-        raise CPiSDomainError('Z VP, VS, RH must be the same length')#    assert n == len(vp) == len(vs) == len(rh)
+        raise CPiSDomainError('Z VP, VS, RH must be the same length')  # assert n == len(vp) == len(vs) == len(rh)
+
     z = np.asarray(z, float)
     if (np.isinf(z) | np.isnan(z)).any():
         raise CPiSDomainError('got inapropriate values for Z (%s)' % str(z))
+
     Ibad = (z[1:] - z[:-1] < 0.001)
     if Ibad.any():
         H = z[1:] - z[:-1]
-        raise CPiSDomainError('Z must be growing, layers must be at least 0.001km thick, got %s (%s)' % (str(z), str(H[Ibad])))
+        raise CPiSDomainError(
+            'Z must be growing, layers must be at least '
+            '0.001km thick, got %s (%s)' % (str(z), str(H[Ibad])))
 
     vs = np.asarray(vs, float)
-    if (np.isinf(vs) | np.isnan(vs)).any(): raise CPiSDomainError('vs value error %s' % str(vs))
-    if not (vs > 0.08).all():               raise CPiSDomainError('vs domain error %s' % str(vs))
+    if (np.isinf(vs) | np.isnan(vs)).any():
+        raise CPiSDomainError('vs value error %s' % str(vs))
+
+    if not (vs > 0.08).all():
+        raise CPiSDomainError('vs domain error %s' % str(vs))
 
     vp = np.asarray(vp, float)
-    if (np.isinf(vp) | np.isnan(vp)).any():      raise CPiSDomainError('vp value error %s' % str(vp))
-    if not ((vp > vs * (4. / 3.) ** 0.5)).all(): raise CPiSDomainError('vp over vs domain error %s' % str(vp / vs))
+    if (np.isinf(vp) | np.isnan(vp)).any():
+        raise CPiSDomainError('vp value error %s' % str(vp))
+
+    if not (vp > vs * (4. / 3.) ** 0.5).all():
+        raise CPiSDomainError('vp over vs domain error %s' % str(vp / vs))
 
     rh = np.asarray(rh, float)
-    if (np.isinf(rh) | np.isnan(rh)).any():      raise CPiSDomainError('rh value error %s' % str(rh))
-    if not  np.all((rh > 1.)):                   raise CPiSDomainError('density domain error : %s' % str(rh))
+    if (np.isinf(rh) | np.isnan(rh)).any():
+        raise CPiSDomainError('rh value error %s' % str(rh))
+
+    if not np.all((rh > 1.)):
+        raise CPiSDomainError('density domain error : %s' % str(rh))
 
     out = "%d\n" % n + \
           ("%f " * (n - 1)) % tuple(z[1:] - z[:-1]) + "\n" + \
@@ -118,12 +138,13 @@ def prep_srfpre96_2(z, vp, vs, rh):
           ("%f " * n) % tuple(rh)
     return out
 
-# _____________________________________
+
 def prep_srfpre96_3(waves,types,modes,freqs):
     """prepare input for modified srfpre96 (max_srfpre96)"""
     nlc = nlu = nrc = nru = 0
     fmt="\nSURF96 %1s %1s X %d %f 1. 1."
     out = ""
+
     for w,t,m,f in zip(waves,types,modes,freqs):
         out += fmt % (w,t,m,1./f)
         if w == "R":
@@ -137,36 +158,50 @@ def prep_srfpre96_3(waves,types,modes,freqs):
     return out
 
 
-# _____________________________________
-class CPiSError(Exception): pass
-class CPiSDomainError(CPiSError): pass
+class CPiSError(Exception):
+    pass
+
+
+class CPiSDomainError(CPiSError):
+    pass
+
 
 def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
-    "converts output from max_srfdis96, to be optimized (takes about 0.5 * the times used by max_srfpre96+max_srfdis96)"
+    """converts output from max_srfdis96, to be optimized
+    (takes about 0.5 * the times used by max_srfpre96+max_srfdis96)"""
 
-    #try:     A = np.genfromtxt(StringIO(unicode(stdout)), dtype = float)
-    #except:  raise CPiSError('could not understand stdout \n%s' % stdout)
+    # try:
+    #     A = np.genfromtxt(StringIO(unicode(stdout)), dtype = float)
+    # except:
+    #     raise CPiSError('could not understand stdout \n%s' % stdout)
+
     A = np.asarray( (" ".join(stdout.strip().rstrip('\n').split('\n'))).split(), float)
     A = A.reshape((len(A) / 6, 6))
-    #A[:, 0] (itst) wave type 1 = Love, 2 = Rayleigh
-    #A[:, 1] (iq-1) mode number, 0 = fundamental
-    #A[:, 2] (t1a)  t1 if phase only else lower period = t1/(1+h), in s
-    #A[:, 3] (t1b)  0. if phase only else upper period = t1/(1-h), in s;
-    #A[:, 4] (cc0)  phase velocity at t1 if phase only else at t1a, in km/s;
-    #A[:, 5] (cc1)  phase velocity at t1 if phase only else at t1b, in km/s;
+
+    # A[:, 0] (itst) wave type 1 = Love, 2 = Rayleigh
+    # A[:, 1] (iq-1) mode number, 0 = fundamental
+    # A[:, 2] (t1a)  t1 if phase only else lower period = t1/(1+h), in s
+    # A[:, 3] (t1b)  0. if phase only else upper period = t1/(1-h), in s;
+    # A[:, 4] (cc0)  phase velocity at t1 if phase only else at t1a, in km/s;
+    # A[:, 5] (cc1)  phase velocity at t1 if phase only else at t1b, in km/s;
 
     W = A[:, 0]
     M = A[:, 1]
-    I = A[:, 3] == 0. #True means phase only
+    I = A[:, 3] == 0.  # True means phase only
     nI = ~I
     n = A.shape[0]
     T, C, U = np.zeros(n, float), np.zeros(n, float), np.zeros(n, float) * np.nan
+
     if I.any():
         T[I]  = A[I,2]
         C[I]  = A[I,4]
+
     if nI.any():
-        T[nI] = A[nI,2] * A[nI,3] / (A[nI,2:4].mean(axis = 1))#np.sqrt(A[nI,2] * A[nI,3]) #Jeffreys average #A[nI,2:4].mean(axis = 1)
-        C[nI] = np.sqrt(A[nI,4] * A[nI,5]) #Jeffreys average #A[nI,4:6].mean(axis = 1)
+        # np.sqrt(A[nI,2] * A[nI,3]) #Jeffreys average #A[nI,2:4].mean(axis = 1)
+        T[nI] = A[nI, 2] * A[nI, 3] / (A[nI, 2:4].mean(axis=1))
+
+        C[nI] = np.sqrt(A[nI,4] * A[nI,5])  # Jeffreys average  # A[nI,4:6].mean(axis = 1)
+
         LnI = (log(A[nI,5]) - log(A[nI,4])) / (log(A[nI,2]) - log(A[nI,3]))
         U[nI] = C[nI] / (1. - LnI)
 
@@ -180,9 +215,12 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
     values = np.zeros(len(waves), float) * np.nan
     for n, (w, t, m, f) in enumerate(zip(waves, types, modes, freqs)):
 
-        if   w == "R":S = RMs[m]
-        else         :S = LMs[m]#elif w == "L"
-        if S is None: continue
+        if w == "R":
+            S = RMs[m]
+        else:
+            S = LMs[m]  # elif w == "L"
+        if S is None:
+            continue
 
         p  = 1. / f
         TS = T[S]
@@ -190,23 +228,29 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
         per = TS[iS]
         if abs(per - p) / p > 0.01: continue
 
-        if   t == 'C': val = C[S][iS]
-        else         : val = U[S][iS] #elif t == "U"
-        #else: raise ValueError('')
-        #if val <= 0: #NON, je met une penalite dans la fonction cout
-        #    raise CPiSError('encountered negative dispersion velocity')
+        if t == 'C':
+            val = C[S][iS]
+
+        else:
+            val = U[S][iS] #elif t == "U"
+        # else:
+        #      raise ValueError('')
+        # if val <= 0: #NON, je met une penalite dans la fonction cout
+        #     raise CPiSError('encountered negative dispersion velocity')
 
         values[n] = val
     return values
 
-#_____________________________________
+
 def argcrossfind(X, Y):
-    #X and Y are unique and sorted
+
+    """X and Y are unique and sorted"""
+
     nx, ny = len(X), len(Y)
     ix, iy = 0, 0
     IX, IY = [], []
+
     while ix < nx and iy < ny:
-#        if X[ix] == Y[iy]:
         if abs((X[ix] - Y[iy]) / X[ix]) < 0.01:
             IX.append(ix)
             IY.append(iy)
@@ -216,9 +260,9 @@ def argcrossfind(X, Y):
         elif X[ix] > Y[iy]: iy += 1
     return np.asarray(IX, int), np.asarray(IY, int)
 
-# _____________________________________
+
 def readsrfdis96(stdout, waves, types, modes, freqs):
-    "converts output from max_srfdis96"
+    """converts output from max_srfdis96"""
     periods = 1./freqs
 
     stdout = stdout.replace('**************', ' 0            ') #??? what the fuck
@@ -226,36 +270,34 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
     stdout = [_[:2] + " " + _[2:] for _ in stdout] # add one more space for mode numbers higher than 10
 
     A = (" ".join(stdout)).split()
-    W   = np.asarray(A[::6],  int)-1  #wave type 0 = Love, 1 = Rayleigh
-    M   = np.asarray(A[1::6], int)    #(iq-1) mode number, 0 = fundamental
-    T1A = np.asarray(A[2::6], float)  #t1 if phase only else lower period = t1/(1+h), in s
-    T1B = np.asarray(A[3::6], float)  #0. if phase only else upper period = t1/(1-h), in s;
-    CC0 = np.asarray(A[4::6], float)  #phase velocity at t1 if phase only else at t1a, in km/s;
-    CC1 = np.asarray(A[5::6], float)  #phase velocity at t1 if phase only else at t1b, in km/s;
-
-
+    W   = np.asarray(A[::6],  int)-1  # wave type 0 = Love, 1 = Rayleigh
+    M   = np.asarray(A[1::6], int)    # (iq-1) mode number, 0 = fundamental
+    T1A = np.asarray(A[2::6], float)  # t1 if phase only else lower period = t1/(1+h), in s
+    T1B = np.asarray(A[3::6], float)  # 0. if phase only else upper period = t1/(1-h), in s;
+    CC0 = np.asarray(A[4::6], float)  # phase velocity at t1 if phase only else at t1a, in km/s;
+    CC1 = np.asarray(A[5::6], float)  # phase velocity at t1 if phase only else at t1b, in km/s;
 
     n = len(W)
     I = T1B == 0. #True means phase only
     L = W == 0    #True means Love
     R = ~L        #assume only R or L
 
-    # ---------------------------------
     nI = ~I
     T, C, U = np.zeros(n, float), np.zeros(n, float), np.zeros(n, float) * np.nan
     if I.any():
-        T[I]  = T1A[I]
-        C[I]  = CC0[I]
+        T[I] = T1A[I]
+        C[I] = CC0[I]
+
     if nI.any():
-        T[nI] = 2. * T1A[nI] * T1B[nI] / (T1A[nI] + T1B[nI]) #see srfpre96 T1A = T1/(1+h), T1B = T1/(1-h) => T1=2 T1A T1B / (T1A + T1B)
-        C[nI] = np.sqrt(CC0[nI] * CC1[nI]) #Jeffreys average #A[nI,4:6].mean(axis = 1)
+        T[nI] = 2. * T1A[nI] * T1B[nI] / (T1A[nI] + T1B[nI])
+        # see srfpre96 T1A = T1/(1+h), T1B = T1/(1-h) => T1=2 T1A T1B / (T1A + T1B)
+        C[nI] = np.sqrt(CC0[nI] * CC1[nI])   # Jeffreys average #A[nI,4:6].mean(axis = 1)
         LnI = (log(CC1[nI]) - log(CC0[nI])) / (log(T1A[nI]) - log(T1B[nI]))
         U[nI] = C[nI] / (1. - LnI)
 
-    # ---------------------------------
-    #arange available data
+    # arange available data
     umodes = np.arange(max(modes) + 1)
-    D = {"L" : [], "R" : []}
+    D = {"L": [], "R": []}
     for m in umodes:
         I = (M == m)
         IR = R & I
@@ -263,20 +305,18 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
         D["L"].append({"T" : T[IL], "C" : C[IL], "U" : U[IL]})
         D["R"].append({"T" : T[IR], "C" : C[IR], "U" : U[IR]})
 
-    # ---------------------------------
     values = np.zeros(len(waves), float) * np.nan
     indexs  = np.arange(len(waves))
     for w, t, m, P, I in groupbywtm(waves, types, modes, periods, indexs, dvalues = None, keepnans = True):
-        #available data : period D[w][m]["T"]; value  D[w][m][t]
-        #requested data : P
+        # available data : period D[w][m]["T"]; value  D[w][m][t]
+        # requested data : P
         IP, ITT = argcrossfind(P, D[w][m]["T"])
         values[I[IP]] = D[w][m][t][ITT]
 
     return values
 
 
-# _____________________________________
-def dispersion(ztop, vp, vs, rh, \
+def dispersion(ztop, vp, vs, rh,
     waves, types, modes, freqs,
     h=0.005, dcl=0.005, dcr=0.005):
 
@@ -321,13 +361,11 @@ def dispersion(ztop, vp, vs, rh, \
         igroupbywtm
     """
 
-    # --------------
     instr2 = prep_srfpre96_2(ztop, vp, vs, rh)
     instr1 = prep_srfpre96_1(h = h, dcl = dcl, dcr = dcr)
     instr3 = prep_srfpre96_3(waves, types, modes, freqs)
     pstdin = "\n".join([instr2, instr1, instr3])
 
-    # --------------
     try:
         with Timeout(5):
             p = Popen("%s|%s" % (srfpre96_exe, srfdis96_exe), stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=True, preexec_fn=os.setsid)#, stderr = stderrfid)
@@ -343,13 +381,11 @@ def dispersion(ztop, vp, vs, rh, \
         try: p.stdin.close()
         except: pass
 
-    # --------------
     values = readsrfdis96(qstdout, waves, types, modes, freqs)
     return values
 
 
-# _____________________________________
-def dispersion_1(ztop, vp, vs, rh, \
+def dispersion_1(ztop, vp, vs, rh,
     Waves, Types, Modes, Freqs,
     h = 0.005, dcl = 0.005, dcr = 0.005, keepnans = False):
 
@@ -394,7 +430,6 @@ def dispersion_1(ztop, vp, vs, rh, \
         yield w, t, m, F, V
 
 
-# _____________________________________
 def dispersion_2(ztop, vp, vs, rh, Curves,
     h=0.005, dcl=0.005, dcr=0.005, keepnans=False):
 
@@ -431,7 +466,6 @@ def dispersion_2(ztop, vp, vs, rh, Curves,
         yield w, t, m, F, V
 
 
-# _____________________________________
 if __name__ == "__main__":
 
     """ DEMO """
@@ -439,7 +473,6 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from srfpython.standalone.display import logtick
     check_herrmann_codes()
-
 
     # depth model
     ztop = [0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80] #km, top layer depth
@@ -476,8 +509,3 @@ if __name__ == "__main__":
     logtick(ax, "xy")
     plt.legend()
     plt.show()
-
-
-
-
-
