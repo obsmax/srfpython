@@ -1,12 +1,14 @@
 #!/usr/bin/python2.7
 from __future__ import print_function
+import os
+import signal
+import warnings
 from subprocess import Popen, PIPE
 from numpy import log
 import numpy as np
-import os
-import signal
 from srfpython.utils import Timer, TimeOutError, Timeout
 from srfpython.depthdisp.dispcurves import groupbywtm, igroupbywtm
+
 
 """
 program to compute surface wave dispersion curves, Maximilien Lehujeur, 01/11/2017
@@ -22,8 +24,8 @@ _src = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src90/"
 
 SRFPRE96_EXE = _pathfile.replace(_file, 'bin/max_srfpre96')
 SRFDIS96_EXE = _pathfile.replace(_file, 'bin/max_srfdis96')
-SHELL_COMMAND = "{}|{}".format(SRFPRE96_EXE, SRFDIS96_EXE)
-
+#SHELL_COMMAND = "{}|{}".format(SRFPRE96_EXE, SRFDIS96_EXE)
+HERRMANN_TIMEOUT = 5
 
 def check_herrmann_codes():
     """check successful compilation"""
@@ -371,29 +373,43 @@ def dispersion(ztop, vp, vs, rh,
     """
 
     instr2 = prep_srfpre96_2(ztop, vp, vs, rh)
-    instr1 = prep_srfpre96_1(h = h, dcl = dcl, dcr = dcr)
+    instr1 = prep_srfpre96_1(h=h, dcl=dcl, dcr=dcr)
     instr3 = prep_srfpre96_3(waves, types, modes, freqs)
     pstdin = "\n".join([instr2, instr1, instr3])
 
+    SRFPRE96_SUBPROC = Popen(SRFPRE96_EXE,
+                             stdin=PIPE,
+                             stdout=PIPE,
+                             stderr=PIPE,
+                             shell=False,
+                             preexec_fn=os.setsid)
+    SRFDIS96_SUBPROC = Popen(SRFDIS96_EXE,
+                             stdin=PIPE,  # SRFPRE96_SUBPROC.stdout,
+                             stdout=PIPE,
+                             stderr=PIPE,
+                             shell=False,
+                             preexec_fn=os.setsid)
     try:
-        with Timeout(5):
-            p = Popen(SHELL_COMMAND,
-                      stdout=PIPE,
-                      stdin=PIPE,
-                      stderr=PIPE,
-                      shell=True,
-                      preexec_fn=os.setsid)  # , stderr = stderrfid)
-            qstdout, _ = p.communicate(pstdin)
-            if p.returncode:
-                raise CPiSError('error : %s | %s failed' % (SRFPRE96_EXE, SRFDIS96_EXE))
-    except TimeOutError:
-        print ("error *123*", ztop, vp, vs, rh)
-        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
-        raise CPiSError('timeout')
-    except: raise
+        with Timeout(HERRMANN_TIMEOUT):
+            pstdout, pstderr = SRFPRE96_SUBPROC.communicate(pstdin)
+            qstdout, qstderr = SRFDIS96_SUBPROC.communicate(pstdout)
+
+    except TimeOutError as e:
+        os.killpg(os.getpgid(SRFPRE96_SUBPROC.pid), signal.SIGKILL)
+        os.killpg(os.getpgid(SRFDIS96_SUBPROC.pid), signal.SIGKILL)
+        message = "Herrmann timed out for model:\n\tztop={}\n\tvp={}\n\tvs={}\n\trh={}\n".format(ztop, vp, vs, rh)
+        raise CPiSError(message)
+
     finally:
-        try: p.stdin.close()
-        except: pass
+        try:
+            SRFPRE96_SUBPROC.stdin.close()
+            SRFDIS96_SUBPROC.stdin.close()
+            SRFPRE96_SUBPROC.stdout.close()
+            SRFDIS96_SUBPROC.stdout.close()
+            SRFPRE96_SUBPROC.stderr.close()
+            SRFDIS96_SUBPROC.stderr.close()
+        except Exception as e:
+            warnings.warn(str(e))
 
     values = readsrfdis96(qstdout, waves, types, modes, freqs)
     return values
@@ -489,13 +505,13 @@ if __name__ == "__main__":
     check_herrmann_codes()
 
     # depth model
-    ztop = [0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80] #km, top layer depth
-    vp   = [1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80] #km/s
-    vs   = [0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31] #km/s
-    rh   = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63] #g/cm3
+    ztop = [0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80]  # km, top layer depth
+    vp   = [1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80]  # km/s
+    vs   = [0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31]  # km/s
+    rh   = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63]  # g/cm3
 
     # dipsersion parameters
-    def f(): return np.logspace(np.log10(0.2), np.log10(3.5), 35)
+    def f(): return np.logspace(np.log10(0.2), np.log10(3.5), 85)
     curves = [('R', 'U', 0, f()),
               ('R', 'U', 1, f()),
               ('R', 'C', 0, f()),
