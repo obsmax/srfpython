@@ -19,8 +19,10 @@ WARNING : This module calls fortran programs, make sure they are compiled correc
 _pathfile = os.path.realpath(__file__)  # .../srfpyhon/HerrMann/dispersion.py
 _file = _pathfile.split('/')[-1]
 _src = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src90/"
-srfpre96_exe = _pathfile.replace(_file, 'bin/max_srfpre96')
-srfdis96_exe = _pathfile.replace(_file, 'bin/max_srfdis96')
+
+SRFPRE96_EXE = _pathfile.replace(_file, 'bin/max_srfpre96')
+SRFDIS96_EXE = _pathfile.replace(_file, 'bin/max_srfdis96')
+SHELL_COMMAND = "{}|{}".format(SRFPRE96_EXE, SRFDIS96_EXE)
 
 
 def check_herrmann_codes():
@@ -31,11 +33,11 @@ def check_herrmann_codes():
     if not os.path.isdir(_src):
         raise Exception('directory %s not found' % _src)
 
-    if not os.path.exists(srfpre96_exe):
-        raise Exception('could not find %s\n%s' % (srfpre96_exe, solution))
+    if not os.path.exists(SRFPRE96_EXE):
+        raise Exception('could not find %s\n%s' % (SRFPRE96_EXE, solution))
 
-    if not os.path.exists(srfdis96_exe):
-        raise Exception('could not find %s\n%s' % (srfdis96_exe, solution))
+    if not os.path.exists(SRFDIS96_EXE):
+        raise Exception('could not find %s\n%s' % (SRFDIS96_EXE, solution))
 
     # depth model
     ztop = [0.00, 1.00]  # km, top layer depth
@@ -182,7 +184,7 @@ def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
     # except:
     #     raise CPiSError('could not understand stdout \n%s' % stdout)
 
-    A = np.asarray( (" ".join(stdout.strip().rstrip('\n').split('\n'))).split(), float)
+    A = np.asarray((" ".join(stdout.strip().rstrip('\n').split('\n'))).split(), float)
     A = A.reshape((len(A) / 6, 6))
 
     # A[:, 0] (itst) wave type 1 = Love, 2 = Rayleigh
@@ -375,10 +377,15 @@ def dispersion(ztop, vp, vs, rh,
 
     try:
         with Timeout(5):
-            p = Popen("%s|%s" % (srfpre96_exe, srfdis96_exe), stdout=PIPE, stdin=PIPE, stderr=PIPE, shell=True, preexec_fn=os.setsid)#, stderr = stderrfid)
+            p = Popen(SHELL_COMMAND,
+                      stdout=PIPE,
+                      stdin=PIPE,
+                      stderr=PIPE,
+                      shell=True,
+                      preexec_fn=os.setsid)  # , stderr = stderrfid)
             qstdout, _ = p.communicate(pstdin)
             if p.returncode:
-                raise CPiSError('error : %s | %s failed' % (srfpre96_exe, srfdis96_exe))
+                raise CPiSError('error : %s | %s failed' % (SRFPRE96_EXE, SRFDIS96_EXE))
     except TimeOutError:
         print ("error *123*", ztop, vp, vs, rh)
         os.killpg(os.getpgid(p.pid), signal.SIGKILL)
