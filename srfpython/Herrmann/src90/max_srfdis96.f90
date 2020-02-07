@@ -110,7 +110,7 @@
       INTEGER iunit,iiso,idimen,icnvel
       CHARACTER(LEN=80) :: FMT ! WARNING must be long enough for FMT
 !-----
-      FMT = "(I2,I2,F14.8,F14.8,F14.8,F14.8)" ! print format for output
+      FMT = "(I2,I2,F11.6,F11.6,F11.6,F11.6)" ! print format for output
       read(LIN,*) Mmax
       iunit = 0 ! read(LIN,*) iunit! was overwrite by 0 anyway
       iiso = 0 !read(LIN,*) iiso ! not used
