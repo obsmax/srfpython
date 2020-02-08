@@ -29,8 +29,6 @@
 !
       PROGRAM SRFDIS96
       IMPLICIT NONE
-
-
 !      real :: start, finish, start1, finish1 ! for cpu timer
 !
 !   This is a combination of program 'surface80' which search the poles
@@ -75,91 +73,84 @@
 !     idispl, idispr = number of dispersion points to compute for love and rayleigh
 !     Mmax = max number of layers in the mode, used in common with other subroutines
 !     ifunc = 1 for love 2 for rayleig
-!     betmn, betmx = extramal values for S-wave velocity in the model in km/s
-!                    in case of a water layer, use P-wave velocity instead of S for betmn
-!     jmn = index of layer where betmn is encountered, starting from 1, from top to botto
-!     jsol = a flag to tell if betmn corresponds to a liquid layer
+!     vsmin, vsmax = extramal values for S-wave velocity in the model in km/s
+!                    in case of a water layer, use P-wave velocity instead of S for vsmin
+!     jmn = index of layer where vsmin is encountered, starting from 1, from top to botto
+!     jsol = a flag to tell if vsmin corresponds to a liquid layer
 !     t1a,t1b = periods at which to compute phase velocity,
 !               for group velocity dispersions, these two values are used for differentiation
 !               for phase velocity, only t1a is used
       !-----
-      ! uderstood variables
-      INTEGER  STDIN , STDOUT 
-      PARAMETER ( STDIN =5,STDOUT =6)
+      INTEGER  STDIN, STDOUT 
       INTEGER LLW,idispl,idispr,Mmax,ifunc,jmn,jsol
-      REAL betmn,betmx,t1a,t1b
-
-      ! not uderstood variables
-      REAL cc0,cc1,ddc,h,sone
-
       INTEGER i,ie,ierr,ifirst,ift, &
             & igr,iq,iret,is,itst,k,kmax
       INTEGER mode
-      INTEGER NP, NL,NLAY
+      INTEGER NP, NL, NLAY
 
+      REAL vsmin,vsmax,t1a,t1b
+      REAL cc0,cc1,ddc,h,sone
+
+      PARAMETER (STDIN =5,STDOUT =6)
       PARAMETER (NL=100,NLAY=100)
       PARAMETER (NP=512)
-      DOUBLE PRECISION TWOpi,one,onea
+
+      DOUBLE PRECISION twopi,one,onea
       DOUBLE PRECISION cc,c1,clow,cm,dc,t1
       DOUBLE PRECISION c(NP),cb(NP)
-      REAL(kind=4) t(NP), D(NL),A(NL),B(NL),RHO(NL) !,RTP(NL),DTP(NL),BTP(NL)
+      REAL(kind=4) t(NP), thicknesses(NL),vp_values(NL),vs_values(NL),density_values(NL)
       REAL(kind=4) qbinv(NL),qainv(NL)
-      COMMON /MODL  / D , A , B , RHO ! , RTP , DTP , BTP
-      COMMON /PARA  / Mmax,LLW,TWOpi
+      COMMON /MODL  / thicknesses, vp_values, vs_values, density_values
+      COMMON /PARA  / Mmax,LLW,twopi
 
       INTEGER iunit,iiso,idimen,icnvel
-      CHARACTER(LEN=80) :: FMT ! WARNING must be long enough for FMT
+      CHARACTER(LEN=80) :: FMT  ! WARNING must be long enough for FMT
 !-----
       FMT = "(I2,I2,F11.6,F11.6,F11.6,F11.6)" ! print format for output
-      read( STDIN ,*) Mmax
-      iunit = 0 ! read( STDIN ,*) iunit! was overwrite by 0 anyway
-      iiso = 0 !read( STDIN ,*) iiso ! not used
-      idimen = 0  !read( STDIN ,*) idimen ! model is always 1d
-      icnvel = 0  !read( STDIN ,*) icnvel ! model is always constant velo
-      ierr = 0 !read( STDIN ,*) ierr
-      read( STDIN ,*) D(1:MMax-1)
-      read( STDIN ,*) A(1:Mmax)
-      read( STDIN ,*) B(1:MMax)
-      read( STDIN ,*) RHO(1:MMax)
+      read(STDIN ,*) Mmax
+      iunit = 0
+      iiso = 0
+      idimen = 0
+      icnvel = 0
+      ierr = 0
+
+      read(STDIN ,*) thicknesses(1:MMax-1)
+      read(STDIN ,*) vp_values(1:Mmax)
+      read(STDIN ,*) vs_values(1:MMax)
+      read(STDIN ,*) density_values(1:MMax)
 !-----
-      READ ( STDIN ,*) h
-      READ ( STDIN ,*) idispl
+      READ (STDIN ,*) h
+      READ (STDIN ,*) idispl
       idispr=idispl ! always true, see srfpre96
 
 !-----
 !     check for water layer
 !-----
       LLW = 1 !first solid layer index
-      IF ( B(1) <= 0.0 ) LLW = 2
-      TWOpi = 2.D0*3.141592653589793D0
+      IF ( vs_values(1) <= 0.0 ) LLW = 2
+      twopi = 2.D0*3.141592653589793D0
       one = 1.0D-2
       jmn = 1
-      betmx = -1.E20
-      betmn = 1.E20
+      vsmax = -1.E20
+      vsmin = 1.E20
 !-----
 !     find the extremal velocities to assist in starting search
 !-----
-!      call cpu_time(start)
-      DO i = 1 , Mmax
-         IF ( B(i) >  0.01 .AND. B(i) <  betmn ) THEN
-            betmn = B(i)
+      DO i = 1, Mmax
+         IF ( vs_values(i) >  0.01 .AND. vs_values(i) <  vsmin ) THEN
+            vsmin = vs_values(i)
             jmn = i
             jsol = 1
-         ELSEIF ( B(i) <= 0.01 .AND. A(i) <  betmn ) THEN
-            betmn = A(i)
+         ELSEIF ( vs_values(i) <= 0.01 .AND. vp_values(i) <  vsmin ) THEN
+            vsmin = vp_values(i)
             jmn = i
             jsol = 0
          ENDIF
-         IF ( B(i) >  betmx ) betmx = B(i)
+         IF ( vs_values(i) >  vsmax ) vsmax = vs_values(i)
       ENDDO
-!      call cpu_time(finish)
-!      print '("T1 = ",f6.3," seconds.")',finish-start
 
-
-!      call cpu_time(start)
-      DO ifunc = 1 , 2 ! 1 = love 2 = rayleigh
-!         IF ( ifunc /= 1 .OR. idispl >  0) THEN       < who is the fucking bastard who coded that?
-!            IF ( ifunc /= 2 .OR. idispr >  0 ) THEN   < who is the fucking bastard who coded that?
+      
+      DO ifunc = 1, 2 ! 1 = love 2 = rayleigh
           IF   ((ifunc == 1 .AND. idispl >  0) &
             .OR.(ifunc == 2 .AND. idispr >  0)) THEN
 
@@ -174,9 +165,9 @@
                !     VP/VS ratio
                !-----
                IF ( jsol == 0 ) THEN ! water layer
-                  cc1 = betmn
+                  cc1 = vsmin
                ELSE ! solid layer solve halfspace period equation
-                  CALL GTSOLH(A(jmn),B(jmn),cc1)
+                  CALL GTSOLH(vp_values(jmn),vs_values(jmn),cc1)
                ENDIF
                !-----
                !     back off a bit to get a starting value at a lower phase velocity
@@ -188,18 +179,18 @@
                dc = DABS(dc)
                c1 = cc
                cm = cc
-               DO i = 1 , kmax
+               DO i = 1, kmax
                   cb(i) = 0.0D0
                   c(i) = 0.0D0
                ENDDO
                ift = 999
 
-               DO iq = 1 , mode
+               DO iq = 1, mode
 !                  call cpu_time(start1)
 
-                  READ (STDIN  ,*) is , ie
+                  READ (STDIN  ,*) is, ie
                   itst = ifunc
-                  DO k = is , ie
+                  DO k = is, ie
                      IF ( k >= ift ) GOTO 5
                      t1 = DBLE(t(k)) ! period at which to compute phase velo
                      IF ( igr >  0 ) THEN
@@ -245,9 +236,9 @@
                      !-----
                      !     bracket root and refine it
                      !-----
-!                     !WRITE(*,*) "VERBOSE : av1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
-                     CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst)
-!                     !WRITE(*,*) "VERBOSE : ap1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
+!                     !WRITE(*,*) "VERBOSE : av1",t1,c1,clow,dc,cm,vsmax,iret,ifunc,ifirst
+                     CALL GETSOL(t1,c1,clow,dc,cm,vsmax,iret,ifunc,ifirst)
+!                     !WRITE(*,*) "VERBOSE : ap1",t1,c1,clow,dc,cm,vsmax,iret,ifunc,ifirst
                      IF ( iret == -1 ) GOTO 5 ! if root not found
                      c(k) = c1
                      !-----
@@ -259,9 +250,9 @@
                         ifirst = 0
                         clow = cb(k) + one*dc
                         c1 = c1 - onea*dc
-!                        write(*,*) "av2",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
-                        CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst)
-!                        write(*,*) "ap2",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
+!                        write(*,*) "av2",t1,c1,clow,dc,cm,vsmax,iret,ifunc,ifirst
+                        CALL GETSOL(t1,c1,clow,dc,cm,vsmax,iret,ifunc,ifirst)
+!                        write(*,*) "ap2",t1,c1,clow,dc,cm,vsmax,iret,ifunc,ifirst
                         !-----
                         !     test if root not found at slightly larger period
                         !-----
@@ -272,26 +263,17 @@
                      ENDIF
                      cc0 = SNGL(c(k))
                      cc1 = SNGL(c1)
-!                     WRITE (STDOUT ,*)
 
                       WRITE(*,FMT) itst,iq - 1,t1a,t1b,cc0,cc1
 
                   ENDDO
-!                  call cpu_time(finish1)
-!                  print '("elapsed time ",f6.3," seconds.")',finish1-start1
                   GOTO 10
-
-! 5                IF ( iq >  1 ) THEN < what is the point?
-!                  ENDIF               < what is the point?
 
  5                ift = k
                   itst = 0
  10            ENDDO
           ENDIF
       ENDDO
-!      call cpu_time(finish)
-!      print '("T2 = ",f6.3," seconds.")',finish-start
-
       END
 
 
@@ -299,16 +281,16 @@
       SUBROUTINE GTSOLH(A,B,C)
       IMPLICIT NONE
 
-      REAL A , B , C , fac1 , fac2 , fr , frp , gamma
+      REAL A, B, C, fac1, fac2, fr, frp, gamma
       INTEGER i
-      REAL*4 kappa , k2 , gk2
+      REAL(kind=4) kappa, k2, gk2
       !WRITE(*,*) "VERBOSE : ENTER GTSOLH" !VERBOSE!
 
 !-----
 !     starting solution
 !-----
       C = 0.95*B
-      DO i = 1 , 5
+      DO i = 1, 5
          gamma = B/A
          kappa = C/B
          k2 = kappa**2
@@ -321,24 +303,22 @@
          frp = frp/B
          C = C - fr/frp
       ENDDO
-!      call cpu_time(finish)
-!      print '("GTSOLH = ",f6.3," seconds.")',finish-start
       END
 
 
 ! ########################################################
-      SUBROUTINE GETSOL(T1,C1,Clow,Dc,Cm,Betmx,Iret,Ifunc,Ifirst)
+      SUBROUTINE GETSOL(T1,C1,Clow,Dc,Cm,vsmax,Iret,Ifunc,Ifirst)
       IMPLICIT NONE
-      REAL Betmx
-      INTEGER Ifirst , Ifunc , Iret
-      REAL(kind=8) wvno , omega , twopi
-      REAL(kind=8) C1 , c2 , cn , Cm , Dc , T1 , Clow, fdir
-      REAL(kind=8) DLTAR , del1 , del2 , del1st , plmn
+      REAL vsmax
+      INTEGER Ifirst, Ifunc, Iret
+      REAL(kind=8) wvno, omega, twopi
+      REAL(kind=8) C1, c2, cn, Cm, Dc, T1, Clow, fdir
+      REAL(kind=8) DLTAR, del1, del2, del1st, plmn
       SAVE del1st
 
       !WRITE(*,*) "VERBOSE : ENTER GETSOL" !VERBOSE!
 
-      ! presumed inputs = T1, Clow, DC, CM, Betmx, Ifunc, Ifirst
+      ! presumed inputs = T1, Clow, DC, CM, vsmax, Ifunc, Ifirst
       ! presumed outputs = C1, Iret
 
 !-----
@@ -351,7 +331,7 @@
 !           reversed direction search
 !     dc  - phase velocity search increment
 !     cm  - minimum possible solution
-!     betmx   - maximum shear velocity
+!     vsmax   - maximum shear velocity
 !     iret    - 1 = successful
 !         - -1= unsuccessful
 !     ifunc   - 1 - Love
@@ -424,7 +404,7 @@
         !-----
          CALL NEVILL(T1,C1,c2,del1,del2,Ifunc,cn)
          C1 = cn
-         IF ( C1 >  (Betmx) ) THEN
+         IF ( C1 >  (vsmax) ) THEN
             Iret = -1  ! failure signal
 !            GOTO 99999 ! quit subroutine
          ELSE
@@ -439,7 +419,7 @@
       IF ( C1 <  Cm ) THEN
          Iret = -1 ! failure signal
       ELSE
-         IF ( C1 <  (Betmx+Dc) ) GOTO 100
+         IF ( C1 <  (vsmax+Dc) ) GOTO 100
          Iret = -1 ! failure signal
       ENDIF
 
@@ -467,22 +447,23 @@
       IMPLICIT NONE
 !*--NEVILL525
 !*** Start of declarations inserted by SPAG
-      DOUBLE PRECISION C1 , C2 , c3 , Cc , Del1 , Del2 , del3 , denom , &
-                     & DLTAR , omega , s1 , s13 , s2 , s32 , ss1 , ss2 ,&
-                     & T , TWOpi , wvno , x
+      DOUBLE PRECISION C1, C2, c3, Cc, Del1, Del2, del3, denom, &
+                     & DLTAR, omega, s1, s13, s2, s32, ss1, ss2 ,&
+                     & T, twopi, wvno, x
       DOUBLE PRECISION y
-      INTEGER Ifunc , j , kk , LLW , m , Mmax , nctrl , nev , NL
-!*** End of declarations inserted by SPAG
+      INTEGER Ifunc, j, kk, LLW, m, Mmax, nctrl, nev, NL
+
 
       PARAMETER (NL=100)
-      REAL(kind=4) D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) , BTP(NL)
-      DIMENSION x(20) , y(20)
-      COMMON /MODL  / D , A , B , RHO !, RTP , DTP , BTP
-      COMMON /PARA  / Mmax , LLW , TWOpi
+      REAL(kind=4) thicknesses(NL), vp_values(NL), &
+              &vs_values(NL), density_values(NL)
+      DIMENSION x(20), y(20)
+      COMMON /MODL  / thicknesses, vp_values, vs_values, density_values
+      COMMON /PARA  / Mmax, LLW, twopi
 !-----
 !     initial guess
 !-----
-      omega = TWOpi/T
+      omega = twopi/T
       CALL HALF(C1,C2,c3,del3,omega,Ifunc)
       nev = 1
       nctrl = 1
@@ -511,7 +492,7 @@
             Del1 = del3
          ENDIF
 !-----
-!     check for convergence. A relative error criteria is used
+!     check for convergence. vp_values relative error criteria is used
 !-----
          IF ( DABS(C1-C2) <= 1.D-6*C1 ) THEN
             Cc = c3
@@ -549,7 +530,7 @@
 !     we interchange the x and y of formula to solve for x(y) when
 !     y = 0
 !-----
-               DO kk = 1 , m
+               DO kk = 1, m
                   j = m - kk + 1
                   denom = y(m+1) - y(j)
                   IF ( DABS(denom) <  1.0D-10*ABS(y(m+1)) ) GOTO 110
@@ -576,7 +557,7 @@
       SUBROUTINE HALF(C1,C2,C3,Del3,Omega,Ifunc)
       IMPLICIT NONE
 
-      DOUBLE PRECISION C1 , C2 , C3 , Del3 , DLTAR , Omega , wvno
+      DOUBLE PRECISION C1, C2, C3, Del3, DLTAR, Omega, wvno
       INTEGER Ifunc
 
       C3 = 0.5*(C1+C2)
@@ -592,7 +573,7 @@
 !      and DLTAR4 for RAYLEIGH waves
       IMPLICIT NONE
 
-      DOUBLE PRECISION DLTAR , DLTAR1 , DLTAR4 , Omega , Wvno
+      DOUBLE PRECISION DLTAR, DLTAR1, DLTAR4, Omega, Wvno
       INTEGER Ifunc
       !WRITE(*,*) "VERBOSE : ENTER DLTAR" !VERBOSE!
 
@@ -613,15 +594,15 @@
 !   find SH dispersion values.
 !
       IMPLICIT NONE
-      DOUBLE PRECISION beta1 , cosq , DLTAR1 , e1 , e10 , e2 , e20 ,    &
-                     & fac , Omega , q , rb , rho1 , sinq , TWOpi ,     &
-                     & Wvno , wvnom , wvnop , xkb , xmu , xnor
-      DOUBLE PRECISION y , ynor , z
-      INTEGER LLW , m , Mmax , mmm1 , NL
+      DOUBLE PRECISION beta1, cosq, DLTAR1, e1, e10, e2, e20,    &
+                     & fac, Omega, q, rb, rho1, sinq, twopi,     &
+                     & Wvno, wvnom, wvnop, xkb, xmu, xnor
+      DOUBLE PRECISION y, ynor, z
+      INTEGER LLW, m, Mmax, mmm1, NL
       PARAMETER (NL=100)
-      REAL(kind=4) D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) ,  BTP(NL)
-      COMMON /MODL  / D , A , B , RHO !, RTP , DTP , BTP
-      COMMON /PARA  / Mmax , LLW , TWOpi
+      REAL(kind=4) thicknesses(NL), vp_values(NL), vs_values(NL), density_values(NL) !, RTP(NL), DTP(NL),  BTP(NL)
+      COMMON /MODL  / thicknesses, vp_values, vs_values, density_values !, RTP, DTP, BTP
+      COMMON /PARA  / Mmax, LLW, twopi
 
       !WRITE(*,*) "VERBOSE : ENTER DLTAR1" !VERBOSE!
 
@@ -629,8 +610,8 @@
 !   Haskell-Thompson love wave formulation from halfspace
 !   to surface.
 !
-      beta1 = DBLE(B(Mmax))
-      rho1 = DBLE(RHO(Mmax))
+      beta1 = DBLE(vs_values(Mmax))
+      rho1 = DBLE(density_values(Mmax))
       xkb = Omega/beta1
       wvnop = Wvno + xkb
       wvnom = DABS(Wvno-xkb)
@@ -638,15 +619,15 @@
       e1 = rho1*rb
       e2 = 1.D+00/(beta1*beta1)
       mmm1 = Mmax - 1
-      DO m = mmm1 , LLW , -1
-         beta1 = DBLE(B(m))
-         rho1 = DBLE(RHO(m))
+      DO m = mmm1, LLW, -1
+         beta1 = DBLE(vs_values(m))
+         rho1 = DBLE(density_values(m))
          xmu = rho1*beta1*beta1
          xkb = Omega/beta1
          wvnop = Wvno + xkb
          wvnom = DABS(Wvno-xkb)
          rb = DSQRT(wvnop*wvnom)
-         q = DBLE(D(m))*rb
+         q = DBLE(thicknesses(m))*rb
          IF ( Wvno <  xkb ) THEN
             sinq = DSIN(q)
             y = sinq/rb
@@ -654,7 +635,7 @@
             cosq = DCOS(q)
          ELSEIF ( Wvno == xkb ) THEN
             cosq = 1.0D+00
-            y = DBLE(D(m))
+            y = DBLE(thicknesses(m))
             z = 0.0D+00
          ELSE
             fac = 0.0D+00
@@ -681,41 +662,42 @@
       FUNCTION DLTAR4(Wvno,Omga)
 !   find P-SV dispersion values.
       IMPLICIT NONE
-      DOUBLE PRECISION A0 , beta , ca , cosp , CPCq , CPY , CPZ , CQW , &
-                     & CQX , cr , DLTAR4 , dpth , e , ee , exa , gam ,  &
-                     & gamm1 , gammk , omega , Omga
-      DOUBLE PRECISION p , q , ra , rb , rho1 , t , TWOpi , w , w0 ,    &
-                     & Wvno , wvno2 , wvnom , wvnop , WY , WZ , xka ,   &
-                     & xkb , XY , XZ , znul
-      INTEGER i , j , LLW , m , Mmax , mmm1 , NL
+      DOUBLE PRECISION A0, beta, ca, cosp, CPCq, CPY, CPZ, CQW, &
+                     & CQX, cr, DLTAR4, dpth, e, ee, exa, gam,  &
+                     & gamm1, gammk, omega, Omga
+      DOUBLE PRECISION p, q, ra, rb, rho1, t, twopi, w, w0,    &
+                     & Wvno, wvno2, wvnom, wvnop, WY, WZ, xka,   &
+                     & xkb, XY, XZ, znul
+      INTEGER i, j, LLW, m, Mmax, mmm1, NL
       PARAMETER (NL=100)
-      DIMENSION e(5) , ee(5) , ca(5,5)
-      REAL(kind=4) D(NL) , A(NL) , B(NL) , RHO(NL)
-      COMMON /MODL  / D , A , B , RHO
-      COMMON /PARA  / Mmax , LLW , TWOpi
-      COMMON /OVRFLW/ A0 , CPCq , CPY , CPZ , CQW , CQX , XY , XZ , WY ,&
-                    & WZ
+      DIMENSION e(5), ee(5), ca(5,5)
+      REAL(kind=4) thicknesses(NL), vp_values(NL), &
+              &vs_values(NL), density_values(NL)
+      COMMON /MODL  / thicknesses, vp_values, &
+              &vs_values, density_values
+      COMMON /PARA  / Mmax, LLW, twopi
+      COMMON /OVRFLW/ A0, CPCq, CPY, CPZ, CQW, CQX, XY, XZ, WY, WZ
 !
       !WRITE(*,*) "VERBOSE : ENTER DLTAR4" !VERBOSE!
       omega = Omga
       IF ( omega <  1.0D-4 ) omega = 1.0D-4
       wvno2 = Wvno*Wvno
-      xka = omega/DBLE(A(Mmax))
-      xkb = omega/DBLE(B(Mmax))
+      xka = omega/DBLE(vp_values(Mmax))
+      xkb = omega/DBLE(vs_values(Mmax))
       wvnop = Wvno + xka
       wvnom = DABS(Wvno-xka)
       ra = DSQRT(wvnop*wvnom)
       wvnop = Wvno + xkb
       wvnom = DABS(Wvno-xkb)
       rb = DSQRT(wvnop*wvnom)
-      t = DBLE(B(Mmax))/omega
+      t = DBLE(vs_values(Mmax))/omega
 !-----
 !   E matrix for the bottom half-space.
 !-----
       gammk = 2.D+00*t*t
       gam = gammk*wvno2
       gamm1 = gam - 1.D+00
-      rho1 = DBLE(RHO(Mmax))
+      rho1 = DBLE(density_values(Mmax))
       e(1) = rho1*rho1*(gamm1*gamm1-gam*gammk*ra*rb)
       e(2) = -rho1*ra
       e(3) = rho1*(gamm1-gammk*ra*rb)
@@ -725,10 +707,10 @@
 !   matrix multiplication from bottom layer upward
 !-----
       mmm1 = Mmax - 1
-      DO m = mmm1 , LLW , -1
-         xka = omega/DBLE(A(m))
-         xkb = omega/DBLE(B(m))
-         t = DBLE(B(m))/omega
+      DO m = mmm1, LLW, -1
+         xka = omega/DBLE(vp_values(m))
+         xkb = omega/DBLE(vs_values(m))
+         t = DBLE(vs_values(m))/omega
          gammk = 2.D+00*t*t
          gam = gammk*wvno2
          wvnop = Wvno + xka
@@ -737,26 +719,26 @@
          wvnop = Wvno + xkb
          wvnom = DABS(Wvno-xkb)
          rb = DSQRT(wvnop*wvnom)
-         dpth = DBLE(D(m))
-         rho1 = DBLE(RHO(m))
+         dpth = DBLE(thicknesses(m))
+         rho1 = DBLE(density_values(m))
          p = ra*dpth
          q = rb*dpth
-         beta = DBLE(B(m))
+         beta = DBLE(vs_values(m))
 !-----
 !   evaluate cosP, cosQ,.... in var.
 !   evaluate Dunkin's matrix in dnka.
 !-----
          CALL VAR(p,q,ra,rb,Wvno,xka,xkb,dpth,w,cosp,exa)
          CALL DNKA(ca,wvno2,gam,gammk,rho1)
-         DO i = 1 , 5
+         DO i = 1, 5
             cr = 0.0D+00
-            DO j = 1 , 5
+            DO j = 1, 5
                cr = cr + e(j)*ca(j,i)
             ENDDO
             ee(i) = cr
          ENDDO
          CALL NORMC(ee,exa)
-         DO i = 1 , 5
+         DO i = 1, 5
             e(i) = ee(i)
          ENDDO
       ENDDO
@@ -764,14 +746,14 @@
 !-----
 !   include water layer.
 !-----
-         xka = omega/DBLE(A(1))
+         xka = omega/DBLE(vp_values(1))
          wvnop = Wvno + xka
          wvnom = DABS(Wvno-xka)
          ra = DSQRT(wvnop*wvnom)
-         dpth = DBLE(D(1))
-         rho1 = DBLE(RHO(1))
+         dpth = DBLE(thicknesses(1))
+         rho1 = DBLE(density_values(1))
          p = ra*dpth
-         beta = DBLE(B(1))
+         beta = DBLE(vs_values(1))
          znul = 1.0D-05
          CALL VAR(p,znul,ra,znul,Wvno,xka,znul,dpth,w,cosp,exa)
          w0 = -rho1*w
@@ -830,13 +812,13 @@
       IMPLICIT NONE
 !*--VAR893
 !*** Start of declarations inserted by SPAG
-      DOUBLE PRECISION A0 , Cosp , cosq , CPCq , CPY , CPZ , CQW , CQX ,&
-                     & Dpth , Exa , fac , P , pex , Q , qmp , Ra , Rb , &
-                     & sex , sinp , sinq
-      DOUBLE PRECISION W , Wvno , WY , WZ , x , Xka , Xkb , XY , XZ ,   &
-                     & y , z
+      DOUBLE PRECISION A0, Cosp, cosq, CPCq, CPY, CPZ, CQW, CQX ,&
+                     & Dpth, Exa, fac, P, pex, Q, qmp, Ra, Rb, &
+                     & sex, sinp, sinq
+      DOUBLE PRECISION W, Wvno, WY, WZ, x, Xka, Xkb, XY, XZ,   &
+                     & y, z
 !*** End of declarations inserted by SPAG
-      COMMON /OVRFLW/ A0 , CPCq , CPY , CPZ , CQW , CQX , XY , XZ , WY ,&
+      COMMON /OVRFLW/ A0, CPCq, CPY, CPZ, CQW, CQX, XY, XZ, WY ,&
                     & WZ
 
       !WRITE(*,*) "VERBOSE : ENTER VAR" !VERBOSE!
@@ -922,7 +904,7 @@
 !   Note that some precision will be lost during normalization.
 !
       IMPLICIT NONE
-      DOUBLE PRECISION Ee , Ex , t1 , t2
+      DOUBLE PRECISION Ee, Ex, t1, t2
       INTEGER i
       DIMENSION Ee(5)
 
@@ -930,11 +912,11 @@
 
       Ex = 0.0D+00
       t1 = 0.0D+00
-      DO i = 1 , 5
+      DO i = 1, 5
          IF ( DABS(Ee(i)) >  t1 ) t1 = DABS(Ee(i))
       ENDDO
       IF ( t1 <  1.D-40 ) t1 = 1.D+00
-      DO i = 1 , 5
+      DO i = 1, 5
          t2 = Ee(i)
          t2 = t2/t1
          Ee(i) = t2
@@ -950,14 +932,14 @@
       SUBROUTINE DNKA(Ca,Wvno2,Gam,Gammk,Rho)
 !     Dunkin's matrix.
       IMPLICIT NONE
-      DOUBLE PRECISION A0 , a0pq , Ca , CPCq , CPY , CPZ , CQW , CQX ,  &
-                     & Gam , gamm1 , Gammk , gm1sq , gmgm1 , gmgmk ,    &
-                     & one , Rho , rho2 , t , twgm1 , two
-      DOUBLE PRECISION Wvno2 , WY , WZ , XY , XZ
+      DOUBLE PRECISION A0, a0pq, Ca, CPCq, CPY, CPZ, CQW, CQX,  &
+                     & Gam, gamm1, Gammk, gm1sq, gmgm1, gmgmk,    &
+                     & one, Rho, rho2, t, twgm1, two
+      DOUBLE PRECISION Wvno2, WY, WZ, XY, XZ
       DIMENSION Ca(5,5)
-      COMMON /OVRFLW/ A0 , CPCq , CPY , CPZ , CQW , CQX , XY , XZ , WY ,&
+      COMMON /OVRFLW/ A0, CPCq, CPY, CPZ, CQW, CQX, XY, XZ, WY ,&
                     & WZ
-      DATA one , two/1.D+00 , 2.D+00/
+      DATA one, two/1.D+00, 2.D+00/
 
       !WRITE(*,*) "VERBOSE : ENTER DNKA"
       gamm1 = Gam - one
