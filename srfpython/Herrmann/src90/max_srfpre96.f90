@@ -125,19 +125,19 @@
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
 
-      INTEGER iunit,NL,LIN,LOT,i
+      INTEGER iunit,NL,STDIN,STDOUT,i
       REAL onel,oner
       REAL*4 h,dcl,dcr
       CHARACTER*80 nmdisp
-      PARAMETER (LIN=5,LOT=6)
+      PARAMETER (STDIN=5,STDOUT=6)
       PARAMETER (NL=200)
 
       INTEGER NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
 
 !-----
-!     LIN   - unit for FORTRAN read from terminal
-!     LOT   - unit for FORTRAN write to terminal
-!     LER   - unit for FORTRAN error output to terminal
+!     STDIN   - unit for FORTRAN read from terminal
+!     STDOUT   - unit for FORTRAN write to terminal
+!     STDERR   - unit for FORTRAN error output to terminal
 !     NL    - number of layers in model
 !     NL2   - number of columns in model (first NL2/2 are
 !           - velocity parameters, second NL2/2 are Q values)
@@ -181,114 +181,55 @@
 !         not used         1 frequency (never)
 !-----
       REAL DL(200),RHO(200),VA(200),VB(200)
-      read(LIN,"(I3)") Nlayer
-      read(LIN,*) DL(1:Nlayer-1)
-      read(LIN,*) VA(1:Nlayer)
-      read(LIN,*) VB(1:Nlayer)
-      read(LIN,*) RHO(1:Nlayer)
+      read(STDIN,"(I3)") Nlayer
+      read(STDIN,*) DL(1:Nlayer-1)
+      read(STDIN,*) VA(1:Nlayer)
+      read(STDIN,*) VB(1:Nlayer)
+      read(STDIN,*) RHO(1:Nlayer)
 
-      write(LOT,"(I3)") Nlayer
+      write(STDOUT,"(I3)") Nlayer
+
+      do i = 1, Nlayer-1
+        write(STDOUT,'(F8.3)', advance="no") DL(i)
+      end do
+      write(STDOUT,'(A1)') ""
 
       do i = 1, Nlayer
-        write(LOT,'(F8.3)', advance="no") DL(i)
+        write(STDOUT,'(F7.3)', advance="no") VA(i)
       end do
-      write(LOT,'(A1)') ""
+      write(STDOUT,'(A1)') ""
 
       do i = 1, Nlayer
-        write(LOT,'(F7.3)', advance="no") VA(i)
+        write(STDOUT,'(F7.3)', advance="no") VB(i)
       end do
-      write(LOT,'(A1)') ""
+      write(STDOUT,'(A1)') ""
 
       do i = 1, Nlayer
-        write(LOT,'(F7.3)', advance="no") VB(i)
+        write(STDOUT,'(F6.3)', advance="no") RHO(i)
       end do
-      write(LOT,'(A1)') ""
-
-      do i = 1, Nlayer
-        write(LOT,'(F6.3)', advance="no") RHO(i)
-      end do
-      write(LOT,'(A1)') ""
-!      write(LOT,*) VA(1:Nlayer)
-!      write(LOT,*) VB(1:Nlayer)
-!      write(LOT,*) RHO(1:Nlayer)
+      write(STDOUT,'(A1)') ""
+!      write(STDOUT,*) VA(1:Nlayer)
+!      write(STDOUT,*) VB(1:Nlayer)
+!      write(STDOUT,*) RHO(1:Nlayer)
 
 
-      READ (LIN,*) h,dcl,dcr
+      READ (STDIN,*) h,dcl,dcr
       oner   = 0.0
       onel   = 0.0
       NLG    = 0
       NRG    = 0
       earthflat = 0
 
-      READ (LIN,*) NLC,NLU,NRC,NRU
+      READ (STDIN,*) NLC,NLU,NRC,NRU
 
-      WRITE(LOT,"(F7.4)") h
+      WRITE(STDOUT,"(F7.4)") h
       CALL GETDSP(nmdisp,&
               & NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
               & earthflat,dcl,dcr,onel,oner)
       END
 
-!#################################################################
-!      SUBROUTINE GETMDL(Nmmodl,Nlayer,Iunit,earthflat)
-!! Nmmodl  = input file name or STDIN
-!! Nlayer  = number of layers in the input model
-!      IMPLICIT NONE
-!
-!      INTEGER LOT,LIN
-!      PARAMETER (LIN=5,LOT=6)
-!
-!      REAL DL,ETAp,ETAs,FREfp,FREfs,QA,QB,REFdep,RHO,VA,VB
-!      INTEGER icnvel,idimen,ierr,earthflat,iiso,Iunit,LGSTR ,lt,Nlayer
-!      INTEGER NL,NLAY
-!      PARAMETER (NL=200,NLAY=200)
-!
-!      COMMON /ISOMOD/ DL(NLAY),VA(NLAY),VB(NLAY),RHO(NLAY),     &
-!                    & QA(NLAY),QB(NLAY),ETAp(NLAY),ETAs(NLAY),  &
-!                    & FREfp(NLAY),FREfs(NLAY)
-!      COMMON /DEPREF/ REFdep
-!      CHARACTER Nmmodl*(*)
-!      COMMON /MODTIT/ TITle
-!      CHARACTER*80 TITle
-!!-----
-!!     open the model file. These values will be saved
-!!     in internal files so that the original model is not
-!!     modified in any way
-!!-----
-!!      CALL GETMOD(2,Nmmodl,Nlayer,TITle,Iunit,iiso,earthflat,idimen,icnvel,  &
-!!                & ierr,.FALSE.)
-!      read(LIN,*) Nlayer
-!      read(LIN,*) DL(1:Nlayer-1)
-!      read(LIN,*) VA(1:Nlayer)
-!      read(LIN,*) VB(1:Nlayer)
-!      read(LIN,*) RHO(1:Nlayer)
-!
-!      Iunit = 0
-!!##      lt = LGSTR(TITle)
-!!##      CALL PUTMOD(2,'stdout',Nlayer,TITle(1:lt),Iunit,iiso,earthflat,idimen, &
-!!##                & icnvel,.FALSE.)
-!      write(LOT,*) Nlayer
-!!      write(LOT,*) Iunit
-!!      write(LOT,*) iiso
-!!      write(LOT,*) earthflat
-!!      write(LOT,*) idimen
-!!      write(LOT,*) icnvel
-!!      write(LOT,*) ierr
-!      write(LOT,*) DL(1:Nlayer-1)
-!      write(LOT,*) VA(1:Nlayer)
-!      write(LOT,*) VB(1:Nlayer)
-!      write(LOT,*) RHO(1:Nlayer)
-!!      write(LOT,*) QA(1:Nlayer)
-!!      write(LOT,*) QB(1:Nlayer)
-!!      write(LOT,*) ETAp(1:Nlayer)
-!!      write(LOT,*) ETAs(1:Nlayer)
-!!      write(LOT,*) FREfp(1:Nlayer)
-!!      write(LOT,*) FREfs(1:Nlayer)
-!
-!      END
-!!*==GETDSP.spg  processed by SPAG 6.72Dc at 15:03 on  5 Dec 2017
 
-
-!#################################################################
+! #################################################################
       SUBROUTINE GETDSP(Nmdisp,NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
               & earthflat,Dcl,Dcr,Onel,Oner)
       IMPLICIT NONE
@@ -296,12 +237,12 @@
       REAL c,cper,dc,Dcl,Dcr,f,obs,obserr,one,    &
          & Onel,Oner,pper,sd
       INTEGER i,idat,igr,ilorr,ilvry,imode,iobs, &
-            & iobsyn,iporg,Iunitd,j,k,kmax,LGSTR,LIN ,&
-            & lnobl,LOT,ls
+            & iobsyn,iporg,Iunitd,j,k,kmax,LGSTR,STDIN ,&
+            & lnobl,STDOUT,ls
       INTEGER lsep,mm,n,nlr,nlrr,NM,nmgr,nmod,nmph ,&
             & NP,nper,nx
-      PARAMETER (NM=5000,LOT=6,NP=512)
-      PARAMETER (LIN=5)
+      PARAMETER (NM=5000,STDOUT=6,NP=512)
+      PARAMETER (STDIN=5)
       CHARACTER Nmdisp*(*)
       INTEGER NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
       REAL*4 tper(NM),vel(NM),dvel(NM)
@@ -314,9 +255,9 @@
 !-----
 !     MEANING OF VARIABLES
       !     nmdisp - file containing dispersion data
-!     LIN   - unit for FORTRAN read from terminal
-!     LOT   - unit for FORTRAN write to terminal
-!     LER   - unit for FORTRAN error output to terminal
+!     STDIN   - unit for FORTRAN read from terminal
+!     STDOUT   - unit for FORTRAN write to terminal
+!     STDERR   - unit for FORTRAN error output to terminal
 !     NL    - number of layers in model
 !     NL2   - number of columns in model (first NL2/2 are
 !           - velocity parameters, second NL2/2 are Q values)
@@ -349,7 +290,7 @@
       idat = 0
       Iunitd = 0
 
- 100  READ (LIN,'(a)',END=200) instr
+ 100  READ (STDIN,'(a)',END=200) instr
 !        WRITE(0,*)idat,' ',instr
       ls = LGSTR(instr)
 !-----
@@ -485,8 +426,8 @@
 !-----
 !     fix up period count
 !-----
-!      WRITE (LOT,*) nper,nper,earthflat
-      WRITE (LOT,'(I4)') nper
+!      WRITE (STDOUT,*) nper,nper,earthflat
+      WRITE (STDOUT,'(I4)') nper
 !-----
 !     adjust NLC, NLU, NRC, NRU for internal use
 !-----
@@ -528,13 +469,13 @@
 !           if(nmgr.gt.0 .and. nmph.gt.0 .and. nmgm.gt.0)igr=2
          IF ( nmgr.GT.0 .AND. nmph.GT.0 ) igr = 2
          nx = MAX(nmph,nmgr)
-!         WRITE (LOT,*) kmax,nx,dc,one,igr!,H
-         WRITE (LOT,"(I4,I4,F7.4,F7.4,I4)") kmax,nx,dc,one,igr!,H
-!        WRITE (LOT,*, advance="no") (per(i),i=1,kmax)
+!         WRITE (STDOUT,*) kmax,nx,dc,one,igr!,H
+         WRITE (STDOUT,"(I4,I4,F7.4,F7.4,I4)") kmax,nx,dc,one,igr!,H
+!        WRITE (STDOUT,*, advance="no") (per(i),i=1,kmax)
          do i = 1, kmax
-             WRITE (LOT,"(F8.3)", advance="no") per(i)
+             WRITE (STDOUT,"(F8.3)", advance="no") per(i)
          end do
-         WRITE (LOT,"(A1)") ""
+         WRITE (STDOUT,"(A1)") ""
 
 
          DO iporg = 1,2
@@ -583,7 +524,7 @@
       IMPLICIT NONE
 !*--GETLIM572
 !*** Start of declarations inserted by SPAG
-      INTEGER i,Ilvry,im,j,LOT,md,n
+      INTEGER i,Ilvry,im,j,STDOUT,md,n
 !*** End of declarations inserted by SPAG
       INTEGER*4 Modemx(2,2),Idat,Lorr(*),Imap(*),Mode(*)
 !-----
@@ -598,7 +539,7 @@
 !     desired results
 !
 !-----
-      PARAMETER (LOT=6)
+      PARAMETER (STDOUT=6)
       INTEGER*4 is(100),ie(100)
       DATA is/100*0/,ie/100*0/
       md = 0
@@ -629,7 +570,7 @@
 !     output starting with the first mode
 !-----
       DO n = 1,md
-         WRITE (LOT,"(I4,I4)") is(n),ie(n)
+         WRITE (STDOUT,"(I4,I4)") is(n),ie(n)
       ENDDO
       END
 

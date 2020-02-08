@@ -2,7 +2,10 @@
 
 #test the modified version of fortran programs max_srfpre96 and max_srfdis96
 
-cat << END | ../bin/max_srfpre96 | ../bin/max_srfdis96
+
+rm -f in.txt out1.txt out2.txt
+
+cat << END > in.txt
 8
 0.25 0.2  0.2  0.2  0.2  0.48 0.27
 1.85 2.36 2.63 3.15 3.71 4.54 5.48 5.8
@@ -42,3 +45,11 @@ SURF96 R U T 1 1.304237 0.696091 0.1
 SURF96 R U T 1 0.833333 0.708612 0.1
 END
 
+../bin/max_srfpre96 < in.txt > out1.txt
+../bin/max_srfpre96 < in.txt | ../bin/max_srfdis96  > out2.txt
+
+
+cmp --silent out1.txt expected1.txt || echo "error : the output from max_srfpre96 differs from expected1"
+cmp --silent out2.txt expected2.txt || echo "error : the output from max_srfdis96 differs from expected1"
+
+rm -f in.txt out1.txt out2.txt
