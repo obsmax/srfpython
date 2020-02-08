@@ -77,12 +77,12 @@
       INTEGER*4 Mmax , Iunit , Iiso , Iflsph , Idimen , Icnvel
       LOGICAL Lverby
 !-----
-!       LIN I*4 - logical unit for standard input
-!       LOT I*4 - logical unit for standard output
+!       STDIN I*4 - logical unit for standard input
+!       STDOUT I*4 - logical unit for standard output
 !-----
       INTEGER lun
-      INTEGER LOT , LER
-      PARAMETER (LOT=6,LER=0)
+      INTEGER STDOUT , LER
+      PARAMETER (STDOUT=6,LER=0)
  
       INTEGER NL
       PARAMETER (NL=200)
@@ -113,11 +113,11 @@
 !-----
 !       test to see if the file exists
 !-----
-      IF ( Mname(1:6).EQ.'stdout' .OR. Mname(1:6).EQ.'STDOUT' ) THEN
+      IF ( Mname(1:6) == 'stdout' .OR. Mname(1:6) == 'STDOUT' ) THEN
 !-----
 !           do not open anything, use standard output
 !-----
-         lun = LOT
+         lun = STDOUT
       ELSE
          INQUIRE (FILE=Mname,EXIST=ext)
          IF ( ext .AND. Lverby ) WRITE (LER,*)                          &
@@ -144,11 +144,11 @@
 !-----
 !       LINE 03
 !-----
-      IF ( Iiso.EQ.0 ) THEN
+      IF ( Iiso == 0 ) THEN
          WRITE (lun,'(a)') 'ISOTROPIC'
-      ELSEIF ( Iiso.EQ.1 ) THEN
+      ELSEIF ( Iiso == 1 ) THEN
          WRITE (lun,'(a)') 'TRANSVERSE ANISOTROPIC'
-      ELSEIF ( Iiso.EQ.2 ) THEN
+      ELSEIF ( Iiso == 2 ) THEN
          WRITE (lun,'(a)') 'ANISOTROPIC'
       ENDIF
 !-----
@@ -158,27 +158,27 @@
 !-----
 !       LINE 05
 !-----
-      IF ( Iflsph.EQ.0 ) THEN
+      IF ( Iflsph == 0 ) THEN
          WRITE (lun,'(a)') 'FLAT EARTH'
-      ELSEIF ( Iflsph.EQ.1 ) THEN
+      ELSEIF ( Iflsph == 1 ) THEN
          WRITE (lun,'(a)') 'SPHERICAL EARTH'
       ENDIF
 !-----
 !       LINE 06
 !-----
-      IF ( Idimen.EQ.1 ) THEN
+      IF ( Idimen == 1 ) THEN
          WRITE (lun,'(a)') '1-D'
-      ELSEIF ( Idimen.EQ.2 ) THEN
+      ELSEIF ( Idimen == 2 ) THEN
          WRITE (lun,'(a)') '2-D'
-      ELSEIF ( Idimen.EQ.3 ) THEN
+      ELSEIF ( Idimen == 3 ) THEN
          WRITE (lun,'(a)') '3-D'
       ENDIF
 !-----
 !       LINE 07
 !-----
-      IF ( Icnvel.EQ.0 ) THEN
+      IF ( Icnvel == 0 ) THEN
          WRITE (lun,'(a)') 'CONSTANT VELOCITY'
-      ELSEIF ( Icnvel.EQ.1 ) THEN
+      ELSEIF ( Icnvel == 1 ) THEN
          WRITE (lun,'(a)') 'VARIABLE VELOCITY'
       ENDIF
 !-----
@@ -209,6 +209,6 @@
                                      & QA(j) , QB(j) , ETAp(j) , ETAs(j)&
                                      & , FREfp(j) , FREfs(j)
       ENDDO
-      IF ( lun.NE.LOT ) CLOSE (lun)
+      IF ( lun /= STDOUT ) CLOSE (lun)
       END
 

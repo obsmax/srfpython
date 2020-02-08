@@ -21,7 +21,7 @@
       COMMON /MODTIT/ TITle
       CHARACTER TITle*80
       INTEGER NL
-      PARAMETER (NL=200)
+      PARAMETER (NL=100)
       COMMON /ISOMOD/ D(NL) , A(NL) , B(NL) , RHO(NL) , QA(NL) , QB(NL) &
                     & , ETAp(NL) , ETAs(NL) , FREfp(NL) , FREfs(NL)
       COMMON /DEPREF/ REFdep

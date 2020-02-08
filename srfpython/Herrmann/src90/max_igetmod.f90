@@ -85,22 +85,22 @@
 !*--GETMOD85
       CHARACTER Mname*(*) , Title*(*)
       INTEGER Rlun
-      INTEGER*4 Mmax , Iunit , Iiso , Iflsph , Idimen , Icnvel
-      INTEGER*4 Ierr
+      INTEGER(kind=4) Mmax, Iunit, Iiso, Iflsph, Idimen, Icnvel
+      INTEGER(kind=4) Ierr
       CHARACTER string*80
       LOGICAL Listmd
 !-----
-!       LIN I*4 - logical unit for standard input
-!       LOT I*4 - logical unit for standard output
+!       STDIN I*4 - logical unit for standard input
+!       STDOUT I*4 - logical unit for standard output
 !-----
-      INTEGER LIN , LOT , LER
-      PARAMETER (LIN=5,LOT=6,LER=0)
+      INTEGER STDIN , STDOUT , LER
+      PARAMETER (STDIN=5,STDOUT=6,LER=0)
  
       INTEGER NL
-      PARAMETER (NL=200)
-      COMMON /ISOMOD/ D(NL) , A(NL) , B(NL) , RHO(NL) , QA(NL) , QB(NL) &
-                    & , ETAp(NL) , ETAs(NL) , FREfp(NL) , FREfs(NL)
-      REAL D , A , B , RHO , QA , QB , ETAp , ETAs , FREfp , FREfs
+      PARAMETER (NL=100)
+      COMMON /ISOMOD/ D(NL), A(NL), B(NL), RHO(NL), QA(NL), QB(NL), &
+              &ETAp(NL), ETAs(NL), FREfp(NL), FREfs(NL)
+      REAL D, A, B, RHO, QA, QB, ETAp, ETAs, FREfp, FREfs
       COMMON /DEPREF/ REFdep
       REAL REFdep
  
@@ -115,11 +115,11 @@
 !-----
 !       test for input
 !-----
-      IF ( Mname(1:5).EQ.'stdin' .OR. Mname(1:5).EQ.'STDIN' ) THEN
+      IF ( Mname(1:5) == 'stdin' .OR. Mname(1:5) == 'STDIN' ) THEN
 !-----
 !           do not open anything, use standard output
 !-----
-         lun = LIN
+         lun = STDIN
       ELSE
          lun = Rlun
          INQUIRE (FILE=Mname,EXIST=ext)
@@ -142,7 +142,7 @@
 !       LINE 01
 !-----
       READ (lun,'(a)') ftype
-      IF ( ftype(1:5).NE.'model' .AND. ftype(1:5).NE.'MODEL' ) THEN
+      IF ( ftype(1:5) /= 'model' .AND. ftype(1:5) /= 'MODEL' ) THEN
          Ierr = -2
          WRITE (LER,*) 'Model file is not in model format'
          CLOSE (lun)
@@ -156,45 +156,45 @@
 !       LINE 03
 !-----
       READ (lun,'(a)') string
-      IF ( string(1:3).EQ.'ISO' .OR. string(1:3).EQ.'iso' ) THEN
+      IF ( string(1:3) == 'ISO' .OR. string(1:3) == 'iso' ) THEN
          Iiso = 0
-      ELSEIF ( string(1:3).EQ.'TRA' .OR. string(1:3).EQ.'tra' ) THEN
+      ELSEIF ( string(1:3) == 'TRA' .OR. string(1:3) == 'tra' ) THEN
          Iiso = 1
-      ELSEIF ( string(1:3).EQ.'ANI' .OR. string(1:3).EQ.'ani' ) THEN
+      ELSEIF ( string(1:3) == 'ANI' .OR. string(1:3) == 'ani' ) THEN
          Iiso = 2
       ENDIF
 !-----
 !       LINE 04
 !-----
       READ (lun,'(a)') string
-      IF ( string(1:3).EQ.'KGS' .OR. string(1:3).EQ.'kgs' ) Iunit = 0
+      IF ( string(1:3) == 'KGS' .OR. string(1:3) == 'kgs' ) Iunit = 0
 !-----
 !       LINE 05
 !-----
       READ (lun,'(a)') string
-      IF ( string(1:3).EQ.'FLA' .OR. string(1:3).EQ.'fla' ) THEN
+      IF ( string(1:3) == 'FLA' .OR. string(1:3) == 'fla' ) THEN
          Iflsph = 0
-      ELSEIF ( string(1:3).EQ.'SPH' .OR. string(1:3).EQ.'sph' ) THEN
+      ELSEIF ( string(1:3) == 'SPH' .OR. string(1:3) == 'sph' ) THEN
          Iflsph = 1
       ENDIF
 !-----
 !       LINE 06
 !-----
       READ (lun,'(a)') string
-      IF ( string(1:3).EQ.'1-d' .OR. string(1:3).EQ.'1-D' ) THEN
+      IF ( string(1:3) == '1-d' .OR. string(1:3) == '1-D' ) THEN
          Idimen = 1
-      ELSEIF ( string(1:3).EQ.'2-d' .OR. string(1:3).EQ.'2-D' ) THEN
+      ELSEIF ( string(1:3) == '2-d' .OR. string(1:3) == '2-D' ) THEN
          Idimen = 2
-      ELSEIF ( string(1:3).EQ.'3-d' .OR. string(1:3).EQ.'3-D' ) THEN
+      ELSEIF ( string(1:3) == '3-d' .OR. string(1:3) == '3-D' ) THEN
          Idimen = 3
       ENDIF
 !-----
 !       LINE 07
 !-----
       READ (lun,'(a)') string
-      IF ( string(1:3).EQ.'CON' .OR. string(1:3).EQ.'con' ) THEN
+      IF ( string(1:3) == 'CON' .OR. string(1:3) == 'con' ) THEN
          Icnvel = 0
-      ELSEIF ( string(1:3).EQ.'VAR' .OR. string(1:3).EQ.'var' ) THEN
+      ELSEIF ( string(1:3) == 'VAR' .OR. string(1:3) == 'var' ) THEN
          Icnvel = 1
       ENDIF
 !-----
@@ -213,37 +213,37 @@
       Mmax = 0
       REFdep = 0.0
       irefdp = 0
-      IF ( Iiso.EQ.0 ) THEN
+      IF ( Iiso == 0 ) THEN
  50      j = Mmax + 1
          READ (lun,*,ERR=100,END=100) D(j) , A(j) , B(j) , RHO(j) ,     &
                                     & QA(j) , QB(j) , ETAp(j) , ETAs(j) &
                                     & , FREfp(j) , FREfs(j)
-         IF ( D(j).LT.0.0 ) THEN
+         IF ( D(j) <  0.0 ) THEN
             D(j) = -D(j)
             REFdep = REFdep + D(j)
             irefdp = j
          ENDIF
          Mmax = j
 !add max : break if layer is 0, so the rest of the file is ignored
-         IF ( D(j).EQ.0.0 ) GOTO 100
+         IF ( D(j) == 0.0 ) GOTO 100
          GOTO 50
       ENDIF
- 100  IF ( Mmax.LE.0 ) THEN
+ 100  IF ( Mmax <= 0 ) THEN
          Ierr = -3
          WRITE (LER,*) 'Error in model file'
       ELSEIF ( Listmd ) THEN
          Ierr = 0
-         WRITE (LOT,99001)
+         WRITE (STDOUT,99001)
 99001    FORMAT (' LAYER             H      P-VEL     S-VEL   DENSITY  '&
                & )
          DO i = 1 , Mmax
-            WRITE (LOT,99002) i , D(i) , A(i) , B(i) , RHO(i)
+            WRITE (STDOUT,99002) i , D(i) , A(i) , B(i) , RHO(i)
 99002       FORMAT (' ',i5,5x,4F10.3)
-            IF ( i.EQ.irefdp ) WRITE (LOT,99003)
+            IF ( i == irefdp ) WRITE (STDOUT,99003)
 99003       FORMAT (' ','-SURFACE ','- - - - - ','- - - - - ',          &
                    &'- - - - - ','- - - - - -')
          ENDDO
       ENDIF
-      IF ( lun.NE.LIN ) CLOSE (lun)
+      IF ( lun /= STDIN ) CLOSE (lun)
       END
 

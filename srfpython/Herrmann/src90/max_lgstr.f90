@@ -9,13 +9,13 @@
       IMPLICIT NONE
 !*--LGSTR10
       CHARACTER*(*) Str
-      INTEGER*4 LGSTR
+      INTEGER(kind=4) LGSTR
       INTEGER n , i
       n = LEN(Str)
       LGSTR = 1
       DO i = n , 1 , -1
          LGSTR = i
-         IF ( Str(i:i).NE.' ' ) GOTO 99999
+         IF ( Str(i:i)/=' ' ) GOTO 99999
       ENDDO
 99999 END
 
