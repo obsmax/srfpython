@@ -97,7 +97,7 @@
       INTEGER mode
       INTEGER NP, NL,NLAY
 
-      PARAMETER (NL=200,NLAY=200)
+      PARAMETER (NL=100,NLAY=100)
       PARAMETER (NP=512)
       DOUBLE PRECISION TWOpi,one,onea
       DOUBLE PRECISION cc,c1,clow,cm,dc,t1
@@ -478,7 +478,7 @@
       INTEGER Ifunc , j , kk , LLW , m , Mmax , nctrl , nev , NL
 !*** End of declarations inserted by SPAG
 
-      PARAMETER (NL=200)
+      PARAMETER (NL=100)
       REAL(kind=4) D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) , BTP(NL)
       DIMENSION x(20) , y(20)
       COMMON /MODL  / D , A , B , RHO !, RTP , DTP , BTP
@@ -623,7 +623,7 @@
                      & Wvno , wvnom , wvnop , xkb , xmu , xnor
       DOUBLE PRECISION y , ynor , z
       INTEGER LLW , m , Mmax , mmm1 , NL
-      PARAMETER (NL=200)
+      PARAMETER (NL=100)
       REAL(kind=4) D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) ,  BTP(NL)
       COMMON /MODL  / D , A , B , RHO !, RTP , DTP , BTP
       COMMON /PARA  / Mmax , LLW , TWOpi
@@ -694,7 +694,7 @@
                      & Wvno , wvno2 , wvnom , wvnop , WY , WZ , xka ,   &
                      & xkb , XY , XZ , znul
       INTEGER i , j , LLW , m , Mmax , mmm1 , NL
-      PARAMETER (NL=200)
+      PARAMETER (NL=100)
       DIMENSION e(5) , ee(5) , ca(5,5)
       REAL(kind=4) D(NL) , A(NL) , B(NL) , RHO(NL)
       COMMON /MODL  / D , A , B , RHO
