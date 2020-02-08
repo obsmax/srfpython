@@ -128,7 +128,6 @@
       INTEGER iunit,NL,STDIN,STDOUT,i
       REAL onel,oner
       REAL*4 h,dcl,dcr
-      CHARACTER*80 nmdisp
       PARAMETER (STDIN=5,STDOUT=6)
       PARAMETER (NL=100)
 
@@ -219,14 +218,14 @@
       READ (STDIN,*) NLC,NLU,NRC,NRU
 
       WRITE(STDOUT,"(F7.4)") h
-      CALL GETDSP(nmdisp,&
+      CALL GETDSP(&
               & NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
               & earthflat,dcl,dcr,onel,oner)
       END
 
 
 ! #################################################################
-      SUBROUTINE GETDSP(Nmdisp,NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
+      SUBROUTINE GETDSP(NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
               & earthflat,Dcl,Dcr,Onel,Oner)
       IMPLICIT NONE
 
@@ -239,7 +238,6 @@
             & NP,nper,nx
       PARAMETER (NM=5000,STDOUT=6,NP=512)
       PARAMETER (STDIN=5)
-      CHARACTER Nmdisp*(*)
       INTEGER NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
       REAL*4 tper(NM),vel(NM),dvel(NM)
       INTEGER*4 lorr(NM),porg(NM),mode(NM),modemx(2,3)
@@ -250,7 +248,6 @@
       DATA modemx/0,0,0,0,0,0/
 !-----
 !     MEANING OF VARIABLES
-      !     nmdisp - file containing dispersion data
 !     STDIN   - unit for FORTRAN read from terminal
 !     STDOUT   - unit for FORTRAN write to terminal
 !     STDERR   - unit for FORTRAN error output to terminal
