@@ -289,18 +289,18 @@
 !-----
 !         do the parsing
 !-----
-      IF ( instr(1:6).EQ.'SURF96' .OR. instr(1:6).EQ.'surf96' ) THEN
+      IF ( instr(1:6) == 'SURF96' .OR. instr(1:6) == 'surf96' ) THEN
 !-----
 !             now get wave type
 !-----
          lsep = 6
          CALL GETBLNK(instr,lsep,ls,lnobl)
          ic = instr(lnobl:lnobl)
-         IF ( ic(1:1).EQ.'R' .OR. ic(1:1).EQ.'r' ) THEN
+         IF ( ic(1:1) == 'R' .OR. ic(1:1) == 'r' ) THEN
             ilorr = 2
-         ELSEIF ( ic(1:1).EQ.'L' .OR. ic(1:1).EQ.'l' ) THEN
+         ELSEIF ( ic(1:1) == 'L' .OR. ic(1:1) == 'l' ) THEN
             ilorr = 1
-         ELSEIF ( ic(1:1).EQ.'A' .OR. ic(1:1).EQ.'a' ) THEN
+         ELSEIF ( ic(1:1) == 'A' .OR. ic(1:1) == 'a' ) THEN
             ilorr = 0
          ELSE
             GOTO 100
@@ -311,11 +311,11 @@
          lsep = lnobl
          CALL GETBLNK(instr,lsep,ls,lnobl)
          ic = instr(lnobl:lnobl)
-         IF ( ic(1:1).EQ.'C' .OR. ic(1:1).EQ.'c' ) THEN
+         IF ( ic(1:1) == 'C' .OR. ic(1:1) == 'c' ) THEN
             iobs = 1
-         ELSEIF ( ic(1:1).EQ.'U' .OR. ic(1:1).EQ.'u' ) THEN
+         ELSEIF ( ic(1:1) == 'U' .OR. ic(1:1) == 'u' ) THEN
             iobs = 2
-         ELSEIF ( ic(1:1).EQ.'G' .OR. ic(1:1).EQ.'g' ) THEN
+         ELSEIF ( ic(1:1) == 'G' .OR. ic(1:1) == 'g' ) THEN
             iobs = 3
          ELSE
             GOTO 100
@@ -326,11 +326,11 @@
          lsep = lnobl
          CALL GETBLNK(instr,lsep,ls,lnobl)
          ic = instr(lnobl:lnobl)
-         IF ( ic(1:1).EQ.'T' .OR. ic(1:1).EQ.'t' ) THEN
+         IF ( ic(1:1)=='T' .OR. ic(1:1)=='t' ) THEN
             iobsyn = 2
-         ELSEIF ( ic(1:1).EQ.'F' .OR. ic(1:1).EQ.'f' ) THEN
+         ELSEIF ( ic(1:1) == 'F' .OR. ic(1:1) == 'f' ) THEN
             iobsyn = 1
-         ELSEIF ( ic(1:1).EQ.'X' .OR. ic(1:1).EQ.'x' ) THEN
+         ELSEIF ( ic(1:1) == 'X' .OR. ic(1:1) == 'x' ) THEN
             iobsyn = 1
          ELSE
             GOTO 100
@@ -362,12 +362,12 @@
 !-----
 !     increment n for internal use
 !-----
-!      IF ( ilorr.NE.1 .OR. iobs.NE.1 .OR. n.LE.NLC ) THEN
-!         IF ( ilorr.NE.1 .OR. iobs.NE.2 .OR. n.LE.NLU ) THEN
-!            IF ( ilorr.NE.1 .OR. iobs.NE.3 .OR. n.LE.NLG ) THEN
-!               IF ( ilorr.NE.2 .OR. iobs.NE.1 .OR. n.LE.NRC ) THEN
-!                  IF ( ilorr.NE.2 .OR. iobs.NE.2 .OR. n.LE.NRU ) THEN
-!                     IF ( ilorr.NE.2 .OR. iobs.NE.3 .OR. n.LE.NRG ) THEN
+!      IF ( ilorr /= 1 .OR. iobs /= 1 .OR. n <= NLC ) THEN
+!         IF ( ilorr /= 1 .OR. iobs /= 2 .OR. n <= NLU ) THEN
+!            IF ( ilorr /= 1 .OR. iobs /= 3 .OR. n <= NLG ) THEN
+!               IF ( ilorr /= 2 .OR. iobs /= 1 .OR. n <= NRC ) THEN
+!                  IF ( ilorr /= 2 .OR. iobs /= 2 .OR. n <= NRU ) THEN
+!                     IF ( ilorr /= 2 .OR. iobs /= 3 .OR. n <= NRG ) THEN
 !                     ENDIF
 !                  ENDIF
 !               ENDIF
@@ -375,13 +375,13 @@
 !         ENDIF
 !      ENDIF
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      ! ilorr.NE.1 <=> ilorr.EQ.2  and inversly
-      IF (( ilorr.EQ.2 .OR. iobs.NE.1 .OR. n.LE.NLC ) .AND. &
-         &( ilorr.EQ.2 .OR. iobs.NE.2 .OR. n.LE.NLU ) .AND. &
-         &( ilorr.EQ.2 .OR. iobs.NE.3 .OR. n.LE.NLG ) .AND. &
-         &( ilorr.EQ.1 .OR. iobs.NE.1 .OR. n.LE.NRC ) .AND. &
-         &( ilorr.EQ.1 .OR. iobs.NE.2 .OR. n.LE.NRU ) .AND. &
-         &( ilorr.EQ.1 .OR. iobs.NE.3 .OR. n.LE.NRG )) THEN
+      ! ilorr /= 1 <=> ilorr == 2  and inversly
+      IF (( ilorr == 2 .OR. iobs /= 1 .OR. n <= NLC ) .AND. &
+         &( ilorr == 2 .OR. iobs /= 2 .OR. n <= NLU ) .AND. &
+         &( ilorr == 2 .OR. iobs /= 3 .OR. n <= NLG ) .AND. &
+         &( ilorr == 1 .OR. iobs /= 1 .OR. n <= NRC ) .AND. &
+         &( ilorr == 1 .OR. iobs /= 2 .OR. n <= NRU ) .AND. &
+         &( ilorr == 1 .OR. iobs /= 3 .OR. n <= NRG )) THEN
 
             idat = idat + 1
             lorr(idat) = ilorr
@@ -393,7 +393,7 @@
             !-----
             tper(idat) = f
             vel(idat) = c
-            IF ( dc.EQ.0.0 ) dc = 1.0
+            IF ( dc == 0.0 ) dc = 1.0
             dvel(idat) = dc
             key(idat) = idat
             tmp(idat) = tper(idat)
@@ -401,9 +401,9 @@
             !!     make gamma seem to be phase data
             !!-----
             !                        mm = iobs
-            !                        IF ( mm.EQ.3 ) mm = 1
-            !                        IF ( n.GT.modemx(ilorr,mm) ) modemx(ilorr,mm) = n
-            IF ( n.GT.modemx(ilorr,iobs) ) modemx(ilorr,iobs) = n
+            !                        IF ( mm == 3 ) mm = 1
+            !                        IF ( n > modemx(ilorr,mm) ) modemx(ilorr,mm) = n
+            IF ( n > modemx(ilorr,iobs) ) modemx(ilorr,iobs) = n
       ENDIF
 
       GOTO 100
@@ -442,7 +442,7 @@
 !                       write range
 !-----
       DO ilvry = 1,2
-         IF ( ilvry.EQ.1 ) THEN
+         IF ( ilvry == 1 ) THEN
             nmph = modemx(1,1) ! NLC
             nmgr = modemx(1,2) ! NLU
             one = Onel
@@ -457,10 +457,10 @@
 !                 ENFORCE USER MODE LIMITS
 !-----
          kmax = nper ! < you son of a bitch
-         IF ( nmgr.EQ.0 ) igr = 0
-         IF ( nmph.EQ.0 ) igr = 1
-!           if(nmgr.gt.0 .and. nmph.gt.0 .and. nmgm.gt.0)igr=2
-         IF ( nmgr.GT.0 .AND. nmph.GT.0 ) igr = 2
+         IF ( nmgr == 0 ) igr = 0
+         IF ( nmph == 0 ) igr = 1
+!           if(nmgr > 0 .and. nmph > 0 .and. nmgm > 0)igr=2
+         IF ( nmgr > 0 .AND. nmph > 0 ) igr = 2
          nx = MAX(nmph,nmgr)
 !         WRITE (STDOUT,*) kmax,nx,dc,one,igr!,H
          WRITE (STDOUT,"(I4,I4,F7.4,F7.4,I4)") kmax,nx,dc,one,igr!,H
@@ -474,15 +474,15 @@
             DO nmod = 1,modemx(ilvry,iporg)
                nlr = 0
                DO i = 1,idat
-                  IF ( lorr(i).EQ.ilvry .AND. MOD(porg(i),2)            &
-                     & .EQ.MOD(iporg,2) .AND. mode(i).EQ.nmod ) THEN
+                  IF ( lorr(i) == ilvry .AND. MOD(porg(i),2)            &
+                     &  == MOD(iporg,2) .AND. mode(i) == nmod ) THEN
                      nlr = nlr + 1
                      tmp(nlr) = tper(i)
                      key(nlr) = nlr
                      jmap(nlr) = i
                   ENDIF
                ENDDO
-               IF ( nlr.GT.0 ) THEN
+               IF ( nlr > 0 ) THEN
                   CALL SORT(tmp,key,nlr)
                   nlrr = nlr
                   DO i = 1,nlr
@@ -536,17 +536,17 @@
       DATA is/100*0/,ie/100*0/
       md = 0
       DO i = 1,2
-         IF ( Modemx(Ilvry,i).GT.md ) md = Modemx(Ilvry,i)
+         IF ( Modemx(Ilvry,i) > md ) md = Modemx(Ilvry,i)
       ENDDO
 !-----
 !     perform linear searches for simplicity
 !-----
       DO n = md,1,-1
          DO j = 1,Idat
-            IF ( Mode(j).EQ.n .AND. Lorr(j).EQ.Ilvry ) THEN
+            IF ( Mode(j) == n .AND. Lorr(j) == Ilvry ) THEN
                im = Imap(j)
-               IF ( is(n).EQ.0 .OR. is(n).GT.im ) is(n) = im
-               IF ( ie(n).EQ.0 .OR. ie(n).LT.im ) ie(n) = im
+               IF ( is(n) == 0 .OR. is(n) > im ) is(n) = im
+               IF ( ie(n) == 0 .OR. ie(n) < im ) ie(n) = im
             ENDIF
          ENDDO
       ENDDO
@@ -554,9 +554,9 @@
 !     fill out comb
 !-----
       DO n = md,2,-1
-         IF ( is(n).LT.is(n-1) ) is(n-1) = is(n)
-         IF ( is(n-1).EQ.0 ) is(n-1) = is(n)
-         IF ( ie(n).GT.ie(n-1) ) ie(n-1) = ie(n)
+         IF ( is(n) < is(n-1) ) is(n-1) = is(n)
+         IF ( is(n-1) == 0 ) is(n-1) = is(n)
+         IF ( ie(n) > ie(n-1) ) ie(n-1) = ie(n)
       ENDDO
 !-----
 !     output starting with the first mode
@@ -593,7 +593,7 @@
       Imap(Key(1)) = Ny
       DO i = 1,Nx
          j = Key(i)
-         IF ( Y(Ny).LT.X(j) ) THEN
+         IF ( Y(Ny) < X(j) ) THEN
             Ny = Ny + 1
             Y(Ny) = X(j)
          ENDIF
@@ -629,7 +629,7 @@
       ENDDO
       DO i = N,1,-1
          DO j = 1,i - 1
-            IF ( X(j).GT.X(j+1) ) THEN
+            IF ( X(j) > X(j+1) ) THEN
                tmp = X(j)
                X(j) = X(j+1)
                X(j+1) = tmp
@@ -665,8 +665,8 @@
       Lnobl = Lsep + 1
       igotit = 0
       DO i = Lsep + 1,Ls
-         IF ( igotit.EQ.0 ) THEN
-            IF ( Instr(i:i).NE.' ' .AND. Instr(i:i).NE.tab ) THEN
+         IF ( igotit == 0 ) THEN
+            IF ( Instr(i:i) /= ' ' .AND. Instr(i:i) /= tab ) THEN
                Lnobl = i
                igotit = 1
             ENDIF
