@@ -375,13 +375,15 @@
 !     increment n for internal use
 !-----
       ! ilorr /= 1 <=> ilorr == 2  and inversly
-      IF (( ilorr == 2 .OR. iobs /= 1 .OR. n <= NLC ) .AND. &
-         &( ilorr == 2 .OR. iobs /= 2 .OR. n <= NLU ) .AND. &
-         &( ilorr == 2 .OR. iobs /= 3 .OR. n <= NLG ) .AND. &
-         &( ilorr == 1 .OR. iobs /= 1 .OR. n <= NRC ) .AND. &
-         &( ilorr == 1 .OR. iobs /= 2 .OR. n <= NRU ) .AND. &
-         &( ilorr == 1 .OR. iobs /= 3 .OR. n <= NRG )) THEN
-
+!      write(STDOUT,*) ilorr, iobs, n
+      IF (      ( ilorr == 1 .AND. iobs == 1 .AND. n <= NLC )&
+         & .OR. ( ilorr == 1 .AND. iobs == 2 .AND. n <= NLU )&
+!        & .OR. ( ilorr == 1 .AND. iobs == 3 .AND. n <= NLG )&
+         & .OR. ( ilorr == 2 .AND. iobs == 1 .AND. n <= NRC )&
+         & .OR. ( ilorr == 2 .AND. iobs == 2 .AND. n <= NRU )&
+!        & .OR. ( ilorr == 2 .AND. iobs == 3 .AND. n <= NRG )&
+              &) THEN
+!            write(STDOUT, *) 'ok'
             idat = idat + 1
             lorr(idat) = ilorr
             porg(idat) = iobs
