@@ -628,12 +628,10 @@
       ENDDO
       END
 
+
 !#################################################################
       SUBROUTINE GETBLNK(Instr,Lsep,Ls,Lnobl)
       IMPLICIT NONE
-
-
-
 !-----
 !     determine first non-blank character
 !
@@ -658,4 +656,3 @@
          ENDIF
       ENDDO
       END
-

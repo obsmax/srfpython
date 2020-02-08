@@ -57,7 +57,7 @@
 !         saving one parameter in subroutine sphere
 !     20 JUL 2004 - removed extraneous line at line 550
 !         since dc not defined
-!         if(dabs(c1-c2) .le. dmin1(1.d-6*c1,0.005d+0*dc) )go to 1000
+!         if(dabs(c1-c2)  <=  dmin1(1.d-6*c1,0.005d+0*dc) )go to 1000
 !     28 DEC 2007 - changed the Earth flattening to now use layer
 !         midpoint and the Biswas (1972: PAGEOPH 96, 61-74, 1972)
 !         density mapping for P-SV  - note a true comparison
@@ -69,8 +69,8 @@
 !     NP  - number of unique periods
 
 !-----
-!     LIN - unit for FORTRAN read from terminal
-!     LOT - unit for FORTRAN write to terminal
+!     STDIN  - unit for FORTRAN read from terminal
+!     STDOUT  - unit for FORTRAN write to terminal
 !     LLW - index of the first solid layer, starting with 1 from top
 !     idispl, idispr = number of dispersion points to compute for love and rayleigh
 !     Mmax = max number of layers in the mode, used in common with other subroutines
@@ -84,8 +84,8 @@
 !               for phase velocity, only t1a is used
       !-----
       ! uderstood variables
-      INTEGER LIN, LOT
-      PARAMETER (LIN=5,LOT=6)
+      INTEGER  STDIN , STDOUT 
+      PARAMETER ( STDIN =5,STDOUT =6)
       INTEGER LLW,idispl,idispr,Mmax,ifunc,jmn,jsol
       REAL betmn,betmx,t1a,t1b
 
@@ -102,8 +102,8 @@
       DOUBLE PRECISION TWOpi,one,onea
       DOUBLE PRECISION cc,c1,clow,cm,dc,t1
       DOUBLE PRECISION c(NP),cb(NP)
-      REAL*4 t(NP), D(NL),A(NL),B(NL),RHO(NL) !,RTP(NL),DTP(NL),BTP(NL)
-      REAL*4 qbinv(NL),qainv(NL)
+      REAL(kind=4) t(NP), D(NL),A(NL),B(NL),RHO(NL) !,RTP(NL),DTP(NL),BTP(NL)
+      REAL(kind=4) qbinv(NL),qainv(NL)
       COMMON /MODL  / D , A , B , RHO ! , RTP , DTP , BTP
       COMMON /PARA  / Mmax,LLW,TWOpi
 
@@ -111,26 +111,26 @@
       CHARACTER(LEN=80) :: FMT ! WARNING must be long enough for FMT
 !-----
       FMT = "(I2,I2,F11.6,F11.6,F11.6,F11.6)" ! print format for output
-      read(LIN,*) Mmax
-      iunit = 0 ! read(LIN,*) iunit! was overwrite by 0 anyway
-      iiso = 0 !read(LIN,*) iiso ! not used
-      idimen = 0  !read(LIN,*) idimen ! model is always 1d
-      icnvel = 0  !read(LIN,*) icnvel ! model is always constant velo
-      ierr = 0 !read(LIN,*) ierr
-      read(LIN,*) D(1:MMax-1)
-      read(LIN,*) A(1:Mmax)
-      read(LIN,*) B(1:MMax)
-      read(LIN,*) RHO(1:MMax)
+      read( STDIN ,*) Mmax
+      iunit = 0 ! read( STDIN ,*) iunit! was overwrite by 0 anyway
+      iiso = 0 !read( STDIN ,*) iiso ! not used
+      idimen = 0  !read( STDIN ,*) idimen ! model is always 1d
+      icnvel = 0  !read( STDIN ,*) icnvel ! model is always constant velo
+      ierr = 0 !read( STDIN ,*) ierr
+      read( STDIN ,*) D(1:MMax-1)
+      read( STDIN ,*) A(1:Mmax)
+      read( STDIN ,*) B(1:MMax)
+      read( STDIN ,*) RHO(1:MMax)
 !-----
-      READ (LIN,*) h
-      READ (LIN,*) idispl
+      READ ( STDIN ,*) h
+      READ ( STDIN ,*) idispl
       idispr=idispl ! always true, see srfpre96
 
 !-----
 !     check for water layer
 !-----
       LLW = 1 !first solid layer index
-      IF ( B(1).LE.0.0 ) LLW = 2
+      IF ( B(1) <= 0.0 ) LLW = 2
       TWOpi = 2.D0*3.141592653589793D0
       one = 1.0D-2
       jmn = 1
@@ -141,16 +141,16 @@
 !-----
 !      call cpu_time(start)
       DO i = 1 , Mmax
-         IF ( B(i).GT.0.01 .AND. B(i).LT.betmn ) THEN
+         IF ( B(i) >  0.01 .AND. B(i) <  betmn ) THEN
             betmn = B(i)
             jmn = i
             jsol = 1
-         ELSEIF ( B(i).LE.0.01 .AND. A(i).LT.betmn ) THEN
+         ELSEIF ( B(i) <= 0.01 .AND. A(i) <  betmn ) THEN
             betmn = A(i)
             jmn = i
             jsol = 0
          ENDIF
-         IF ( B(i).GT.betmx ) betmx = B(i)
+         IF ( B(i) >  betmx ) betmx = B(i)
       ENDDO
 !      call cpu_time(finish)
 !      print '("T1 = ",f6.3," seconds.")',finish-start
@@ -158,22 +158,22 @@
 
 !      call cpu_time(start)
       DO ifunc = 1 , 2 ! 1 = love 2 = rayleigh
-!         IF ( ifunc.NE.1 .OR. idispl.GT.0) THEN       < who is the fucking bastard who coded that?
-!            IF ( ifunc.NE.2 .OR. idispr.GT.0 ) THEN   < who is the fucking bastard who coded that?
-          IF   ((ifunc.EQ.1 .AND. idispl.GT.0) &
-            .OR.(ifunc.EQ.2 .AND. idispr.GT.0)) THEN
+!         IF ( ifunc /= 1 .OR. idispl >  0) THEN       < who is the fucking bastard who coded that?
+!            IF ( ifunc /= 2 .OR. idispr >  0 ) THEN   < who is the fucking bastard who coded that?
+          IF   ((ifunc == 1 .AND. idispl >  0) &
+            .OR.(ifunc == 2 .AND. idispr >  0)) THEN
 
-               READ (LIN,*) kmax, mode, ddc, sone, igr !, h
-               READ (LIN,*) (t(i),i=1,kmax)
+               READ (STDIN  ,*) kmax, mode, ddc, sone, igr !, h
+               READ (STDIN  ,*) (t(i),i=1,kmax)
 
-               IF ( sone.LT.0.01 ) sone = 2.0
+               IF ( sone <  0.01 ) sone = 2.0
                onea = DBLE(sone)
                !-----
                !     get starting value for phase velocity,
                !         which will correspond to the
                !     VP/VS ratio
                !-----
-               IF ( jsol.EQ.0 ) THEN ! water layer
+               IF ( jsol == 0 ) THEN ! water layer
                   cc1 = betmn
                ELSE ! solid layer solve halfspace period equation
                   CALL GTSOLH(A(jmn),B(jmn),cc1)
@@ -197,12 +197,12 @@
                DO iq = 1 , mode
 !                  call cpu_time(start1)
 
-                  READ (LIN,*) is , ie
+                  READ (STDIN  ,*) is , ie
                   itst = ifunc
                   DO k = is , ie
-                     IF ( k.GE.ift ) GOTO 5
+                     IF ( k >= ift ) GOTO 5
                      t1 = DBLE(t(k)) ! period at which to compute phase velo
-                     IF ( igr.GT.0 ) THEN
+                     IF ( igr >  0 ) THEN
                         t1a = t1/(1.+h) ! for group, shift the period a little bit for differential
                         t1b = t1/(1.-h) ! for group, shift the period a little bit for differential
                         t1 = DBLE(t1a)
@@ -222,22 +222,22 @@
                     !     The subroutine getsol determines the zero crossing and refines
                     !     the root.
                     !-----
-                     IF ( k.EQ.is .AND. iq.EQ.1 ) THEN
+                     IF ( k == is .AND. iq == 1 ) THEN
                         c1 = cc
                         clow = cc
                         ifirst = 1
-                     ELSEIF ( k.EQ.is .AND. iq.GT.1 ) THEN
+                     ELSEIF ( k == is .AND. iq >  1 ) THEN
                         c1 = c(is) + one*dc
                         clow = c1
                         ifirst = 1
-                     ELSEIF ( k.GT.is .AND. iq.GT.1 ) THEN
+                     ELSEIF ( k >  is .AND. iq >  1 ) THEN
                         ifirst = 0
                     ! clow = c(k) + one*dc
                     ! c1 = c(k-1) -onea*dc
                         clow = c(k) + one*dc
                         c1 = c(k-1)
-                        IF ( c1.LT.clow ) c1 = clow
-                     ELSEIF ( k.GT.is .AND. iq.EQ.1 ) THEN
+                        IF ( c1 <  clow ) c1 = clow
+                     ELSEIF ( k >  is .AND. iq == 1 ) THEN
                         ifirst = 0
                         c1 = c(k-1) - onea*dc
                         clow = cm
@@ -248,12 +248,12 @@
 !                     !WRITE(*,*) "VERBOSE : av1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
                      CALL GETSOL(t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst)
 !                     !WRITE(*,*) "VERBOSE : ap1",t1,c1,clow,dc,cm,betmx,iret,ifunc,ifirst
-                     IF ( iret.EQ.-1 ) GOTO 5 ! if root not found
+                     IF ( iret == -1 ) GOTO 5 ! if root not found
                      c(k) = c1
                      !-----
                      !     for group velocities compute near above solution
                      !-----
-                     IF ( igr.GT.0 ) THEN
+                     IF ( igr >  0 ) THEN
                         ! for group, need to compute phase velo at periods t1a and t1b instead of just t1
                         t1 = DBLE(t1b)
                         ifirst = 0
@@ -265,14 +265,14 @@
                         !-----
                         !     test if root not found at slightly larger period
                         !-----
-                        IF ( iret.EQ.-1 ) c1 = c(k)
+                        IF ( iret == -1 ) c1 = c(k)
                         cb(k) = c1
                      ELSE
                         c1 = 0.0D+00
                      ENDIF
                      cc0 = SNGL(c(k))
                      cc1 = SNGL(c1)
-!                     WRITE (LOT,*)
+!                     WRITE (STDOUT ,*)
 
                       WRITE(*,FMT) itst,iq - 1,t1a,t1b,cc0,cc1
 
@@ -281,7 +281,7 @@
 !                  print '("elapsed time ",f6.3," seconds.")',finish1-start1
                   GOTO 10
 
-! 5                IF ( iq.GT.1 ) THEN < what is the point?
+! 5                IF ( iq >  1 ) THEN < what is the point?
 !                  ENDIF               < what is the point?
 
  5                ift = k
@@ -334,9 +334,9 @@
       IMPLICIT NONE
       REAL Betmx
       INTEGER Ifirst , Ifunc , Iret
-      REAL*8 wvno , omega , twopi
-      REAL*8 C1 , c2 , cn , Cm , Dc , T1 , Clow, fdir
-      REAL*8 DLTAR , del1 , del2 , del1st , plmn
+      REAL(kind=8) wvno , omega , twopi
+      REAL(kind=8) C1 , c2 , cn , Cm , Dc , T1 , Clow, fdir
+      REAL(kind=8) DLTAR , del1 , del2 , del1st , plmn
       SAVE del1st
 
       !WRITE(*,*) "VERBOSE : ENTER GETSOL" !VERBOSE!
@@ -376,13 +376,13 @@
       omega = twopi/T1
       wvno = omega/C1
       del1 = DLTAR(wvno,omega,Ifunc)
-      IF ( Ifirst.EQ.1 ) del1st = del1
+      IF ( Ifirst == 1 ) del1st = del1
       plmn = DSIGN(1.0D+00,del1st)*DSIGN(1.0D+00,del1)
-      IF ( Ifirst.EQ.1 ) THEN
+      IF ( Ifirst == 1 ) THEN
          fdir = +1.0
-      ELSEIF ( Ifirst.NE.1 .AND. plmn.GE.0.0D+00 ) THEN
+      ELSEIF ( Ifirst /= 1 .AND. plmn >= 0.0D+00 ) THEN
          fdir = +1.0
-      ELSEIF ( Ifirst.NE.1 .AND. plmn.LT.0.0D+00 ) THEN
+      ELSEIF ( Ifirst /= 1 .AND. plmn <  0.0D+00 ) THEN
          fdir = -1.0
       ENDIF
 !-----
@@ -395,20 +395,20 @@
 !     go below the floor of clow, when the direction is reversed
 !-----
 !     original syntax
-! 100  IF ( idir.GT.0 ) THEN
+! 100  IF ( idir >  0 ) THEN
 !         c2 = C1 + Dc
 !      ELSE
 !         c2 = C1 - Dc
 !      ENDIF
-!      IF ( c2.LE.Clow ) THEN
+!      IF ( c2 <= Clow ) THEN
 !         idir = +1
 !         C1 = Clow
 !      ENDIF
-!      IF ( c2.LE.Clow ) GOTO 100
+!      IF ( c2 <= Clow ) GOTO 100
 
 !     syntax 1
 100   C2 = C1 + fdir * Dc
-      IF ( c2.LE.Clow ) THEN
+      IF ( c2 <= Clow ) THEN
          ! wrong start
          ! we are below Clow, force research direction to upward
          ! put C1 to Clow and restart the loop from beginning
@@ -421,13 +421,13 @@
       wvno = omega/c2
       del2 = DLTAR(wvno,omega,Ifunc)
 
-      IF ( DSIGN(1.0D+00,del1).NE.DSIGN(1.0D+00,del2) ) THEN
+      IF ( DSIGN(1.0D+00,del1) /= DSIGN(1.0D+00,del2) ) THEN
         !-----
         !     root bracketed, refine it
         !-----
          CALL NEVILL(T1,C1,c2,del1,del2,Ifunc,cn)
          C1 = cn
-         IF ( C1.GT.(Betmx) ) THEN
+         IF ( C1 >  (Betmx) ) THEN
             Iret = -1  ! failure signal
 !            GOTO 99999 ! quit subroutine
          ELSE
@@ -439,10 +439,10 @@
       C1 = c2
       del1 = del2
 !   check that c1 is in region of solutions
-      IF ( C1.LT.Cm ) THEN
+      IF ( C1 <  Cm ) THEN
          Iret = -1 ! failure signal
       ELSE
-         IF ( C1.LT.(Betmx+Dc) ) GOTO 100
+         IF ( C1 <  (Betmx+Dc) ) GOTO 100
          Iret = -1 ! failure signal
       ENDIF
 
@@ -479,7 +479,7 @@
 !*** End of declarations inserted by SPAG
 
       PARAMETER (NL=200)
-      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) , BTP(NL)
+      REAL(kind=4) D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) , BTP(NL)
       DIMENSION x(20) , y(20)
       COMMON /MODL  / D , A , B , RHO !, RTP , DTP , BTP
       COMMON /PARA  / Mmax , LLW , TWOpi
@@ -491,14 +491,14 @@
       nev = 1
       nctrl = 1
  100  nctrl = nctrl + 1
-      IF ( nctrl.GE.100 ) THEN
+      IF ( nctrl >= 100 ) THEN
          Cc = c3
       ELSE
 !-----
 !     make sure new estimate is inside the previous values. If not
 !     perform interval halving
 !-----
-         IF ( c3.LT.DMIN1(C1,C2) .OR. c3.GT.DMAX1(C1,C2) ) THEN
+         IF ( c3 <  DMIN1(C1,C2) .OR. c3 >  DMAX1(C1,C2) ) THEN
             nev = 0
             CALL HALF(C1,C2,c3,del3,omega,Ifunc)
          ENDIF
@@ -507,7 +507,7 @@
 !-----
 !     define new bounds according to the sign of the period equation
 !-----
-         IF ( DSIGN(1.D+00,del3)*DSIGN(1.D+00,Del1).LT.0.0D+00 ) THEN
+         IF ( DSIGN(1.D+00,del3)*DSIGN(1.D+00,Del1) <  0.0D+00 ) THEN
             C2 = c3
             Del2 = del3
          ELSE
@@ -517,14 +517,14 @@
 !-----
 !     check for convergence. A relative error criteria is used
 !-----
-         IF ( DABS(C1-C2).LE.1.D-6*C1 ) THEN
+         IF ( DABS(C1-C2) <= 1.D-6*C1 ) THEN
             Cc = c3
          ELSE
 !-----
 !     if the slopes are not the same between c1, c3 and c3
 !     do not use neville iteration
 !-----
-            IF ( DSIGN(1.0D+00,s13).NE.DSIGN(1.0D+00,s32) ) nev = 0
+            IF ( DSIGN(1.0D+00,s13) /= DSIGN(1.0D+00,s32) ) nev = 0
 !-----
 !     if the period equation differs by more than a factor of 10
 !     use interval halving to avoid poor behavior of polynomial fit
@@ -533,12 +533,12 @@
             s1 = 0.01*ss1
             ss2 = DABS(Del2)
             s2 = 0.01*ss2
-            IF ( s1.GT.ss2 .OR. s2.GT.ss1 .OR. nev.EQ.0 ) THEN
+            IF ( s1 >  ss2 .OR. s2 >  ss1 .OR. nev == 0 ) THEN
                CALL HALF(C1,C2,c3,del3,omega,Ifunc)
                nev = 1
                m = 1
             ELSE
-               IF ( nev.EQ.2 ) THEN
+               IF ( nev == 2 ) THEN
                   x(m+1) = c3
                   y(m+1) = del3
                ELSE
@@ -556,7 +556,7 @@
                DO kk = 1 , m
                   j = m - kk + 1
                   denom = y(m+1) - y(j)
-                  IF ( DABS(denom).LT.1.0D-10*ABS(y(m+1)) ) GOTO 110
+                  IF ( DABS(denom) <  1.0D-10*ABS(y(m+1)) ) GOTO 110
                   x(j) = (-y(j)*x(j+1)+y(m+1)*x(j))/denom
                ENDDO
                c3 = x(1)
@@ -564,7 +564,7 @@
                del3 = DLTAR(wvno,omega,Ifunc)
                nev = 2
                m = m + 1
-               IF ( m.GT.10 ) m = 10
+               IF ( m >  10 ) m = 10
                GOTO 100
  110           CALL HALF(C1,C2,c3,del3,omega,Ifunc)
                nev = 1
@@ -601,10 +601,10 @@
       INTEGER Ifunc
       !WRITE(*,*) "VERBOSE : ENTER DLTAR" !VERBOSE!
 
-      IF ( Ifunc.EQ.1 ) THEN
+      IF ( Ifunc == 1 ) THEN
          !love wave period equation
          DLTAR = DLTAR1(Wvno,Omega)
-      ELSEIF ( Ifunc.EQ.2 ) THEN
+      ELSEIF ( Ifunc == 2 ) THEN
          !rayleigh wave period equation
          DLTAR = DLTAR4(Wvno,Omega)
       ENDIF
@@ -624,7 +624,7 @@
       DOUBLE PRECISION y , ynor , z
       INTEGER LLW , m , Mmax , mmm1 , NL
       PARAMETER (NL=200)
-      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) ,  BTP(NL)
+      REAL(kind=4) D(NL) , A(NL) , B(NL) , RHO(NL) !, RTP(NL) , DTP(NL) ,  BTP(NL)
       COMMON /MODL  / D , A , B , RHO !, RTP , DTP , BTP
       COMMON /PARA  / Mmax , LLW , TWOpi
 
@@ -652,18 +652,18 @@
          wvnom = DABS(Wvno-xkb)
          rb = DSQRT(wvnop*wvnom)
          q = DBLE(D(m))*rb
-         IF ( Wvno.LT.xkb ) THEN
+         IF ( Wvno <  xkb ) THEN
             sinq = DSIN(q)
             y = sinq/rb
             z = -rb*sinq
             cosq = DCOS(q)
-         ELSEIF ( Wvno.EQ.xkb ) THEN
+         ELSEIF ( Wvno == xkb ) THEN
             cosq = 1.0D+00
             y = DBLE(D(m))
             z = 0.0D+00
          ELSE
             fac = 0.0D+00
-            IF ( q.LT.16 ) fac = DEXP(-2.0D+0*q)
+            IF ( q <  16 ) fac = DEXP(-2.0D+0*q)
             cosq = (1.0D+00+fac)*0.5D+00
             sinq = (1.0D+00-fac)*0.5D+00
             y = sinq/rb
@@ -673,8 +673,8 @@
          e20 = e1*y/xmu + e2*cosq
          xnor = DABS(e10)
          ynor = DABS(e20)
-         IF ( ynor.GT.xnor ) xnor = ynor
-         IF ( xnor.LT.1.D-40 ) xnor = 1.0D+00
+         IF ( ynor >  xnor ) xnor = ynor
+         IF ( xnor <  1.D-40 ) xnor = 1.0D+00
          e1 = e10/xnor
          e2 = e20/xnor
       ENDDO
@@ -696,7 +696,7 @@
       INTEGER i , j , LLW , m , Mmax , mmm1 , NL
       PARAMETER (NL=200)
       DIMENSION e(5) , ee(5) , ca(5,5)
-      REAL*4 D(NL) , A(NL) , B(NL) , RHO(NL)
+      REAL(kind=4) D(NL) , A(NL) , B(NL) , RHO(NL)
       COMMON /MODL  / D , A , B , RHO
       COMMON /PARA  / Mmax , LLW , TWOpi
       COMMON /OVRFLW/ A0 , CPCq , CPY , CPZ , CQW , CQX , XY , XZ , WY ,&
@@ -704,7 +704,7 @@
 !
       !WRITE(*,*) "VERBOSE : ENTER DLTAR4" !VERBOSE!
       omega = Omga
-      IF ( omega.LT.1.0D-4 ) omega = 1.0D-4
+      IF ( omega <  1.0D-4 ) omega = 1.0D-4
       wvno2 = Wvno*Wvno
       xka = omega/DBLE(A(Mmax))
       xkb = omega/DBLE(B(Mmax))
@@ -766,7 +766,7 @@
             e(i) = ee(i)
          ENDDO
       ENDDO
-      IF ( LLW.NE.1 ) THEN
+      IF ( LLW /= 1 ) THEN
 !-----
 !   include water layer.
 !-----
@@ -855,19 +855,19 @@
 !-----
       pex = 0.0D+00
       sex = 0.0D+00
-      IF ( Wvno.LT.Xka ) THEN
+      IF ( Wvno <  Xka ) THEN
          sinp = DSIN(P)
          W = sinp/Ra
          x = -Ra*sinp
          Cosp = DCOS(P)
-      ELSEIF ( Wvno.EQ.Xka ) THEN
+      ELSEIF ( Wvno == Xka ) THEN
          Cosp = 1.0D+00
          W = Dpth
          x = 0.0D+00
-      ELSEIF ( Wvno.GT.Xka ) THEN
+      ELSEIF ( Wvno >  Xka ) THEN
          pex = P
          fac = 0.0D+00
-         IF ( P.LT.16 ) fac = DEXP(-2.0D+00*P)
+         IF ( P <  16 ) fac = DEXP(-2.0D+00*P)
          Cosp = (1.0D+00+fac)*0.5D+00
          sinp = (1.0D+00-fac)*0.5D+00
          W = sinp/Ra
@@ -877,19 +877,19 @@
 !   examine S-wave eigenfunctions
 !      checking whether c > vs, c = vs, c < vs
 !-----
-      IF ( Wvno.LT.Xkb ) THEN
+      IF ( Wvno <  Xkb ) THEN
          sinq = DSIN(Q)
          y = sinq/Rb
          z = -Rb*sinq
          cosq = DCOS(Q)
-      ELSEIF ( Wvno.EQ.Xkb ) THEN
+      ELSEIF ( Wvno == Xkb ) THEN
          cosq = 1.0D+00
          y = Dpth
          z = 0.0D+00
-      ELSEIF ( Wvno.GT.Xkb ) THEN
+      ELSEIF ( Wvno >  Xkb ) THEN
          sex = Q
          fac = 0.0D+00
-         IF ( Q.LT.16 ) fac = DEXP(-2.0D+0*Q)
+         IF ( Q <  16 ) fac = DEXP(-2.0D+0*Q)
          cosq = (1.0D+00+fac)*0.5D+00
          sinq = (1.0D+00-fac)*0.5D+00
          y = sinq/Rb
@@ -900,7 +900,7 @@
 !-----
       Exa = pex + sex
       A0 = 0.0D+00
-      IF ( Exa.LT.60.0D+00 ) A0 = DEXP(-Exa)
+      IF ( Exa <  60.0D+00 ) A0 = DEXP(-Exa)
       CPCq = Cosp*cosq
       CPY = Cosp*y
       CPZ = Cosp*z
@@ -912,7 +912,7 @@
       WZ = W*z
       qmp = sex - pex
       fac = 0.0D+00
-      IF ( qmp.GT.-40.0D+00 ) fac = DEXP(qmp)
+      IF ( qmp >  -40.0D+00 ) fac = DEXP(qmp)
       cosq = cosq*fac
       y = fac*y
       z = fac*z
@@ -937,9 +937,9 @@
       Ex = 0.0D+00
       t1 = 0.0D+00
       DO i = 1 , 5
-         IF ( DABS(Ee(i)).GT.t1 ) t1 = DABS(Ee(i))
+         IF ( DABS(Ee(i)) >  t1 ) t1 = DABS(Ee(i))
       ENDDO
-      IF ( t1.LT.1.D-40 ) t1 = 1.D+00
+      IF ( t1 <  1.D-40 ) t1 = 1.D+00
       DO i = 1 , 5
          t2 = Ee(i)
          t2 = t2/t1
