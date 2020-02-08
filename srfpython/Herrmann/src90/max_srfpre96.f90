@@ -125,13 +125,14 @@
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
 
-      INTEGER iunit,NL,STDIN,STDOUT,i
+      INTEGER NL,STDIN,STDOUT,i
+      INTEGER iunit,NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
+
       REAL onel,oner
       REAL*4 h,dcl,dcr
+
       PARAMETER (STDIN=5,STDOUT=6)
       PARAMETER (NL=100)
-
-      INTEGER NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
 
 !-----
 !     STDIN   - unit for FORTRAN read from terminal
@@ -232,19 +233,24 @@
       REAL c,cper,dc,Dcl,Dcr,f,obs,obserr,one,    &
          & Onel,Oner,pper,sd
       INTEGER i,idat,igr,ilorr,ilvry,imode,iobs, &
-            & iobsyn,iporg,Iunitd,j,k,kmax,LGSTR,STDIN ,&
+            & iobsyn,iporg,Iunitd,j,k,LGSTR,STDIN ,&
             & lnobl,STDOUT,ls
       INTEGER lsep,mm,n,nlr,nlrr,NM,nmgr,nmod,nmph ,&
             & NP,nper,nx
+      INTEGER NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
+
       PARAMETER (NM=5000,STDOUT=6,NP=512)
       PARAMETER (STDIN=5)
-      INTEGER NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
-      REAL*4 tper(NM),vel(NM),dvel(NM)
-      INTEGER*4 lorr(NM),porg(NM),mode(NM),modemx(2,3)
-      REAL*4 per(NP),tmp(NM)
-      INTEGER*4 key(NM),imap(NM),jmap(NM)
+
+      INTEGER(kind=4) lorr(NM),porg(NM),mode(NM),modemx(2,3)
+      INTEGER(kind=4) key(NM),imap(NM),jmap(NM)
+
+      REAL(kind=4) tper(NM),vel(NM),dvel(NM)
+      REAL(kind=4) per(NP),tmp(NM)
+
       CHARACTER instr*132
       CHARACTER ic*1
+
       DATA modemx/0,0,0,0,0,0/
 !-----
 !     MEANING OF VARIABLES
@@ -344,7 +350,6 @@
          READ (instr(lnobl:ls),*) imode,pper,obs,obserr
       ENDIF
 
-
       n = imode + 1
       f = pper
       c = obs
@@ -362,19 +367,6 @@
 !-----
 !     increment n for internal use
 !-----
-!      IF ( ilorr /= 1 .OR. iobs /= 1 .OR. n <= NLC ) THEN
-!         IF ( ilorr /= 1 .OR. iobs /= 2 .OR. n <= NLU ) THEN
-!            IF ( ilorr /= 1 .OR. iobs /= 3 .OR. n <= NLG ) THEN
-!               IF ( ilorr /= 2 .OR. iobs /= 1 .OR. n <= NRC ) THEN
-!                  IF ( ilorr /= 2 .OR. iobs /= 2 .OR. n <= NRU ) THEN
-!                     IF ( ilorr /= 2 .OR. iobs /= 3 .OR. n <= NRG ) THEN
-!                     ENDIF
-!                  ENDIF
-!               ENDIF
-!            ENDIF
-!         ENDIF
-!      ENDIF
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! ilorr /= 1 <=> ilorr == 2  and inversly
       IF (( ilorr == 2 .OR. iobs /= 1 .OR. n <= NLC ) .AND. &
          &( ilorr == 2 .OR. iobs /= 2 .OR. n <= NLU ) .AND. &
@@ -456,16 +448,16 @@
 !-----
 !                 ENFORCE USER MODE LIMITS
 !-----
-         kmax = nper ! < you son of a bitch
+
          IF ( nmgr == 0 ) igr = 0
          IF ( nmph == 0 ) igr = 1
 !           if(nmgr > 0 .and. nmph > 0 .and. nmgm > 0)igr=2
          IF ( nmgr > 0 .AND. nmph > 0 ) igr = 2
          nx = MAX(nmph,nmgr)
-!         WRITE (STDOUT,*) kmax,nx,dc,one,igr!,H
-         WRITE (STDOUT,"(I4,I4,F7.4,F7.4,I4)") kmax,nx,dc,one,igr!,H
-!        WRITE (STDOUT,*, advance="no") (per(i),i=1,kmax)
-         do i = 1, kmax
+
+         WRITE (STDOUT,"(I4,I4,F7.4,F7.4,I4)") nper,nx,dc,one,igr!,H
+
+         do i = 1, nper
              WRITE (STDOUT,"(F8.3)", advance="no") per(i)
          end do
          WRITE (STDOUT,"(A1)") ""
@@ -509,16 +501,11 @@
       ENDDO
 !        close(4,status='keep')
       END
-!*==GETLIM.spg  processed by SPAG 6.72Dc at 15:03 on  5 Dec 2017
+
 
 !#################################################################
       SUBROUTINE GETLIM(Modemx,Idat,Lorr,Mode,Imap,Ilvry)
       IMPLICIT NONE
-!*--GETLIM572
-!*** Start of declarations inserted by SPAG
-      INTEGER i,Ilvry,im,j,STDOUT,md,n
-!*** End of declarations inserted by SPAG
-      INTEGER*4 Modemx(2,2),Idat,Lorr(*),Imap(*),Mode(*)
 !-----
 !     get limits on dispersion periods for dispersion program
 !     to speed determination of higher modes, we develop
@@ -531,9 +518,14 @@
 !     desired results
 !
 !-----
+
+      INTEGER i,Ilvry,im,j,STDOUT,md,n
       PARAMETER (STDOUT=6)
-      INTEGER*4 is(100),ie(100)
+
+      INTEGER(kind=4) Modemx(2,2),Idat,Lorr(*),Imap(*),Mode(*)
+      INTEGER(kind=4) is(100),ie(100)
       DATA is/100*0/,ie/100*0/
+
       md = 0
       DO i = 1,2
          IF ( Modemx(Ilvry,i) > md ) md = Modemx(Ilvry,i)
@@ -566,22 +558,19 @@
       ENDDO
       END
 
+
 !#################################################################
       SUBROUTINE UNIQ(Y,X,Key,Nx,Ny,Imap)
       IMPLICIT NONE
-!*--UNIQ629
-!*** Start of declarations inserted by SPAG
-      INTEGER i,j,Nx,Ny
-!*** End of declarations inserted by SPAG
-
 !-----
 !     this subroutine takes a sorted list, x(key(i))
 !     and determines the unique elements y() in it
 !     and returns the unique number ny
 !     imap(i) = ny maps original into unique
 !-----
-      REAL*4 Y(*),X(*)
-      INTEGER*4 Key(*),Imap(*)
+      REAL(kind=4) Y(*),X(*)
+      INTEGER(kind=4) Key(*),Imap(*),i,j,Nx,Ny
+
 !        WRITE(0,*)'nx,ny,imap:',nx,ny,(imap(j),j=1,nx)
 !        WRITE(0,*)'x:',(x(j),j=1,nx)
 !        WRITE(0,*)'key:',(key(j),j=1,nx)
@@ -600,16 +589,12 @@
          Imap(j) = Ny
       ENDDO
       END
-!*==SORT.spg  processed by SPAG 6.72Dc at 15:03 on  5 Dec 2017
+
 
 !#################################################################
       SUBROUTINE SORT(X,Key,N)
       IMPLICIT NONE
-!*--SORT665
-!*** Start of declarations inserted by SPAG
-      INTEGER i,j,ktmp
-      REAL tmp
-!*** End of declarations inserted by SPAG
+
 !-----
 !     Starting with x(1) ,,, x(n)
 !     return   the xarray sorted in increasing order
@@ -621,12 +606,14 @@
 !-----
 !        Reference: http://en.wikipedia.org/wiki/Bubble_sort
 !-----
-      INTEGER N
-      REAL X(N)
-      INTEGER Key(N)
+
+      INTEGER N,i,j,ktmp,Key(N)
+      REAL tmp, X(N)
+
       DO i = 1,N
          Key(i) = i
       ENDDO
+
       DO i = N,1,-1
          DO j = 1,i - 1
             IF ( X(j) > X(j+1) ) THEN
@@ -639,17 +626,14 @@
             ENDIF
          ENDDO
       ENDDO
-
-
       END
-!*==GETBLNK.spg  processed by SPAG 6.72Dc at 15:03 on  5 Dec 2017
+
 !#################################################################
       SUBROUTINE GETBLNK(Instr,Lsep,Ls,Lnobl)
       IMPLICIT NONE
-!*--GETBLNK706
-!*** Start of declarations inserted by SPAG
-      INTEGER i,igotit
-!*** End of declarations inserted by SPAG
+
+
+
 !-----
 !     determine first non-blank character
 !
@@ -658,9 +642,10 @@
 !     ls  I*4 length of input string
 !     lnobl   I*4 index of first non blank character
 !-----
-      CHARACTER Instr*(*)
-      INTEGER Lsep,Ls,Lnobl
-      CHARACTER tab*1
+
+      CHARACTER Instr*(*),tab*1
+      INTEGER Lsep,Ls,Lnobl,i,igotit
+
       tab = CHAR(9)
       Lnobl = Lsep + 1
       igotit = 0
