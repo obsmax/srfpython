@@ -130,7 +130,7 @@
       REAL*4 h,dcl,dcr
       CHARACTER*80 nmdisp
       PARAMETER (STDIN=5,STDOUT=6)
-      PARAMETER (NL=200)
+      PARAMETER (NL=100)
 
       INTEGER NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
 
@@ -180,38 +180,34 @@
 !         not used         0 period (always)
 !         not used         1 frequency (never)
 !-----
-      REAL DL(200),RHO(200),VA(200),VB(200)
-      read(STDIN,"(I3)") Nlayer
-      read(STDIN,*) DL(1:Nlayer-1)
-      read(STDIN,*) VA(1:Nlayer)
-      read(STDIN,*) VB(1:Nlayer)
-      read(STDIN,*) RHO(1:Nlayer)
+      REAL thicknesses(100),density_values(100),vp_values(100),vs_values(100)
+      read(STDIN,"(I3)") nlayer
+      read(STDIN,*) thicknesses(1:nlayer-1)
+      read(STDIN,*) vp_values(1:nlayer)
+      read(STDIN,*) vs_values(1:nlayer)
+      read(STDIN,*) density_values(1:nlayer)
 
-      write(STDOUT,"(I3)") Nlayer
+      write(STDOUT,"(I3)") nlayer
 
-      do i = 1, Nlayer-1
-        write(STDOUT,'(F8.3)', advance="no") DL(i)
+      do i = 1, nlayer-1
+        write(STDOUT,'(F8.3)', advance="no") thicknesses(i)
       end do
       write(STDOUT,'(A1)') ""
 
-      do i = 1, Nlayer
-        write(STDOUT,'(F7.3)', advance="no") VA(i)
+      do i = 1, nlayer
+        write(STDOUT,'(F7.3)', advance="no") vp_values(i)
       end do
       write(STDOUT,'(A1)') ""
 
-      do i = 1, Nlayer
-        write(STDOUT,'(F7.3)', advance="no") VB(i)
+      do i = 1, nlayer
+        write(STDOUT,'(F7.3)', advance="no") vs_values(i)
       end do
       write(STDOUT,'(A1)') ""
 
-      do i = 1, Nlayer
-        write(STDOUT,'(F6.3)', advance="no") RHO(i)
+      do i = 1, nlayer
+        write(STDOUT,'(F6.3)', advance="no") density_values(i)
       end do
       write(STDOUT,'(A1)') ""
-!      write(STDOUT,*) VA(1:Nlayer)
-!      write(STDOUT,*) VB(1:Nlayer)
-!      write(STDOUT,*) RHO(1:Nlayer)
-
 
       READ (STDIN,*) h,dcl,dcr
       oner   = 0.0
@@ -476,7 +472,6 @@
              WRITE (STDOUT,"(F8.3)", advance="no") per(i)
          end do
          WRITE (STDOUT,"(A1)") ""
-
 
          DO iporg = 1,2
             DO nmod = 1,modemx(ilvry,iporg)
