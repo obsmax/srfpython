@@ -295,8 +295,7 @@
       END
 
 
-! -------------------------------------------------------------
-! -------------------------------------------------------------
+! ########################################################
       SUBROUTINE GTSOLH(A,B,C)
       IMPLICIT NONE
 
@@ -308,9 +307,6 @@
 !-----
 !     starting solution
 !-----
-
-
-
       C = 0.95*B
       DO i = 1 , 5
          gamma = B/A
@@ -328,8 +324,9 @@
 !      call cpu_time(finish)
 !      print '("GTSOLH = ",f6.3," seconds.")',finish-start
       END
-! -------------------------------------------------------------
-! -------------------------------------------------------------
+
+
+! ########################################################
       SUBROUTINE GETSOL(T1,C1,Clow,Dc,Cm,Betmx,Iret,Ifunc,Ifirst)
       IMPLICIT NONE
       REAL Betmx
@@ -448,10 +445,9 @@
 
 
 99999 END
-!*==SPHERE.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
-!
-! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-!
+
+
+! ########################################################
       SUBROUTINE NEVILL(T,C1,C2,Del1,Del2,Ifunc,Cc)
 !-----
 !   hybrid method for refining root once it has been bracketted
@@ -574,23 +570,22 @@
          ENDIF
       ENDIF
       END
-!*==HALF.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
 
+
+! ########################################################
       SUBROUTINE HALF(C1,C2,C3,Del3,Omega,Ifunc)
       IMPLICIT NONE
-!*--HALF633
-!*** Start of declarations inserted by SPAG
+
       DOUBLE PRECISION C1 , C2 , C3 , Del3 , DLTAR , Omega , wvno
       INTEGER Ifunc
-!*** End of declarations inserted by SPAG
+
       C3 = 0.5*(C1+C2)
       wvno = Omega/C3
       Del3 = DLTAR(wvno,Omega,Ifunc)
       END
-!*==DLTAR.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
-!
-! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-!
+
+
+! ########################################################
       FUNCTION DLTAR(Wvno,Omega,Ifunc)
 !   control the way to P-SV or SH.
 !   -> call DLTAR1 for LOVE waves
@@ -610,9 +605,9 @@
       ENDIF
       !WRITE(*,*) "VERBOSE : EXIT DLTAR", DLTAR !VERBOSE!
       END
-!
-! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-!
+
+
+! ########################################################
       FUNCTION DLTAR1(Wvno,Omega)
 !
 !   find SH dispersion values.
@@ -680,12 +675,11 @@
       ENDDO
       DLTAR1 = e1
       END
-!
-! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-!
+
+
+! ########################################################!
       FUNCTION DLTAR4(Wvno,Omga)
 !   find P-SV dispersion values.
-!
       IMPLICIT NONE
       DOUBLE PRECISION A0 , beta , ca , cosp , CPCq , CPY , CPZ , CQW , &
                      & CQX , cr , DLTAR4 , dpth , e , ee , exa , gam ,  &
@@ -786,9 +780,9 @@
          DLTAR4 = e(1)
       ENDIF
       END
-!*==VAR.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
-!
-! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+! ########################################################
       SUBROUTINE VAR(P,Q,Ra,Rb,Wvno,Xka,Xkb,Dpth,W,Cosp,Exa)
 !-----
 !   find variables cosP, cosQ, sinP, sinQ, etc.
@@ -917,9 +911,9 @@
       y = fac*y
       z = fac*z
       END
-!
-! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-!
+
+
+! ########################################################
       SUBROUTINE NORMC(Ee,Ex)
 !   This routine is an important step to control over- or
 !   underflow.
@@ -950,12 +944,11 @@
 !-----
       Ex = DLOG(t1)
       END
-!
-! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-!
+
+
+! ########################################################
       SUBROUTINE DNKA(Ca,Wvno2,Gam,Gammk,Rho)
 !     Dunkin's matrix.
-!
       IMPLICIT NONE
       DOUBLE PRECISION A0 , a0pq , Ca , CPCq , CPY , CPZ , CQW , CQX ,  &
                      & Gam , gamm1 , Gammk , gm1sq , gmgm1 , gmgmk ,    &
