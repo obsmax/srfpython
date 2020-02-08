@@ -83,8 +83,11 @@
 !      les parametres de dispersion et pre-calculs indispensables a srfdis96
 !      a savoir
 !      nper, nper, earthflat (nombre de periodes distinctes, nombre de periodes distinctes, 0 pour terre plate)
-      PROGRAM SRFPRE96
-      IMPLICIT NONE
+
+!----------------------------------------------------------------------c
+!----------------------------------------------------------------------c
+!----------------------------------------------------------------------c
+!----------------------------------------------------------------------c
 !----------------------------------------------------------------------c
 !                                                                    c
 !      COMPUTER PROGRAMS IN SEISMOLOGY                               c
@@ -124,15 +127,6 @@
 !     Modified  January  2002 to internally use the model96 files
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
-
-      INTEGER NL,STDIN,STDOUT,i
-      INTEGER iunit,NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
-
-      REAL onel,oner
-      REAL*4 h,dcl,dcr
-
-      PARAMETER (STDIN=5,STDOUT=6)
-      PARAMETER (NL=100)
 
 !-----
 !     STDIN   - unit for FORTRAN read from terminal
@@ -180,6 +174,19 @@
 !         not used         0 period (always)
 !         not used         1 frequency (never)
 !-----
+
+      PROGRAM SRFPRE96
+      IMPLICIT NONE
+
+      INTEGER NL,STDIN,STDOUT,i
+      INTEGER iunit,NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
+
+      REAL onel,oner
+      REAL(kind=4) h,dcl,dcr
+
+      PARAMETER (STDIN=5,STDOUT=6)
+      PARAMETER (NL=100)
+
       REAL thicknesses(100),density_values(100),vp_values(100),vs_values(100)
       read(STDIN,"(I3)") nlayer
       read(STDIN,*) thicknesses(1:nlayer-1)
@@ -210,24 +217,19 @@
       write(STDOUT,'(A1)') ""
 
       READ (STDIN,*) h,dcl,dcr
-      oner   = 0.0
-      onel   = 0.0
-      NLG    = 0
-      NRG    = 0
-      earthflat = 0
-
       READ (STDIN,*) NLC,NLU,NRC,NRU
 
+
       WRITE(STDOUT,"(F7.4)") h
+
       CALL GETDSP(&
-              & NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
-              & earthflat,dcl,dcr,onel,oner)
+              & NLC,NLU,NRC,NRU,nlayer, &
+              & dcl,dcr)
       END
 
 
 ! #################################################################
-      SUBROUTINE GETDSP(NLG,NLC,NLU,NRG,NRC,NRU,nlayer, &
-              & earthflat,Dcl,Dcr,Onel,Oner)
+      SUBROUTINE GETDSP(NLC,NLU,NRC,NRU,nlayer,Dcl,Dcr)
       IMPLICIT NONE
 
       REAL c,cper,dc,Dcl,Dcr,f,obs,obserr,one,    &
@@ -239,7 +241,7 @@
             & NP,nper,nx
       INTEGER NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
 
-      PARAMETER (NM=5000,STDOUT=6,NP=512)
+      PARAMETER (NM=1000,STDOUT=6,NP=512)
       PARAMETER (STDIN=5)
 
       INTEGER(kind=4) lorr(NM),porg(NM),mode(NM),modemx(2,3)
@@ -286,6 +288,11 @@
 !     get units and data type
 !     NEW units are always km and period(sec)
 !-----
+      oner   = 0.0
+      onel   = 0.0
+      NLG    = 0
+      NRG    = 0
+      earthflat = 0
       idat = 0
       Iunitd = 0
 
@@ -392,9 +399,6 @@
             !!-----
             !!     make gamma seem to be phase data
             !!-----
-            !                        mm = iobs
-            !                        IF ( mm == 3 ) mm = 1
-            !                        IF ( n > modemx(ilorr,mm) ) modemx(ilorr,mm) = n
             IF ( n > modemx(ilorr,iobs) ) modemx(ilorr,iobs) = n
       ENDIF
 
