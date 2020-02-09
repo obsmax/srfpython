@@ -114,6 +114,7 @@
       READ(STDIN, *) density_values(1:nlayer)
       READ(STDIN, *) h
       READ(STDIN, *) idispl
+      ddc = 0.005  ! for now
 
       idispr=idispl ! always true, see srfpre96
       iunit = 0
@@ -147,12 +148,12 @@
          IF ( vs_values(i) >  vsmax ) vsmax = vs_values(i)
       ENDDO
 
-      
+      sone = 0.
       DO ifunc = 1, 2 ! 1 = love 2 = rayleigh
           IF   ((ifunc == 1 .AND. idispl >  0) &
             .OR.(ifunc == 2 .AND. idispr >  0)) THEN
 
-               READ (STDIN  ,*) kmax, mode, ddc, sone, igr !, h
+               READ (STDIN  ,*) kmax, mode, igr !, h
                READ (STDIN  ,*) (t(i),i=1,kmax)
 
                IF ( sone <  0.01 ) sone = 2.0

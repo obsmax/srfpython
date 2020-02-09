@@ -1,8 +1,8 @@
 ! #################################################################
-      SUBROUTINE GETDSP(NLC,NLU,NRC,NRU,Dcl,Dcr)
+      SUBROUTINE GETDSP(NLC,NLU,NRC,NRU)
       IMPLICIT NONE
 
-      REAL c,cper,dc,Dcl,Dcr,f,obs,obserr,one,    &
+      REAL c,cper,f,obs,obserr,one,    &
          & Onel,Oner,pper,sd
       INTEGER i,idat,igr,ilorr,ilvry,imode,iobs, &
             & iobsyn,iporg,Iunitd,j,k,LGSTR,STDIN ,&
@@ -17,7 +17,7 @@
       INTEGER(kind=4) lorr(NM),porg(NM),mode(NM),modemx(2,3)
       INTEGER(kind=4) key(NM),imap(NM),jmap(NM)
 
-      REAL(kind=4) tper(NM),vel(NM),dvel(NM)
+      REAL(kind=4) tper(NM),vel(NM)
       REAL(kind=4) per(NP),tmp(NM)
 
       CHARACTER instr*132
@@ -127,14 +127,13 @@
       n = imode + 1
       f = pper
       c = obs
-      dc = obserr
 !-----
 !     ilorr     = Love (1) or Rayleigh
 !     iobs     = Phase (1) Group (2) Gamma(3)
 !     n     = mode Fund = 1, First = 2, etc
 !     f     = Frequency or Period
-!     c     = Velocity of Gamma depending on iobs
-!     dc    = Error in Velocity of Gamma, depending on iobs
+!     c     = Velocity or Gamma depending on iobs
+!     dc    = Error in Velocity or Gamma, depending on iobs
 !-----
 !     before adding to the data set, ensure that the
 !     data are to be used
@@ -159,8 +158,6 @@
             !-----
             tper(idat) = f
             vel(idat) = c
-            IF ( dc == 0.0 ) dc = 1.0
-            dvel(idat) = dc
             key(idat) = idat
             tmp(idat) = tper(idat)
             !!-----
@@ -209,12 +206,10 @@
             nmph = modemx(1,1) ! NLC
             nmgr = modemx(1,2) ! NLU
             one = Onel
-            dc = Dcl
          ELSE
             nmph = modemx(2,1) ! NRC
             nmgr = modemx(2,2) ! NRU
             one = Oner
-            dc = Dcr
          ENDIF
 !-----
 !                 ENFORCE USER MODE LIMITS
@@ -226,7 +221,7 @@
          IF ( nmgr > 0 .AND. nmph > 0 ) igr = 2
          nx = MAX(nmph,nmgr)
 
-         WRITE (STDOUT,"(I4,I4,F7.4,F7.4,I4)") nper,nx,dc,one,igr!,H
+         WRITE (STDOUT,"(I4,I4,I4)") nper,nx,igr!,H
 
          do i = 1, nper
              WRITE (STDOUT,"(F8.3)", advance="no") per(i)

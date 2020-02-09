@@ -186,7 +186,7 @@
       PARAMETER (STDIN=5,STDOUT=6)
       PARAMETER (NL=100)
 
-      REAL thicknesses(100),density_values(100),vp_values(100),vs_values(100)
+      REAL thicknesses(NL),density_values(NL),vp_values(NL),vs_values(NL)
       read(STDIN,"(I3)") nlayer
       read(STDIN,*) thicknesses(1:nlayer-1)
       read(STDIN,*) vp_values(1:nlayer)
@@ -220,8 +220,7 @@
 
       READ (STDIN,*) NLC,NLU,NRC,NRU
       CALL GETDSP(&
-              & NLC,NLU,NRC,NRU, &
-              & dcl,dcr)
+              & NLC,NLU,NRC,NRU)
       END
 
 
