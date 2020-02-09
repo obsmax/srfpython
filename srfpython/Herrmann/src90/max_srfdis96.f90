@@ -69,9 +69,9 @@
 !-----
 !     STDIN  - unit for FORTRAN read from terminal
 !     STDOUT  - unit for FORTRAN write to terminal
-!     LLW - index of the first solid layer, starting with 1 from top
+!     i_fisrst_solid_layer - index of the first solid layer, starting with 1 from top
 !     idispl, idispr = number of dispersion points to compute for love and rayleigh
-!     Mmax = max number of layers in the mode, used in common with other subroutines
+!     nlayer = max number of layers in the mode, used in common with other subroutines
 !     ifunc = 1 for love 2 for rayleig
 !     vsmin, vsmax = extramal values for S-wave velocity in the model in km/s
 !                    in case of a water layer, use P-wave velocity instead of S for vsmin
@@ -82,7 +82,7 @@
 !               for phase velocity, only t1a is used
       !-----
       INTEGER  STDIN, STDOUT 
-      INTEGER LLW,idispl,idispr,Mmax,ifunc,jmn,jsol
+      INTEGER i_first_solid_layer,idispl,idispr,nlayer,ifunc,jmn,jsol
       INTEGER i,ie,ierr,ifirst,ift, &
             & igr,iq,iret,is,itst,k,kmax
       INTEGER mode
@@ -101,33 +101,31 @@
       REAL(kind=4) t(NP), thicknesses(NL),vp_values(NL),vs_values(NL),density_values(NL)
       REAL(kind=4) qbinv(NL),qainv(NL)
       COMMON /MODL  / thicknesses, vp_values, vs_values, density_values
-      COMMON /PARA  / Mmax,LLW,twopi
+      COMMON /PARA  / nlayer,i_first_solid_layer,twopi
 
       INTEGER iunit,iiso,idimen,icnvel
       CHARACTER(LEN=80) :: FMT  ! WARNING must be long enough for FMT
 !-----
       FMT = "(I2,I2,F11.6,F11.6,F11.6,F11.6)" ! print format for output
-      read(STDIN ,*) Mmax
+      READ(STDIN, *) nlayer
+      READ(STDIN, *) thicknesses(1:nlayer-1)
+      READ(STDIN, *) vp_values(1:nlayer)
+      READ(STDIN, *) vs_values(1:nlayer)
+      READ(STDIN, *) density_values(1:nlayer)
+      READ(STDIN, *) h
+      READ(STDIN, *) idispl
+
+      idispr=idispl ! always true, see srfpre96
       iunit = 0
       iiso = 0
       idimen = 0
       icnvel = 0
       ierr = 0
-
-      read(STDIN ,*) thicknesses(1:MMax-1)
-      read(STDIN ,*) vp_values(1:Mmax)
-      read(STDIN ,*) vs_values(1:MMax)
-      read(STDIN ,*) density_values(1:MMax)
-!-----
-      READ (STDIN ,*) h
-      READ (STDIN ,*) idispl
-      idispr=idispl ! always true, see srfpre96
-
 !-----
 !     check for water layer
 !-----
-      LLW = 1 !first solid layer index
-      IF ( vs_values(1) <= 0.0 ) LLW = 2
+      i_first_solid_layer = 1 !first solid layer index
+      IF ( vs_values(1) <= 0.0 ) i_first_solid_layer = 2
       twopi = 2.D0*3.141592653589793D0
       one = 1.0D-2
       jmn = 1
@@ -136,7 +134,7 @@
 !-----
 !     find the extremal velocities to assist in starting search
 !-----
-      DO i = 1, Mmax
+      DO i = 1, nlayer
          IF ( vs_values(i) >  0.01 .AND. vs_values(i) <  vsmin ) THEN
             vsmin = vs_values(i)
             jmn = i
@@ -451,7 +449,7 @@
                      & DLTAR, omega, s1, s13, s2, s32, ss1, ss2 ,&
                      & T, twopi, wvno, x
       DOUBLE PRECISION y
-      INTEGER Ifunc, j, kk, LLW, m, Mmax, nctrl, nev, NL
+      INTEGER Ifunc, j, kk, i_first_solid_layer, m, nlayer, nctrl, nev, NL
 
 
       PARAMETER (NL=100)
@@ -459,7 +457,7 @@
               &vs_values(NL), density_values(NL)
       DIMENSION x(20), y(20)
       COMMON /MODL  / thicknesses, vp_values, vs_values, density_values
-      COMMON /PARA  / Mmax, LLW, twopi
+      COMMON /PARA  / nlayer, i_first_solid_layer, twopi
 !-----
 !     initial guess
 !-----
@@ -598,11 +596,11 @@
                      & fac, Omega, q, rb, rho1, sinq, twopi,     &
                      & Wvno, wvnom, wvnop, xkb, xmu, xnor
       DOUBLE PRECISION y, ynor, z
-      INTEGER LLW, m, Mmax, mmm1, NL
+      INTEGER i_first_solid_layer, m, nlayer, mmm1, NL
       PARAMETER (NL=100)
       REAL(kind=4) thicknesses(NL), vp_values(NL), vs_values(NL), density_values(NL) !, RTP(NL), DTP(NL),  BTP(NL)
       COMMON /MODL  / thicknesses, vp_values, vs_values, density_values !, RTP, DTP, BTP
-      COMMON /PARA  / Mmax, LLW, twopi
+      COMMON /PARA  / nlayer, i_first_solid_layer, twopi
 
       !WRITE(*,*) "VERBOSE : ENTER DLTAR1" !VERBOSE!
 
@@ -610,16 +608,16 @@
 !   Haskell-Thompson love wave formulation from halfspace
 !   to surface.
 !
-      beta1 = DBLE(vs_values(Mmax))
-      rho1 = DBLE(density_values(Mmax))
+      beta1 = DBLE(vs_values(nlayer))
+      rho1 = DBLE(density_values(nlayer))
       xkb = Omega/beta1
       wvnop = Wvno + xkb
       wvnom = DABS(Wvno-xkb)
       rb = DSQRT(wvnop*wvnom)
       e1 = rho1*rb
       e2 = 1.D+00/(beta1*beta1)
-      mmm1 = Mmax - 1
-      DO m = mmm1, LLW, -1
+      mmm1 = nlayer - 1
+      DO m = mmm1, i_first_solid_layer, -1
          beta1 = DBLE(vs_values(m))
          rho1 = DBLE(density_values(m))
          xmu = rho1*beta1*beta1
@@ -668,36 +666,36 @@
       DOUBLE PRECISION p, q, ra, rb, rho1, t, twopi, w, w0,    &
                      & Wvno, wvno2, wvnom, wvnop, WY, WZ, xka,   &
                      & xkb, XY, XZ, znul
-      INTEGER i, j, LLW, m, Mmax, mmm1, NL
+      INTEGER i, j, i_first_solid_layer, m, nlayer, mmm1, NL
       PARAMETER (NL=100)
       DIMENSION e(5), ee(5), ca(5,5)
       REAL(kind=4) thicknesses(NL), vp_values(NL), &
               &vs_values(NL), density_values(NL)
       COMMON /MODL  / thicknesses, vp_values, &
               &vs_values, density_values
-      COMMON /PARA  / Mmax, LLW, twopi
+      COMMON /PARA  / nlayer, i_first_solid_layer, twopi
       COMMON /OVRFLW/ A0, CPCq, CPY, CPZ, CQW, CQX, XY, XZ, WY, WZ
 !
       !WRITE(*,*) "VERBOSE : ENTER DLTAR4" !VERBOSE!
       omega = Omga
       IF ( omega <  1.0D-4 ) omega = 1.0D-4
       wvno2 = Wvno*Wvno
-      xka = omega/DBLE(vp_values(Mmax))
-      xkb = omega/DBLE(vs_values(Mmax))
+      xka = omega/DBLE(vp_values(nlayer))
+      xkb = omega/DBLE(vs_values(nlayer))
       wvnop = Wvno + xka
       wvnom = DABS(Wvno-xka)
       ra = DSQRT(wvnop*wvnom)
       wvnop = Wvno + xkb
       wvnom = DABS(Wvno-xkb)
       rb = DSQRT(wvnop*wvnom)
-      t = DBLE(vs_values(Mmax))/omega
+      t = DBLE(vs_values(nlayer))/omega
 !-----
 !   E matrix for the bottom half-space.
 !-----
       gammk = 2.D+00*t*t
       gam = gammk*wvno2
       gamm1 = gam - 1.D+00
-      rho1 = DBLE(density_values(Mmax))
+      rho1 = DBLE(density_values(nlayer))
       e(1) = rho1*rho1*(gamm1*gamm1-gam*gammk*ra*rb)
       e(2) = -rho1*ra
       e(3) = rho1*(gamm1-gammk*ra*rb)
@@ -706,8 +704,8 @@
 !-----
 !   matrix multiplication from bottom layer upward
 !-----
-      mmm1 = Mmax - 1
-      DO m = mmm1, LLW, -1
+      mmm1 = nlayer - 1
+      DO m = mmm1, i_first_solid_layer, -1
          xka = omega/DBLE(vp_values(m))
          xkb = omega/DBLE(vs_values(m))
          t = DBLE(vs_values(m))/omega
@@ -742,7 +740,7 @@
             e(i) = ee(i)
          ENDDO
       ENDDO
-      IF ( LLW /= 1 ) THEN
+      IF ( i_first_solid_layer /= 1 ) THEN
 !-----
 !   include water layer.
 !-----
