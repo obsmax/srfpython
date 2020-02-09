@@ -179,9 +179,8 @@
       IMPLICIT NONE
 
       INTEGER NL,STDIN,STDOUT,i
-      INTEGER iunit,NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
+      INTEGER iunit,NLG,NLC,NLU,NRG,NRC,NRU,nlayer
 
-      REAL onel,oner
       REAL(kind=4) h,dcl,dcr
 
       PARAMETER (STDIN=5,STDOUT=6)
@@ -217,19 +216,17 @@
       write(STDOUT,'(A1)') ""
 
       READ (STDIN,*) h,dcl,dcr
-      READ (STDIN,*) NLC,NLU,NRC,NRU
-
-
       WRITE(STDOUT,"(F7.4)") h
 
+      READ (STDIN,*) NLC,NLU,NRC,NRU
       CALL GETDSP(&
-              & NLC,NLU,NRC,NRU,nlayer, &
+              & NLC,NLU,NRC,NRU, &
               & dcl,dcr)
       END
 
 
 ! #################################################################
-      SUBROUTINE GETDSP(NLC,NLU,NRC,NRU,nlayer,Dcl,Dcr)
+      SUBROUTINE GETDSP(NLC,NLU,NRC,NRU,Dcl,Dcr)
       IMPLICIT NONE
 
       REAL c,cper,dc,Dcl,Dcr,f,obs,obserr,one,    &
@@ -239,7 +236,7 @@
             & lnobl,STDOUT,ls
       INTEGER lsep,mm,n,nlr,nlrr,NM,nmgr,nmod,nmph ,&
             & NP,nper,nx
-      INTEGER NLG,NLC,NLU,NRG,NRC,NRU,nlayer,earthflat
+      INTEGER NLC,NLU,NRC,NRU
 
       PARAMETER (NM=1000,STDOUT=6,NP=512)
       PARAMETER (STDIN=5)
@@ -290,9 +287,6 @@
 !-----
       oner   = 0.0
       onel   = 0.0
-      NLG    = 0
-      NRG    = 0
-      earthflat = 0
       idat = 0
       Iunitd = 0
 
@@ -378,10 +372,8 @@
 !      write(STDOUT,*) ilorr, iobs, n
       IF (      ( ilorr == 1 .AND. iobs == 1 .AND. n <= NLC )&
          & .OR. ( ilorr == 1 .AND. iobs == 2 .AND. n <= NLU )&
-!        & .OR. ( ilorr == 1 .AND. iobs == 3 .AND. n <= NLG )&
          & .OR. ( ilorr == 2 .AND. iobs == 1 .AND. n <= NRC )&
          & .OR. ( ilorr == 2 .AND. iobs == 2 .AND. n <= NRU )&
-!        & .OR. ( ilorr == 2 .AND. iobs == 3 .AND. n <= NRG )&
               &) THEN
 !            write(STDOUT, *) 'ok'
             idat = idat + 1
