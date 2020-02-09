@@ -4,6 +4,7 @@ rm -f max_igetmod.o
 rm -f max_iputmod.o
 rm -f max_lgstr.o
 rm -f max_setdsp.o
+rm -f max_getdsp.o
 rm -f max_setmod.o
 rm -f max_mchdep.o
 rm -f max_srfdis96.o
