@@ -27,213 +27,6 @@ SRFDIS96_EXE = _pathfile.replace(_file, 'bin/max_srfdis96')
 HERRMANN_TIMEOUT = 5
 
 
-class Curve(object):
-    def __init__(self, wave, type, mode, frequencies):
-        assert wave in ['R', 'L']
-        assert type in ['C', 'U']
-        assert isinstance(mode, int) and mode >= 0
-        assert isinstance(frequencies, np.ndarray)
-        assert frequencies.ndim == 1
-        assert frequencies[1:] > frequencies[:-1]
-        self.wave = wave
-        self.type = type
-        self.mode = mode
-        self.frequencies = frequencies
-
-
-class HerrmannCaller(object):
-    @staticmethod
-    def curves2srfpre96input(curves):
-
-        fmt = "\nSURF96 {wave:1s} {type:1s} X {mode:d} {period} 1. 1."
-        surf96_txt = ""
-
-        nrc = nlc = nru = nlu = 0
-        for curve in curves:
-            assert isinstance(curve, Curve)
-            for period in 1. / curve.frequencies:
-
-                surf96_txt += fmt.format(
-                    wave=curve.wave,
-                    type=curve.type,
-                    mode=curve.mode,
-                    period=period)
-
-                if curve.wave == "R":
-                    if curve.type == "C":
-                        nrc = max([nrc, m + 1])
-                    elif curve.type == "U":
-                        nru = max([nru, m + 1])
-
-                elif curve.wave == "L":
-                    if curve.type == "C":
-                        nlc = max([nlc, m + 1])
-
-                    elif curve.type == "U":
-                        nlu = max([nlu, m + 1])
-
-        srfpre96input = """{} {} {} {}""".format(nlc, nlu, nrc, nru) + surf96_txt
-        return srfpre96input
-
-    @staticmethod
-    def callsrfpre96(srfpre96input):
-        srfpre96_subproc = Popen(
-            SRFPRE96_EXE,
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE,
-            shell=False,
-            preexec_fn=os.setsid)
-
-        try:
-            with Timeout(HERRMANN_TIMEOUT):
-                srfpre96_stdout, srfpre96_stderr = srfpre96_subproc.communicate(srfpre96input)
-
-        except TimeOutError:
-            os.killpg(os.getpgid(srfpre96_subproc.pid), signal.SIGKILL)
-            message = "srfpre96 timed out for input :\n" + srfpre96input
-            raise CPiSError(message)
-
-        finally:
-            try:
-                srfpre96_subproc.stdin.close()
-                srfpre96_subproc.stdout.close()
-                srfpre96_subproc.stderr.close()
-            except Exception as e:
-                warnings.warn(str(e))
-        return srfpre96_stdout, srfpre96_stderr
-
-    def __init__(self, curves, h=0.005, ddc=0.005):
-        self.curves = curves
-        self.srfpre96_stdout, _ = self.curves2srfpre96input(curves=curves)
-        self.srfdis96_input_format = "{h:f} {ddc:f}\n" \
-                                     "{} {}".format()
-
-    def __call__(self, ztop, vp, vs, rh):
-        pass
-
-
-
-
-def check_herrmann_codes():
-    """check successful compilation"""
-
-    solution = "please recompile fortran codes using recompile_src90"
-
-    if not os.path.isdir(_src):
-        raise Exception('directory %s not found' % _src)
-
-    if not os.path.exists(SRFPRE96_EXE):
-        raise Exception('could not find %s\n%s' % (SRFPRE96_EXE, solution))
-
-    if not os.path.exists(SRFDIS96_EXE):
-        raise Exception('could not find %s\n%s' % (SRFDIS96_EXE, solution))
-
-    # depth model
-    ztop = [0.00, 1.00]  # km, top layer depth
-    vp = [2.00, 3.00]  # km/s
-    vs = [1.00, 2.00]  # km/s
-    rh = [2.67, 2.67]  # g/cm3
-
-    # dipsersion parameters
-    curves = [('R', 'C', 0, np.array([1., 2.])),
-              ('L', 'C', 0, np.array([2., 3.]))]
-
-    g = dispersion_2(ztop, vp, vs, rh, curves)
-
-    try:
-        w, t, m, F, V = g.next()
-        assert (w, t, m) == ("L", "C", 0)
-        assert np.all(F == np.array([2., 3.]))
-        w, t, m, F, V = g.next()
-        assert (w, t, m) == ("R", "C", 0)
-        assert np.all(F == np.array([1., 2.]))
-
-    except AssertionError:
-        raise Exception('could not execute fortran codes\n%s' % solution)
-
-
-def recompile_src90(yes=False):
-    script = """
-cd {_src}
-./clean.sh && ./compile.sh
-""".format(_src=_src)
-    if yes:
-        os.system(script)
-    else:
-        print(script)
-        if raw_input('run command?').lower() in ["y", "yes"]:
-            os.system(script)
-
-
-# ##################################### MODIFIED HERRMANN'S CODES
-
-def prep_srfpre96_1(h=0.005, ddc=0.005):
-    """prepare input for modified srfpre96 (max_srfpre96)
-    dcl, dcr are root search increment for loev and rayleigh waves respectively
-    h, dcl,dcr : see srfpre96
-    """
-    return "{} {}".format(h, ddc)
-
-
-def prep_srfpre96_2(z, vp, vs, rh):
-    """prepare input for modified srfpre96 (max_srfpre96)
-       z   = depth in km, z[0] must be 0
-       vp  = vp in km/s
-       vs  = vs in km/s
-       rh  = density in g/cm3
-    """
-
-    if z[0]:
-        raise CPiSDomainError('Z0 must be 0')  # assert z[0] == 0.
-    n = len(z)
-
-    if not (n == len(vp) == len(vs) == len(rh)):
-        raise CPiSDomainError('Z VP, VS, RH must be the same length')  # assert n == len(vp) == len(vs) == len(rh)
-
-    z = np.asarray(z, float)
-    if (np.isinf(z) | np.isnan(z)).any():
-        raise CPiSDomainError('got inapropriate values for Z (%s)' % str(z))
-
-    Ibad = (z[1:] - z[:-1] < 0.001)
-    if Ibad.any():
-        H = z[1:] - z[:-1]
-        raise CPiSDomainError(
-            'Z must be growing, layers must be at least '
-            '0.001km thick, got %s (%s)' % (str(z), str(H[Ibad])))
-
-    vs = np.asarray(vs, float)
-    if (np.isinf(vs) | np.isnan(vs)).any():
-        raise CPiSDomainError('vs value error %s' % str(vs))
-
-    if not (vs > 0.08).all():
-        raise CPiSDomainError('vs domain error %s' % str(vs))
-
-    vp = np.asarray(vp, float)
-    if (np.isinf(vp) | np.isnan(vp)).any():
-        raise CPiSDomainError('vp value error %s' % str(vp))
-
-    if not (vp > vs * (4. / 3.) ** 0.5).all():
-        raise CPiSDomainError('vp over vs domain error %s' % str(vp / vs))
-
-    rh = np.asarray(rh, float)
-    if (np.isinf(rh) | np.isnan(rh)).any():
-        raise CPiSDomainError('rh value error %s' % str(rh))
-
-    if not np.all((rh > 1.)):
-        raise CPiSDomainError('density domain error : %s' % str(rh))
-
-    out = "%d\n" % n + \
-          ("%f " * (n - 1)) % tuple(z[1:] - z[:-1]) + "\n" + \
-          ("%f " * n) % tuple(vp) + "\n" + \
-          ("%f " * n) % tuple(vs) + "\n" + \
-          ("%f " * n) % tuple(rh)
-    return out
-
-
-
-
-
 class CPiSError(Exception):
     pass
 
@@ -242,80 +35,43 @@ class CPiSDomainError(CPiSError):
     pass
 
 
-def readsrfdis96_old_stable(stdout, waves, types, modes, freqs):
-    """converts output from max_srfdis96, to be optimized
-    (takes about 0.5 * the times used by max_srfpre96+max_srfdis96)"""
+class Curve(object):
+    def __init__(self, wave, type, mode, freqs, values=None, dvalues=None, checks=True):
+        if checks:
+            assert wave in ['R', 'L']
+            assert type in ['C', 'U']
+            assert isinstance(mode, int) and mode >= 0
+            assert isinstance(freqs, np.ndarray)
+            assert freqs.ndim == 1
+            assert np.all(freqs[1:] > freqs[:-1])
+        self.wave = wave
+        self.type = type
+        self.mode = mode
+        self.freqs = freqs
+        self.values = values
+        self.dvalues = dvalues
+        self.nfreqs = len(self.freqs)
+        self._waves = None  # attribute set only on first demand and kept afterwards
+        self._types = None
+        self._modes = None
 
-    # try:
-    #     A = np.genfromtxt(StringIO(unicode(stdout)), dtype = float)
-    # except:
-    #     raise CPiSError('could not understand stdout \n%s' % stdout)
+    @property
+    def waves(self):
+        if self._waves is None:
+            self._waves = np.asarray([self.wave for _ in range(self.nfreqs)], '|S1')
+        return self._waves
 
-    A = np.asarray((" ".join(stdout.strip().rstrip('\n').split('\n'))).split(), float)
-    A = A.reshape((len(A) / 6, 6))
+    @property
+    def types(self):
+        if self._types is None:
+            self._types = np.asarray([self.type for _ in range(self.nfreqs)], '|S1')
+        return self._types
 
-    # A[:, 0] (itst) wave type 1 = Love, 2 = Rayleigh
-    # A[:, 1] (iq-1) mode number, 0 = fundamental
-    # A[:, 2] (t1a)  t1 if phase only else lower period = t1/(1+h), in s
-    # A[:, 3] (t1b)  0. if phase only else upper period = t1/(1-h), in s;
-    # A[:, 4] (cc0)  phase velocity at t1 if phase only else at t1a, in km/s;
-    # A[:, 5] (cc1)  phase velocity at t1 if phase only else at t1b, in km/s;
-
-    W = A[:, 0]
-    M = A[:, 1]
-    I = A[:, 3] == 0.  # True means phase only
-    nI = ~I
-    n = A.shape[0]
-    T, C, U = np.zeros(n, float), np.zeros(n, float), np.zeros(n, float) * np.nan
-
-    if I.any():
-        T[I]  = A[I,2]
-        C[I]  = A[I,4]
-
-    if nI.any():
-        # np.sqrt(A[nI,2] * A[nI,3]) #Jeffreys average #A[nI,2:4].mean(axis = 1)
-        T[nI] = A[nI, 2] * A[nI, 3] / (A[nI, 2:4].mean(axis=1))
-
-        C[nI] = np.sqrt(A[nI,4] * A[nI,5])  # Jeffreys average  # A[nI,4:6].mean(axis = 1)
-
-        LnI = (log(A[nI,5]) - log(A[nI,4])) / (log(A[nI,2]) - log(A[nI,3]))
-        U[nI] = C[nI] / (1. - LnI)
-
-    L, R = (W == 1), (W == 2)
-    umodes = np.arange(max(modes) + 1)
-    RMs = [R & (M == m) for m in umodes]
-    LMs = [L & (M == m) for m in umodes]
-    RMs = [rms if rms.any() else None for rms in RMs]
-    LMs = [lms if lms.any() else None for lms in LMs]
-
-    values = np.zeros(len(waves), float) * np.nan
-    for n, (w, t, m, f) in enumerate(zip(waves, types, modes, freqs)):
-
-        if w == "R":
-            S = RMs[m]
-        else:
-            S = LMs[m]  # elif w == "L"
-        if S is None:
-            continue
-
-        p  = 1. / f
-        TS = T[S]
-        iS = np.abs(TS - p).argmin()
-        per = TS[iS]
-        if abs(per - p) / p > 0.01: continue
-
-        if t == 'C':
-            val = C[S][iS]
-
-        else:
-            val = U[S][iS] #elif t == "U"
-        # else:
-        #      raise ValueError('')
-        # if val <= 0: #NON, je met une penalite dans la fonction cout
-        #     raise CPiSError('encountered negative dispersion velocity')
-
-        values[n] = val
-    return values
+    @property
+    def modes(self):
+        if self._modes is None:
+            self._modes = np.asarray([self.mode for _ in range(self.nfreqs)], int)
+        return self._modes
 
 
 def argcrossfind(X, Y):
@@ -337,15 +93,15 @@ def argcrossfind(X, Y):
     return np.asarray(IX, int), np.asarray(IY, int)
 
 
-def readsrfdis96(stdout, waves, types, modes, freqs):
+def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
     """converts output from max_srfdis96"""
     periods = 1./freqs
 
-    stdout = stdout.replace('**************', ' 0            ') #??? what the fuck
-    stdout = stdout.strip().rstrip('\n').split('\n')
-    stdout = [_[:2] + " " + _[2:] for _ in stdout] # add one more space for mode numbers higher than 10
+    srfdis96stdout = srfdis96stdout.replace('**************', ' 0            ') #??? what the fuck
+    srfdis96stdout = srfdis96stdout.strip().rstrip('\n').split('\n')
+    srfdis96stdout = [_[:2] + " " + _[2:] for _ in srfdis96stdout] # add one more space for mode numbers higher than 10
 
-    A = (" ".join(stdout)).split()
+    A = (" ".join(srfdis96stdout)).split()
     W   = np.asarray(A[::6],  int)-1  # wave type 0 = Love, 1 = Rayleigh
     M   = np.asarray(A[1::6], int)    # (iq-1) mode number, 0 = fundamental
     T1A = np.asarray(A[2::6], float)  # t1 if phase only else lower period = t1/(1+h), in s
@@ -392,181 +148,232 @@ def readsrfdis96(stdout, waves, types, modes, freqs):
     return values
 
 
-def dispersion(ztop, vp, vs, rh,
-    waves, types, modes, freqs,
-    h=0.005, ddc=0.005):
+class HerrmannCaller(object):
+    @staticmethod
+    def curves2srfpre96input(curves):
 
-    """compute surface wave dispersion curves from a 1-D depth model
-    based on a modified version of the codes from Herrmann and Ammon 2002
+        fmt = "\nSURF96 {wave:1s} {type:1s} X {mode:d} {period} 1. 1."
+        surf96_txt = ""
 
-    *) a dispersion curve is given by 4 attributes
-        wave : string, "R" for Rayleigh, "L" for Love
-        type : string, "C" for Phase velocity, "U" for Group-velocity
-        mode : integer, a mode number, 0 means fundamental
-        freq : array, frequencies in Hz
+        nrc = nlc = nru = nlu = 0
+        for curve in curves:
+            assert isinstance(curve, Curve)
+            for period in 1. / curve.freqs:
 
-    *) a 1-D depth model is given by 4 attributes
-        ztop : list or array, sorted, positive, top layer depth in km, ztop[0] must be 0 !!!
-        vp   : list or array, P wave velocity in km/s
-        vs   : list or array, S wave velocity in km/s
-        rh   : list or array, density in g.cm^-3
+                surf96_txt += fmt.format(
+                    wave=curve.wave,
+                    type=curve.type,
+                    mode=curve.mode,
+                    period=period)
 
-    input:
-        -> depth model
-        ztop, vp, vs, rh = depth model, 4 iterables with same length
+                if curve.wave == "R":
+                    if curve.type == "C":
+                        nrc = max([nrc, curve.mode + 1])
+                    elif curve.type == "U":
+                        nru = max([nru, curve.mode + 1])
 
-        -> dispersion points
-        waves, types, modes, freqs = dispersion curves, 4 iterables with same length
-        example :
-            waves = ['L', 'L', 'L', 'R', 'R', 'R', 'R', 'R']
-            types = ['U', 'U', 'U', 'C', 'C', 'C', 'C', 'C']
-            modes = [ 0,   0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ]
-            freqs = [ 1.,  2.,  3.,  1.,  2.,  3.,  4.,  5.]
+                elif curve.wave == "L":
+                    if curve.type == "C":
+                        nlc = max([nlc, curve.mode + 1])
 
-        -> Herrmann's parameters, see CPS documentation
-        h = float, period increment for phase to group conversion (0.005 is reasonable)
-        dcl, dcr = 2 floats, phase velocity increment for love and rayleigh root searches respectively, see Herrmann doc
+                    elif curve.type == "U":
+                        nlu = max([nlu, curve.mode + 1])
 
-    output:
-        values : list or array, dispersion values for each wave, type, mode, possibly nan (above cut-off period)
-                 note : use groupbywtm to group outputs by wave, type, and mode
-    see also :
-        dispersion_1
-        dispersion_2
-        groupbywtm
-        igroupbywtm
-    """
+        srfpre96input = """{:d} {:d} {:d} {:d}""".format(nlc, nlu, nrc, nru) \
+                        + surf96_txt
+        return srfpre96input
 
-    instr1 = prep_srfpre96_1(h=h, ddc=ddc)
-    instr2 = prep_srfpre96_2(ztop, vp, vs, rh)
-    instr3 = prep_srfpre96_3(waves, types, modes, freqs)
-    pstdin = "\n".join([instr2, instr1, instr3])
+    @staticmethod
+    def callherrmann(stdin, exe):
+        subproc = Popen(
+            exe,
+            stdin=PIPE,
+            stdout=PIPE,
+            stderr=PIPE,
+            shell=False,
+            preexec_fn=os.setsid)
 
-    SRFPRE96_SUBPROC = Popen(SRFPRE96_EXE,
-                             stdin=PIPE,
-                             stdout=PIPE,
-                             stderr=PIPE,
-                             shell=False,
-                             preexec_fn=os.setsid)
-    SRFDIS96_SUBPROC = Popen(SRFDIS96_EXE,
-                             stdin=PIPE,  # SRFPRE96_SUBPROC.stdout,
-                             stdout=PIPE,
-                             stderr=PIPE,
-                             shell=False,
-                             preexec_fn=os.setsid)
-    try:
-        with Timeout(HERRMANN_TIMEOUT):
-            pstdout, pstderr = SRFPRE96_SUBPROC.communicate(pstdin)
-            qstdout, qstderr = SRFDIS96_SUBPROC.communicate(pstdout)
-
-    except TimeOutError:
-        os.killpg(os.getpgid(SRFPRE96_SUBPROC.pid), signal.SIGKILL)
-        os.killpg(os.getpgid(SRFDIS96_SUBPROC.pid), signal.SIGKILL)
-        message = "Herrmann timed out for model:\n\t" \
-                  "ztop={}\n\tvp={}\n\t" \
-                  "vs={}\n\trh={}\n".format(ztop, vp, vs, rh)
-        raise CPiSError(message)
-
-    finally:
         try:
-            SRFPRE96_SUBPROC.stdin.close()
-            SRFDIS96_SUBPROC.stdin.close()
-            SRFPRE96_SUBPROC.stdout.close()
-            SRFDIS96_SUBPROC.stdout.close()
-            SRFPRE96_SUBPROC.stderr.close()
-            SRFDIS96_SUBPROC.stderr.close()
-        except Exception as e:
-            warnings.warn(str(e))
+            with Timeout(HERRMANN_TIMEOUT):
+                stdout, stderr = \
+                    subproc.communicate(stdin)
 
-    values = readsrfdis96(qstdout, waves, types, modes, freqs)
-    return values
+        except TimeOutError:
+            os.killpg(os.getpgid(subproc.pid), signal.SIGKILL)
+            message = "srfpre96 timed out for input :\n" + stdin
+            raise CPiSError(message)
+
+        finally:
+            try:
+                subproc.stdin.close()
+                subproc.stdout.close()
+                subproc.stderr.close()
+            except Exception as e:
+                warnings.warn(str(e))
+        return stdout, stderr
+
+    @staticmethod
+    def depthmodel_arrays_to_string(ztop, vp, vs, rh):
+        """prepare input for modified srfpre96 (max_srfpre96)
+           z   = depth in km, z[0] must be 0
+           vp  = vp in km/s
+           vs  = vs in km/s
+           rh  = density in g/cm3
+        """
+
+        if ztop[0]:
+            raise CPiSDomainError('Z0 must be 0')  # assert z[0] == 0.
+        n = len(ztop)
+
+        if not (n == len(vp) == len(vs) == len(rh)):
+            raise CPiSDomainError('Z VP, VS, RH must be the same length')  # assert n == len(vp) == len(vs) == len(rh)
+
+        ztop = np.asarray(ztop, float)
+        if (np.isinf(ztop) | np.isnan(ztop)).any():
+            raise CPiSDomainError('got inapropriate values for Z (%s)' % str(ztop))
+
+        Ibad = (ztop[1:] - ztop[:-1] < 0.001)
+        if Ibad.any():
+            H = ztop[1:] - ztop[:-1]
+            raise CPiSDomainError(
+                'Z must be growing, layers must be at least '
+                '0.001km thick, got %s (%s)' % (str(ztop), str(H[Ibad])))
+
+        vs = np.asarray(vs, float)
+        if (np.isinf(vs) | np.isnan(vs)).any():
+            raise CPiSDomainError('vs value error %s' % str(vs))
+
+        if not (vs > 0.08).all():
+            raise CPiSDomainError('vs domain error %s' % str(vs))
+
+        vp = np.asarray(vp, float)
+        if (np.isinf(vp) | np.isnan(vp)).any():
+            raise CPiSDomainError('vp value error %s' % str(vp))
+
+        if not (vp > vs * (4. / 3.) ** 0.5).all():
+            raise CPiSDomainError('vp over vs domain error %s' % str(vp / vs))
+
+        rh = np.asarray(rh, float)
+        if (np.isinf(rh) | np.isnan(rh)).any():
+            raise CPiSDomainError('rh value error %s' % str(rh))
+
+        if not np.all((rh > 1.)):
+            raise CPiSDomainError('density domain error : %s' % str(rh))
+
+        out = "%d\n" % n + \
+              ("%f " * (n - 1)) % tuple(ztop[1:] - ztop[:-1]) + "\n" + \
+              ("%f " * n) % tuple(vp) + "\n" + \
+              ("%f " * n) % tuple(vs) + "\n" + \
+              ("%f " * n) % tuple(rh)
+        return out
+
+    def __init__(self, curves, h=0.005, ddc=0.005):
+        self.curves = curves
+
+        srfpre96input = self.curves2srfpre96input(curves=curves)
+        self.srfpre96output, stderr = self.callherrmann(stdin=srfpre96input, exe=SRFPRE96_EXE)
+        self.srfpre96output = "{:f} {:f}\n".format(h, ddc) + self.srfpre96output
+
+        if len(stderr):
+            raise CPiSError('srfpre96 failed with error {}'.format(stderr))
+
+        self.waves = np.concatenate([curve.waves for curve in curves])
+        self.types = np.concatenate([curve.types for curve in curves])
+        self.modes = np.concatenate([curve.modes for curve in curves])
+        self.freqs = np.concatenate([curve.freqs for curve in curves])
+        self.curve_end_index = np.cumsum([curve.nfreqs for curve in curves])
+        self.curve_begin_index = np.concatenate(([0], self.curve_end_index[:-1]))
+
+    def __call__(self, ztop, vp, vs, rh):
+
+        srfdis96input = \
+            "{depthmodel_string:s}\n".format(
+                depthmodel_string=self.depthmodel_arrays_to_string(ztop, vp, vs, rh)) \
+            + self.srfpre96output
+
+        srfdis96output, stderr = self.callherrmann(stdin=srfdis96input, exe=SRFDIS96_EXE)
+
+        if len(stderr):
+            raise CPiSError('srfdis96 failed with error : {}'.format(stderr))
+
+        values = readsrfdis96(srfdis96stdout=srfdis96output,
+                              waves=self.waves,
+                              types=self.types,
+                              modes=self.modes,
+                              freqs=self.freqs)
+
+        curves = []
+        for b, e in zip(self.curve_begin_index, self.curve_end_index):
+            curve = Curve(wave=self.waves[b],
+                          type=self.types[b],
+                          mode=self.modes[b],
+                          freqs=self.freqs[b:e],
+                          values=values[b:e])
+            curves.append(curve)
+
+        return curves
 
 
-def dispersion_1(ztop, vp, vs, rh,
-    Waves, Types, Modes, Freqs,
-    h = 0.005, dcl = 0.005, dcr = 0.005, keepnans = False):
+def check_herrmann_codes():
+    """check successful compilation"""
 
-    """same as dispersion with slightly more convenient inputs and outputs
-    (no need to repeat wave, type and mode)
+    solution = "please recompile fortran codes using recompile_src90"
 
-    input:
-        -> depth model
-        ztop, vp, vs, rh = depth model, 4 iterables with same length
+    if not os.path.isdir(_src):
+        raise Exception('directory %s not found' % _src)
 
-        -> dispersion points
-        Waves, Types, Modes, Freqs = dispersion curves, 4 iterables with same length
-        example :
-            Waves = ['L', 'L', 'R']
-            Types = ['C', 'C', 'U']
-            Modes = [ 0,   1,   0 ]
-            Freqs = [fLC0, fLC1, fRU0] where f??? are frequency numpy arrays or lists
+    if not os.path.exists(SRFPRE96_EXE):
+        raise Exception('could not find %s\n%s' % (SRFPRE96_EXE, solution))
 
-        -> Herrmann's parameters, see dispersion
+    if not os.path.exists(SRFDIS96_EXE):
+        raise Exception('could not find %s\n%s' % (SRFDIS96_EXE, solution))
 
-    output :
-        a generator of tuples
-        each tuple correspond to one dispersion curve
-        (wave(str,"R"/"L"), type(str,"C"/"U"), mode(int), frequency(array,Hz), velocity(array,km/s))
-        example
-            ("L", "C", 0, fLC0, VLC0)
-            ("L", "C", 1, fLC1, VLC1)
-            ("R", "U", 0, fRU0, VRU0)
+    # depth model
+    ztop = [0.00, 1.00]  # km, top layer depth
+    vp = [2.00, 3.00]  # km/s
+    vs = [1.00, 2.00]  # km/s
+    rh = [2.67, 2.67]  # g/cm3
 
-    see also :
-        dispersion
-        dispersion_2
-        groupbywtm
-        igroupbywtm
-    """
-    waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
-    values = dispersion(ztop, vp, vs, rh, \
-                waves, types, modes, freqs,
-                h = h, dcl = dcl, dcr = dcr)
+    # dipsersion parameters
+    curves = [Curve(wave='R', type='C', mode=0, freqs=np.array([1., 2.])),
+              Curve(wave='L', type='C', mode=0, freqs=np.array([2., 3.]))]
 
-    for w, t, m, F, V in groupbywtm(waves, types, modes, freqs, values, keepnans = keepnans):
-        yield w, t, m, F, V
+    hc = HerrmannCaller(curves, h=0.005, ddc=0.005)
+    curves = hc(ztop, vp, vs, rh)
+
+    try:
+        assert curves[0].wave == "R"
+        assert curves[0].type == "C"
+        assert curves[0].mode == 0
+        assert np.all(curves[0].freqs == np.array([1., 2.]))
+
+        assert curves[1].wave == "L"
+        assert curves[1].type == "C"
+        assert curves[1].mode == 0
+        assert np.all(curves[1].freqs == np.array([2., 3.]))
+
+    except AssertionError:
+        raise Exception('could not execute fortran codes\n%s' % solution)
 
 
-def dispersion_2(ztop, vp, vs, rh, Curves,
-    h=0.005, dcl=0.005, dcr=0.005, keepnans=False):
-
-    """same as dispersion with slightly more convenient inputs and outputs
-    (inputs are grouped by dispersion curves)
-
-    input:
-        -> depth model
-        ztop, vp, vs, rh = depth model, 4 iterables with same length
-
-        -> dispersion curves
-        Curves = list of tuples like (wave(str,"R"/"L"), type(str,"C"/"U"), mode(int), frequency(array,Hz))
-        example :
-            Curves = [('L', 'C', 0, fLC0),
-                      ('L', 'C', 1, fLC1),
-                      ('R', 'U', 0, fRU0)]
-
-        -> Herrmann's parameters, see dispersion
-
-    output :
-        see dispersion_1
-
-    see also :
-        dispersion
-        dispersion_1
-        groupbywtm
-        igroupbywtm
-    """
-    Waves, Types, Modes, Freqs = zip(*Curves)
-    for w, t, m, F, V in dispersion_1(\
-            ztop, vp, vs, rh,
-            Waves, Types, Modes, Freqs,
-            h=h, dcl=dcl, dcr=dcr, keepnans=keepnans):
-        yield w, t, m, F, V
+def recompile_src90(yes=False):
+    script = """
+cd {_src}
+./clean.sh && ./compile.sh
+""".format(_src=_src)
+    if yes:
+        os.system(script)
+    else:
+        print(script)
+        if raw_input('run command?').lower() in ["y", "yes"]:
+            os.system(script)
 
 
 if __name__ == "__main__":
 
     """ DEMO """
 
+    import time
     import matplotlib.pyplot as plt
     from srfpython.standalone.display import logtick
     check_herrmann_codes()
@@ -578,27 +385,26 @@ if __name__ == "__main__":
     rh   = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63]  # g/cm3
 
     # dipsersion parameters
-    def f(): return np.logspace(np.log10(0.2), np.log10(3.5), 85)
-    curves = [('R', 'U', 0, f()),
-              ('R', 'U', 1, f()),
-              ('R', 'C', 0, f()),
-              ('R', 'C', 1, f()),
-              ('L', 'U', 0, f()),
-              ('L', 'U', 1, f()),
-              ('L', 'C', 0, f()),
-              ('L', 'C', 1, f())]
+    f = np.logspace(np.log10(0.2), np.log10(3.5), 85)
+    curves = [Curve(wave='R', type='U', mode=0, freqs=f),
+              Curve(wave='R', type='U', mode=1, freqs=f),
+              Curve(wave='R', type='C', mode=0, freqs=f),
+              Curve(wave='R', type='C', mode=1, freqs=f),
+              Curve(wave='L', type='U', mode=0, freqs=f),
+              Curve(wave='L', type='U', mode=1, freqs=f),
+              Curve(wave='L', type='C', mode=0, freqs=f),
+              Curve(wave='L', type='C', mode=1, freqs=f)]
 
-    # reorganize inputs for dispersion_1
-    Waves, Types, Modes, Freqs = zip(*curves)
+    hc = HerrmannCaller(curves=curves, h=0.005, ddc=0.005)
 
-    # compute dispersion curves
-    with Timer('dispersion'):
-        out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
+    start = time.time()
+    curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh)
+    print(time.time() - start)
 
     # display results
     ax = plt.gca()
-    for w, t, m, fs, us in out:
-        ax.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
+    for curve in curves:
+        ax.loglog(1. / curve.freqs, curve.values, '+-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
     ax.set_xlabel('period (s)')
     ax.set_ylabel('velocity (km/s)')
     ax.grid(True, which="major")
