@@ -58,8 +58,8 @@ HerrMet --extract -pdf last 1000 0. 1 -top 10 0. 1
 """
 
 RUNFILE = "{rootname}/_HerrMet.run"
-EXTRACTMODELFILE = '{rootname}/_HerrMet.p{percentile:.2f}.mod96'
-EXTRACTDISPFILE = '{rootname}/_HerrMet.p{percentile:.2f}.surf96'
+EXTRACTMODELFILE = '{rootname}/_HerrMet.{extract_mode}_{extract_limit}_{extract_llkmin}_{extract_step}.p{percentile:.2f}.mod96'
+EXTRACTDISPFILE = '{rootname}/_HerrMet.{extract_mode}_{extract_limit}_{extract_llkmin}_{extract_step}.p{percentile:.2f}.surf96'
 
 
 def _find_runfile(rootname):
@@ -79,8 +79,20 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
     assert np.all(percentiles[1:] > percentiles[:-1])
 
     for p in percentiles:
-        extract_disp_file = EXTRACTDISPFILE.format(rootname=rootname, percentile=p)
-        extract_model_file = EXTRACTMODELFILE.format(rootname=rootname, percentile=p)
+        extract_disp_file = EXTRACTDISPFILE.format(
+            rootname=rootname,
+            extract_mode=extract_mode,
+            extract_limit=extract_limit,
+            extract_llkmin=extract_llkmin,
+            extract_step=extract_step,
+            percentile=p)
+        extract_model_file = EXTRACTMODELFILE.format(
+            rootname=rootname,
+            extract_mode=extract_mode,
+            extract_limit=extract_limit,
+            extract_llkmin=extract_llkmin,
+            extract_step=extract_step,
+            percentile=p)
         if os.path.isfile(extract_disp_file) and os.path.isfile(extract_model_file):
             continue
         break
@@ -124,7 +136,13 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
                      **mapkwargs):
         try:
             dmout = depthmodel(vppc, vspc, rhpc)
-            extract_model_file = EXTRACTMODELFILE.format(rootname=rootname, percentile=p)
+            extract_model_file = EXTRACTMODELFILE.format(
+                rootname=rootname,
+                extract_mode=extract_mode,
+                extract_limit=extract_limit,
+                extract_llkmin=extract_llkmin,
+                extract_step=extract_step,
+                percentile=p)
             if verbose:
                 print "writing %s" % extract_model_file
             dmout.write96(extract_model_file)  # , overwrite=True)
@@ -134,7 +152,13 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
             print "Error", str(e)
 
     for p in percentiles:
-        extract_disp_file = EXTRACTDISPFILE.format(rootname=rootname, percentile=p)
+        extract_disp_file = EXTRACTDISPFILE.format(
+            rootname=rootname,
+            extract_mode=extract_mode,
+            extract_limit=extract_limit,
+            extract_llkmin=extract_llkmin,
+            extract_step=extract_step,
+            percentile=p)
         if os.path.isfile(extract_disp_file):
             os.system('trash {}'.format(extract_disp_file))
 
@@ -146,7 +170,13 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
                       **mapkwargs):
         try:
             srout = surf96reader_from_arrays(wpc, tpc, mpc, fpc, vpc)
-            extract_disp_file = EXTRACTDISPFILE.format(rootname=rootname, percentile=p)
+            extract_disp_file = EXTRACTDISPFILE.format(
+                rootname=rootname,
+                extract_mode=extract_mode,
+                extract_limit=extract_limit,
+                extract_llkmin=extract_llkmin,
+                extract_step=extract_step,
+                percentile=p)
             if verbose:
                 print "writing to {}".format(extract_disp_file)
             with open(extract_disp_file, 'a') as fid:
