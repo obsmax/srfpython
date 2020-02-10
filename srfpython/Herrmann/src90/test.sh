@@ -5,13 +5,7 @@
 
 rm -f in.txt out1.txt out2.txt
 
-cat << END > in.txt
-8
-0.25 0.2  0.2  0.2  0.2  0.48 0.27
-1.85 2.36 2.63 3.15 3.71 4.54 5.48 5.8
-0.86 1.1  1.24 1.47 1.73 2.13 3.13 3.31
-2.47 2.47 2.47 2.47 2.47 2.58 2.58 2.63
-0.005000 0.00500 0.005000
+cat << END > in1.txt
 2 2 2 2
 SURF96 L C T 0 7.692308 3.152852 0.1
 SURF96 L C T 0 4.479947 2.655829 0.1
@@ -45,9 +39,20 @@ SURF96 R U T 1 1.304237 0.696091 0.1
 SURF96 R U T 1 0.833333 0.708612 0.1
 END
 
-../bin/max_srfpre96 < in.txt > out1.txt
-../bin/max_srfpre96 < in.txt | ../bin/max_srfdis96  > out2.txt
+../bin/max_srfpre96 < in1.txt > out1.txt
 
+
+cat << END > in2.txt
+  0.005 0.005
+  8
+   0.250   0.200   0.200   0.200   0.200   0.480   0.270
+  1.850  2.360  2.630  3.150  3.710  4.540  5.480  5.800
+  0.860  1.100  1.240  1.470  1.730  2.130  3.130  3.310
+ 2.470 2.470 2.470 2.470 2.470 2.580 2.580 2.630
+END
+cat out1.txt >> in2.txt
+
+../bin/max_srfdis96 < in2.txt > out2.txt
 
 cmp --silent out1.txt expected1.txt || echo "error : the output from max_srfpre96 differs from expected1"
 cmp --silent out2.txt expected2.txt || echo "error : the output from max_srfdis96 differs from expected1"

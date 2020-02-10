@@ -178,49 +178,12 @@
       PROGRAM SRFPRE96
       IMPLICIT NONE
 
-      INTEGER NL,STDIN,STDOUT,i
-      INTEGER iunit,NLG,NLC,NLU,NRG,NRC,NRU,nlayer
-
-      REAL(kind=4) h,dcl,dcr
-
+      INTEGER STDIN,STDOUT
+      INTEGER NLC,NLU,NRC,NRU
       PARAMETER (STDIN=5,STDOUT=6)
-      PARAMETER (NL=100)
-
-      REAL thicknesses(NL),density_values(NL),vp_values(NL),vs_values(NL)
-      read(STDIN,"(I3)") nlayer
-      read(STDIN,*) thicknesses(1:nlayer-1)
-      read(STDIN,*) vp_values(1:nlayer)
-      read(STDIN,*) vs_values(1:nlayer)
-      read(STDIN,*) density_values(1:nlayer)
-
-      write(STDOUT,"(I3)") nlayer
-
-      do i = 1, nlayer-1
-        write(STDOUT,'(F8.3)', advance="no") thicknesses(i)
-      end do
-      write(STDOUT,'(A1)') ""
-
-      do i = 1, nlayer
-        write(STDOUT,'(F7.3)', advance="no") vp_values(i)
-      end do
-      write(STDOUT,'(A1)') ""
-
-      do i = 1, nlayer
-        write(STDOUT,'(F7.3)', advance="no") vs_values(i)
-      end do
-      write(STDOUT,'(A1)') ""
-
-      do i = 1, nlayer
-        write(STDOUT,'(F6.3)', advance="no") density_values(i)
-      end do
-      write(STDOUT,'(A1)') ""
-
-      READ (STDIN,*) h,dcl,dcr
-      WRITE(STDOUT,"(F7.4)") h
 
       READ (STDIN,*) NLC,NLU,NRC,NRU
-      CALL GETDSP(&
-              & NLC,NLU,NRC,NRU)
+      CALL GETDSP(NLC,NLU,NRC,NRU)
       END
 
 

@@ -24,95 +24,8 @@ _src = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src90/"
 
 SRFPRE96_EXE = _pathfile.replace(_file, 'bin/max_srfpre96')
 SRFDIS96_EXE = _pathfile.replace(_file, 'bin/max_srfdis96')
+# SHELL_COMMAND = "{}|{}".format(SRFPRE96_EXE, SRFDIS96_EXE)
 HERRMANN_TIMEOUT = 5
-
-
-class Curve(object):
-    def __init__(self, wave, type, mode, frequencies):
-        assert wave in ['R', 'L']
-        assert type in ['C', 'U']
-        assert isinstance(mode, int) and mode >= 0
-        assert isinstance(frequencies, np.ndarray)
-        assert frequencies.ndim == 1
-        assert frequencies[1:] > frequencies[:-1]
-        self.wave = wave
-        self.type = type
-        self.mode = mode
-        self.frequencies = frequencies
-
-
-class HerrmannCaller(object):
-    @staticmethod
-    def curves2srfpre96input(curves):
-
-        fmt = "\nSURF96 {wave:1s} {type:1s} X {mode:d} {period} 1. 1."
-        surf96_txt = ""
-
-        nrc = nlc = nru = nlu = 0
-        for curve in curves:
-            assert isinstance(curve, Curve)
-            for period in 1. / curve.frequencies:
-
-                surf96_txt += fmt.format(
-                    wave=curve.wave,
-                    type=curve.type,
-                    mode=curve.mode,
-                    period=period)
-
-                if curve.wave == "R":
-                    if curve.type == "C":
-                        nrc = max([nrc, m + 1])
-                    elif curve.type == "U":
-                        nru = max([nru, m + 1])
-
-                elif curve.wave == "L":
-                    if curve.type == "C":
-                        nlc = max([nlc, m + 1])
-
-                    elif curve.type == "U":
-                        nlu = max([nlu, m + 1])
-
-        srfpre96input = """{} {} {} {}""".format(nlc, nlu, nrc, nru) + surf96_txt
-        return srfpre96input
-
-    @staticmethod
-    def callsrfpre96(srfpre96input):
-        srfpre96_subproc = Popen(
-            SRFPRE96_EXE,
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE,
-            shell=False,
-            preexec_fn=os.setsid)
-
-        try:
-            with Timeout(HERRMANN_TIMEOUT):
-                srfpre96_stdout, srfpre96_stderr = srfpre96_subproc.communicate(srfpre96input)
-
-        except TimeOutError:
-            os.killpg(os.getpgid(srfpre96_subproc.pid), signal.SIGKILL)
-            message = "srfpre96 timed out for input :\n" + srfpre96input
-            raise CPiSError(message)
-
-        finally:
-            try:
-                srfpre96_subproc.stdin.close()
-                srfpre96_subproc.stdout.close()
-                srfpre96_subproc.stderr.close()
-            except Exception as e:
-                warnings.warn(str(e))
-        return srfpre96_stdout, srfpre96_stderr
-
-    def __init__(self, curves, h=0.005, ddc=0.005):
-        self.curves = curves
-        self.srfpre96_stdout, _ = self.curves2srfpre96input(curves=curves)
-        self.srfdis96_input_format = "{h:f} {ddc:f}\n" \
-                                     "{} {}".format()
-
-    def __call__(self, ztop, vp, vs, rh):
-        pass
-
-
 
 
 def check_herrmann_codes():
@@ -231,7 +144,30 @@ def prep_srfpre96_2(z, vp, vs, rh):
     return out
 
 
+def prep_srfpre96_3(waves,types,modes,freqs):
+    """prepare input for modified srfpre96 (max_srfpre96)"""
+    nlc = nlu = nrc = nru = 0
+    fmt="\nSURF96 %1s %1s X %d %f 1. 1."
+    out = ""
 
+    for w,t,m,f in zip(waves,types,modes,freqs):
+        out += fmt % (w,t,m,1./f)
+
+        if w == "R":
+            if t == "C":
+                nrc = max([nrc, m + 1])
+            elif t == "U":
+                nru = max([nru, m + 1])
+
+        elif w == "L":
+            if t == "C":
+                nlc = max([nlc, m + 1])
+
+            elif t == "U":
+                nlu = max([nlu, m + 1])
+
+    out = "%d %d %d %d" %(nlc,nlu,nrc,nru) + out
+    return out
 
 
 class CPiSError(Exception):

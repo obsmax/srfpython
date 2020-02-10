@@ -107,15 +107,14 @@
       CHARACTER(LEN=80) :: FMT  ! WARNING must be long enough for FMT
 !-----
       FMT = "(I2,I2,F11.6,F11.6,F11.6,F11.6)" ! print format for output
+      READ(STDIN, *) h, ddc
       READ(STDIN, *) nlayer
       READ(STDIN, *) thicknesses(1:nlayer-1)
       READ(STDIN, *) vp_values(1:nlayer)
       READ(STDIN, *) vs_values(1:nlayer)
       READ(STDIN, *) density_values(1:nlayer)
-      READ(STDIN, *) h
-      READ(STDIN, *) idispl
-      ddc = 0.005  ! for now
 
+      READ(STDIN, *) idispl
       idispr=idispl ! always true, see srfpre96
       iunit = 0
       iiso = 0
