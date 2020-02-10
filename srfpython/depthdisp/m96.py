@@ -29,10 +29,8 @@ if __name__ == "__main__":
 
     from srfpython.standalone.display import gcf, gca, showme, pause, plt, logtick
     from srfpython.utils import readargv
-    from srfpython.Herrmann.Herrmann import dispersion_1
     from srfpython.depthdisp.dispcurves import surf96reader, Claw, freqspace
     from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
-
 
 
     import numpy as np
@@ -108,6 +106,7 @@ if __name__ == "__main__":
 
     # -----------------------------------
     elif "disp" in argv.keys():
+        from srfpython.Herrmann.Herrmann import HerrmannCaller, Curve
 
         for m in argv['disp']:
             dm = depthmodel_from_mod96(m)
@@ -116,15 +115,20 @@ if __name__ == "__main__":
             vs   = dm.vs.values
             rh   = dm.rh.values
 
-            Waves, Types, Modes, Freqs = [], [], [], []
+            #Waves, Types, Modes, Freqs = [], [], [], []
+            curves = []
             for k in argv.keys():
                 if k[0].upper() in "RL" and k[1].upper() in "UC" and k[2] in "0123456789":
                     fstart, fend, nfreq, fspace = argv[k]
-                    freq = freqspace(float(fstart), float(fend), int(nfreq), fspace)
-                    Waves.append(k[0])
-                    Types.append(k[1])
-                    Modes.append(int(k[2:]))
-                    Freqs.append(freq)
+                    freqs = freqspace(float(fstart), float(fend), int(nfreq), fspace)
+                    curve = Curve(
+                        wave=k[0],    # Waves.append(k[0])
+                        type=k[1],    # Types.append(k[1])
+                        mode=int(k[2:]),    # Modes.append(int(k[2:]))
+                        freqs=freqs)    # Freqs.append(freq)
+                    curves.append(curve)
+            hc = HerrmannCaller(curves=curves)
+            curves = hc(ztop, vp, vs, rh)
 
             if "save" in argv.keys():
                 sfx = ""
@@ -137,10 +141,14 @@ if __name__ == "__main__":
                 print "%s => %s" % (m, s96out)
 
                 assert s96out.endswith('.surf96') or s96out.endswith('.s96')
+
                 with open(s96out, 'w') as fid:
-                    for w, t, mm, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs):
-                        for FF, VV in zip(F, V):
-                            fid.write('SURF96 %s %s T %d %f %f 0.1\n' % (w, t, mm, 1. / FF, VV))
+                    for curve in curves:
+                        for FF, VV in zip(curve.freqs, curve.values):
+                            fid.write('SURF96 %s %s T %d %f %f 0.1\n' % (curve.wave, curve.type, curve.mode, 1. / FF, VV))
+                    # for w, t, mm, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs):
+                    #     for FF, VV in zip(F, V):
+                    #         fid.write('SURF96 %s %s T %d %f %f 0.1\n' % (w, t, mm, 1. / FF, VV))
             else:
                 axvp = gcf().add_subplot(1, 5, 1)
                 axvs = gcf().add_subplot(1, 5, 2, sharey=axvp)
@@ -152,8 +160,9 @@ if __name__ == "__main__":
                 dm.pr().show(axpr)
                 dm.rh.show(axrh)
 
-                for w, t, m, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs):
-                    axdsp.loglog(1. / F, V, label="%s%s%d" % (w, t, m))
+                for curve in curves:
+                #for w, t, m, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs):
+                    axdsp.loglog(1. / curve.freqs, curve.values, label="%s%s%d" % (curve.wave, curve.type, curve.mode))
 
         if "save" not in argv.keys():
             logtick(axdsp, "xy")

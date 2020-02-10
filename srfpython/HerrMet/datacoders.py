@@ -30,46 +30,50 @@ Datacoder     : object to convert output from Herrmann.dispersion to an array of
 """
 
 
-# ___________________________________
 class Datacoder(object):
     def __init__(self, waves, types, modes, freqs, values, dvalues):
-        "init with the target data and uncertainty"
-        assert np.all(~np.isnan(values))
-        assert np.all([len(w) == len(waves) for w in [types, modes, freqs, values, dvalues]])
-        self.waves = waves     #parameters for forward problem
-        self.types = types     #parameters for forward problem
-        self.modes = modes     #parameters for forward problem
-        self.freqs = freqs     #parameters for forward problem
-        self.values = values   #target dispersion
-        self.dvalues = dvalues #target dispersion
+        """init with the target data and uncertainty"""
 
-    # ------------------
+        assert np.all(~np.isnan(values))
+
+        self.npoints = len(waves)
+        assert len(types) == len(modes) == \
+               len(freqs) == len(values) == \
+               len(dvalues) == self.npoints
+
+        self.waves = waves      # parameters for forward problem
+        self.types = types      # parameters for forward problem
+        self.modes = modes      # parameters for forward problem
+        self.freqs = freqs      # parameters for forward problem
+        self.values = values    # target dispersion
+        self.dvalues = dvalues  # target dispersion
+
     def target(self):
-        dobs   =  self.values          #target data array
-        CDinv  = (self.dvalues) ** -2. #target data covariance (inverted, diagonal terms)
+        dobs = self.values  # target data array
+        CDinv = self.dvalues ** -2.  # target data covariance (inverted, diagonal terms)
         return dobs, CDinv
 
-    # ------------------
     def __call__(self, values):
-        assert len(values) == len(self.values)
-        d = values
-        return d
+        """converts dispersion values into a data array d"""
+        # assert len(values) == self.npoints
+        return values  # the default behavior is identity, see subclasses for advanced conversions
 
-    # ------------------
     def inv(self, d):
-        values = d
-        return values
+        """converts a data array d into dispersion values"""
+        return d  # the default behavior is identity, see subclasses for advanced conversions
 
 
-# ------------------
 def log_nofail(x):
-     if np.isnan(x): return x
-     elif x < 0.: return np.nan
-     elif x == 0.: return -np.inf
-     else: return np.log(x)
+    if np.isnan(x):
+        return x
+    elif x < 0.:
+        return np.nan
+    elif x == 0.:
+        return -np.inf
+    else:
+        return np.log(x)
 
 
-# ------------------
 class Datacoder_log(Datacoder):
     def __init__(self, waves, types, modes, freqs, values, dvalues):
         Datacoder.__init__(self, waves, types, modes, freqs, values, dvalues)

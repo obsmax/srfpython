@@ -4,7 +4,7 @@ from srfpython.standalone.multipro8 import Job, MapAsync
 from srfpython.standalone.display import values2colors, legendtext, chftsz
 from srfpython.standalone import cmaps #used in function eval
 from srfpython.standalone.asciifile import AsciiFile
-from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm, dispersion
+from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthmodel
 from srfpython.depthdisp.dispcurves import freqspace
 from srfpython.depthdisp.depthpdfs import dmstats1

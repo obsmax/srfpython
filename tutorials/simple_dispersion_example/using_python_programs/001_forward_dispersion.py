@@ -17,36 +17,32 @@ print dm
 # -----------------------
 
 # define the dipsersion curves to compute
-#          Wave(R/L) Type(C/U) Mode    Frequency array (Hz)             
-Curves = [('R',      'U',      0,      freqspace(0.2, 3.5, 35, "log")), 
-          ('R',      'U',      1,      freqspace(0.2, 3.5, 35, "log")), 
-          ('R',      'C',      0,      freqspace(0.2, 3.5, 35, "log")), 
-          ('R',      'C',      1,      freqspace(0.2, 3.5, 35, "log")), 
-          ('L',      'U',      0,      freqspace(0.2, 3.5, 35, "log")), 
-          ('L',      'U',      1,      freqspace(0.2, 3.5, 35, "log")), 
-          ('L',      'C',      0,      freqspace(0.2, 3.5, 35, "log")), 
-          ('L',      'C',      1,      freqspace(0.2, 3.5, 35, "log"))] 
+
+curves = [Curve(wave='R', type='U', mode=0, freqs=freqspace(0.2, 3.5, 35, "log")),
+          Curve(wave='R', type='U', mode=1, freqs=freqspace(0.2, 3.5, 35, "log")),
+          Curve(wave='R', type='C', mode=0, freqs=freqspace(0.2, 3.5, 35, "log")),
+          Curve(wave='R', type='C', mode=1, freqs=freqspace(0.2, 3.5, 35, "log")),
+          Curve(wave='L', type='U', mode=0, freqs=freqspace(0.2, 3.5, 35, "log")),
+          Curve(wave='L', type='U', mode=1, freqs=freqspace(0.2, 3.5, 35, "log")),
+          Curve(wave='L', type='C', mode=0, freqs=freqspace(0.2, 3.5, 35, "log")),
+          Curve(wave='L', type='C', mode=1, freqs=freqspace(0.2, 3.5, 35, "log"))]
 
 # compute dispersion curves and display
-
-results = dispersion_2(
-    ztop=dm.vp.z, 
+hc = HerrmannCaller(curves=curves)
+curves_out = hc(
+    ztop=dm.vp.z,
     vp=dm.vp.values, 
     vs=dm.vs.values, 
     rh=dm.rh.values, 
-    Curves=Curves)  # just a generator no results generated until looping over it
+    keepnans=False)
 
 ax = plt.gca()
-for wave_letter, type_letter, mode_number, \
-    frequency_array, velocity_array in results:
+for curve in curves_out:
+    curve.plot(ax, "+-")
 
-    ax.loglog(1. / frequency_array, velocity_array, '+-',
-              label="%s%s%d" % (wave_letter, type_letter, mode_number))
 
-ax.set_xlabel('period (s)')
-ax.set_ylabel('velocity (km/s)')    
-ax.grid(True, which="major")
-ax.grid(True, which="minor")
+ax.set_xscale('log')
+ax.set_yscale('log')
 logtick(ax, "xy")
 ax.set_title('figure 2 : Herrmann.py demo')
 

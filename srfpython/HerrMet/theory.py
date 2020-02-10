@@ -35,20 +35,19 @@ Datacoder     : object to convert output from Herrmann.dispersion to an array of
 
 # ----------------------------------
 class Theory(object):
-    h   = 0.005
-    dcl = 0.005
-    dcr = 0.005
 
-    # ------------------
-    def __init__(self, parameterizer, datacoder):
+    def __init__(self, parameterizer, datacoder, h=0.005, ddc=0.005):
         assert isinstance(parameterizer, Parameterizer)
         assert isinstance(datacoder, Datacoder)
         self.parameterizer, self.datacoder = parameterizer, datacoder
 
-    # ------------------
+        from srfpython.Herrmann.Herrmann import HerrmannCaller, Curve
+        curves = []
+        self.herrmanncaller = HerrmannCaller(curves, h=h, ddc=ddc)
+
     def __call__(self, m):
         D, P = self.datacoder, self.parameterizer
-        ZTOP, VP, VS, RH = P.inv(m) #recover model from parameterized array (m)
+        ZTOP, VP, VS, RH = P.inv(m)   # recover model from parameterized array (m)
         values = dispersion(ZTOP, VP, VS, RH, \
             D.waves, D.types, D.modes, D.freqs,
             self.h, self.dcl, self.dcr)
@@ -58,11 +57,15 @@ class Theory(object):
 # -------------------------------------
 def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **mapkwargs):
     """extrapolate dispersion curves"""
+
     def fun(mms):
         ztop, vp, vs, rh = mms
         try:
             overvalues = dispersion(ztop, vp, vs, rh, overwaves, overtypes, overmodes, overfreqs, h = 0.005, dcl = 0.005, dcr = 0.005)
-        except KeyboardInterrupt: raise
+
+        except KeyboardInterrupt:
+            raise
+
         except Exception as e:
             h = ztop[1:] - ztop[:-1]
             # assume failuer was caused by rounding issues
@@ -71,9 +74,13 @@ def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **map
             try: #again
                 overvalues = dispersion(ztop, vp, vs, rh, overwaves, overtypes, overmodes, overfreqs, h=0.005, dcl=0.005,
                                       dcr=0.005)
-            except KeyboardInterrupt: raise
+
+            except KeyboardInterrupt:
+                raise
+
             except Exception as giveup:
                 overvalues = np.nan * np.ones(len(overwaves))
+
         return mms, overvalues
 
     with MapSync(fun, (Job(mms) for mms in ms), **mapkwargs) as ma:

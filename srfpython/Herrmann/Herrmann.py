@@ -73,6 +73,18 @@ class Curve(object):
             self._modes = np.asarray([self.mode for _ in range(self.nfreqs)], int)
         return self._modes
 
+    def label(self):
+        return '{}{}{}'.format(self.wave, self.type, self.mode)
+
+    def plot(self, ax, *args, **kwargs):
+        kwargs.setdefault("label", self.label())
+        ax.plot(1.0 / self.freqs, self.values, *args, **kwargs)
+
+        ax.set_xlabel('period (s)')
+        ax.set_ylabel('velocity (km/s)')
+        ax.grid(True, which="major")
+        ax.grid(True, which="minor")
+
 
 def argcrossfind(X, Y):
 
@@ -284,7 +296,7 @@ class HerrmannCaller(object):
         self.curve_end_index = np.cumsum([curve.nfreqs for curve in curves])
         self.curve_begin_index = np.concatenate(([0], self.curve_end_index[:-1]))
 
-    def __call__(self, ztop, vp, vs, rh):
+    def __call__(self, ztop, vp, vs, rh, keepnans=False):
 
         srfdis96input = \
             "{depthmodel_string:s}\n".format(
@@ -311,7 +323,18 @@ class HerrmannCaller(object):
                           values=values[b:e])
             curves.append(curve)
 
-        return curves
+        if keepnans:
+            return curves
+
+        # remove nans from values
+        curves_out = []
+        for curve in curves:
+            I = np.isnan(curve.values)
+            if I.all():
+                continue
+            curve.freqs, curve.values = curve.freqs[~I], curve.values[~I]
+            curves_out.append(curve)
+        return curves_out
 
 
 def check_herrmann_codes():
@@ -367,6 +390,18 @@ cd {_src}
         print(script)
         if raw_input('run command?').lower() in ["y", "yes"]:
             os.system(script)
+
+
+def dispersion(*args, **kwargs):
+    raise Exception('obsolet')
+
+
+def dispersion_1(*args, **kwargs):
+    raise Exception('obsolet')
+
+
+def dispersion_2(*args, **kwargs):
+    raise Exception('obsolet')
 
 
 if __name__ == "__main__":
