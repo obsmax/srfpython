@@ -1,5 +1,5 @@
-from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, dispersion_2, groupbywtm, igroupbywtm, \
-    check_herrmann_codes, recompile_src90
+# from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, dispersion_2, groupbywtm, igroupbywtm, \
+#     check_herrmann_codes, recompile_src90
 from srfpython.depthdisp.depthmodels import depthmodel1D, depthmodel, depthmodel_from_mod96string, \
     depthmodel_from_mod96, depthmodel_from_arrays, depthspace
 from srfpython.depthdisp.dispcurves import Claw, Ulaw, freqspace, \
