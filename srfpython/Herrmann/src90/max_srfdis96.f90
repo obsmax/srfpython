@@ -10,6 +10,17 @@
 !        si la 4eme colonne vaut 0, alors la 3eme colonne est la periode absolue
 !        sinon la 3eme colonne est diminuee d un facteur 1-h et la 4eme est augmentee d'un fact. 1+h
 !    5eme et 6eme : vitesse de phase correspondant aux colonnes 3 et 4
+
+! mes modifs : update 10/02/2020
+! les entrees sont lues dans stdin
+!    ligne 1 : nlayer
+!    ligne 2 : valeurs d'epaisseurs de couches en km  (nlayer-1)
+!    ligne 3 : valeurs de vp en km/s
+!    ligne 4 : valeurs de vs en km/s
+!    ligne 5 : valeurs de densite en g/cm/cm/cm
+!    ligne 6 : h et ddc  (pour convertion phase->group et recherche de racines)
+!    lignes suivantes : sorties de srfpre96
+
 !----------------------------------------------------------------------c
 !                                                                    c
 !    COMPUTER PROGRAMS IN SEISMOLOGY                                 c
@@ -113,6 +124,7 @@
       READ(STDIN, *) vs_values(1:nlayer)
       READ(STDIN, *) density_values(1:nlayer)
       READ(STDIN, *) h, ddc
+      ! after this point the inputs corresponds from the output of srfpre96
       READ(STDIN, *) idispl
       idispr=idispl ! always true, see srfpre96
       iunit = 0

@@ -84,6 +84,12 @@
 !      a savoir
 !      nper, nper, earthflat (nombre de periodes distinctes, nombre de periodes distinctes, 0 pour terre plate)
 
+!  mes modifs : update 10/02/2020
+! j'ai vire tout ce qui porte sur le modele de vitesse
+! ne reste que les points des courbes de dispersion auquels doivent etre calcules
+! les valeurs de vitesse
+! => srfpre96 n est appele qu une seule fois
+
 !----------------------------------------------------------------------c
 !----------------------------------------------------------------------c
 !----------------------------------------------------------------------c
