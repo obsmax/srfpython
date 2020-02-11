@@ -1,6 +1,6 @@
 from srfpython.standalone.multipro8 import Job, MapSync
 from srfpython.standalone.stdout import waitbar
-from srfpython.Herrmann.Herrmann import dispersion
+from srfpython.Herrmann.Herrmann import HerrmannCallerFromLists
 from parameterizers import Parameterizer
 from datacoders import Datacoder
 import numpy as np
@@ -33,7 +33,6 @@ Datacoder     : object to convert output from Herrmann.dispersion to an array of
 """
 
 
-# ----------------------------------
 class Theory(object):
 
     def __init__(self, parameterizer, datacoder, h=0.005, ddc=0.005):
@@ -41,44 +40,48 @@ class Theory(object):
         assert isinstance(datacoder, Datacoder)
         self.parameterizer, self.datacoder = parameterizer, datacoder
 
-        from srfpython.Herrmann.Herrmann import HerrmannCaller, Curve
-        curves = []
-        self.herrmanncaller = HerrmannCaller(curves, h=h, ddc=ddc)
+        self.herrmanncaller = HerrmannCallerFromLists(
+            waves=datacoder.waves, types=datacoder.types,
+            modes=datacoder.modes, freqs=datacoder.freqs,
+            h=h, ddc=ddc)
 
     def __call__(self, m):
-        D, P = self.datacoder, self.parameterizer
-        ZTOP, VP, VS, RH = P.inv(m)   # recover model from parameterized array (m)
-        values = dispersion(ZTOP, VP, VS, RH, \
-            D.waves, D.types, D.modes, D.freqs,
-            self.h, self.dcl, self.dcr)
-        return D(values) #convert dispersion data to coded array  (d)
+        ztop, vp, vs, rh = self.parameterizer.inv(m)   # recover model from parameterized array (m)
+
+        values = self.herrmanncaller.disperse(ztop, vp, vs, rh)
+
+        return self.datacoder(values)  # convert dispersion data to coded array  (d)
 
 
-# -------------------------------------
 def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **mapkwargs):
     """extrapolate dispersion curves"""
+
+    herrmanncaller = HerrmannCallerFromLists(
+        waves=overwaves, types=overtypes,
+        modes=overmodes, freqs=overfreqs,
+        h=0.005, ddc=0.005)
 
     def fun(mms):
         ztop, vp, vs, rh = mms
         try:
-            overvalues = dispersion(ztop, vp, vs, rh, overwaves, overtypes, overmodes, overfreqs, h = 0.005, dcl = 0.005, dcr = 0.005)
+            overvalues = herrmanncaller.dispersion(ztop, vp, vs, rh)
 
         except KeyboardInterrupt:
             raise
 
-        except Exception as e:
+        except Exception:
             h = ztop[1:] - ztop[:-1]
             # assume failuer was caused by rounding issues
             h[h <= 0.001] = 0.001001
             ztop = np.concatenate(([0.], h.cumsum()))
-            try: #again
-                overvalues = dispersion(ztop, vp, vs, rh, overwaves, overtypes, overmodes, overfreqs, h=0.005, dcl=0.005,
-                                      dcr=0.005)
+            try:  # again
+                overvalues = herrmanncaller.disperse(ztop, vp, vs, rh)
 
             except KeyboardInterrupt:
                 raise
 
-            except Exception as giveup:
+            except Exception:
+                raise
                 overvalues = np.nan * np.ones(len(overwaves))
 
         return mms, overvalues

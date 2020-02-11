@@ -117,7 +117,7 @@
       INTEGER iunit,iiso,idimen,icnvel
       CHARACTER(LEN=80) :: FMT  ! WARNING must be long enough for FMT
 !-----
-      FMT = "(I2,I2,F11.6,F11.6,F11.6,F11.6)" ! print format for output
+      FMT = "(I2,I2,F12.6,F12.6,F12.6,F12.6)" ! print format for output
       READ(STDIN, *) nlayer
       READ(STDIN, *) thicknesses(1:nlayer-1)
       READ(STDIN, *) vp_values(1:nlayer)

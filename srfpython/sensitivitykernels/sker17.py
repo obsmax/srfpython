@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 import numpy as np
-from srfpython.Herrmann.Herrmann import dispersion, dispersion_1, Timer, groupbywtm, igroupbywtm, CPiSDomainError
+from srfpython.Herrmann.Herrmann import Timer, groupbywtm, igroupbywtm, CPiSDomainError
+from srfpython.Herrmann.Herrmann import HerrmannCallerFromLists, HerrmannCallerFromGroupedLists
 from srfpython.utils import minmax
 from srfpython.standalone.cmaps import cccfcmap3, tomocmap1
 from srfpython.standalone.multipro8 import MapSync, Job
@@ -32,10 +33,10 @@ def lognofail(x):
 
 
 # _____________________________________
-def sker17(ztop, vp, vs, rh, \
+def sker17(ztop, vp, vs, rh,
     waves, types, modes, freqs,
     dz=0.001, dlogvs=0.01, dlogpr=0.01, dlogrh=0.01, norm=True,
-    h = 0.005, dcl = 0.005, dcr = 0.005):
+    h=0.005, ddc=0.005):
     """sker17 : compute finite difference sensitivity kernels for surface waves dispersion curves 
     input: 
         -> depth model
@@ -72,6 +73,9 @@ def sker17(ztop, vp, vs, rh, \
     """
 
     waves, types, modes, freqs = [np.asarray(_) for _ in waves, types, modes, freqs]
+
+    herrmanncaller = HerrmannCallerFromLists(waves, types, modes, freqs, h=h, ddc=ddc)
+
     nlayer = len(ztop)
     H = np.array(ztop) # NOT ASARRAY
     H[:-1], H[-1] = H[1:] - H[:-1], np.inf #layer thickness in km
@@ -82,9 +86,7 @@ def sker17(ztop, vp, vs, rh, \
                              dlogpr * np.ones_like(vs),
                              dlogrh * np.ones_like(rh)))
 
-    logvalues0 = lognofail(dispersion(ztop, vp, vs, rh,
-                       waves, types, modes, freqs,
-                       h = h, dcl = dcl, dcr = dcr))
+    logvalues0 = lognofail(herrmanncaller.disperse(ztop, vp, vs, rh))
 
     IZ = np.arange(nlayer)
     IVS = np.arange(nlayer, 2*nlayer)
@@ -106,11 +108,9 @@ def sker17(ztop, vp, vs, rh, \
             Hi = ztopi[ilayer + 1] - ztopi[ilayer]
 
         try:
-            logvaluesi = lognofail(dispersion(
+            logvaluesi = lognofail(herrmanncaller.disperse(
                 ztopi, np.exp(logvsi + logpri),
-                np.exp(logvsi), np.exp(logrhi),
-                waves, types, modes, freqs,
-                h=h, dcl=dcl, dcr=dcr))
+                np.exp(logvsi), np.exp(logrhi)))
         except CPiSDomainError as err:
             print ("error during gradient computation %s" % str(err))
             return i, None
@@ -125,14 +125,12 @@ def sker17(ztop, vp, vs, rh, \
 
         return i, DVAVPi
 
-    # ----
     def gen():
         for i in xrange(1, 4 * len(ztop)):
             modeli = model0.copy()
             modeli[i] += dmodel[i]
             yield Job(i, modeli)
 
-    # ----
     with MapSync(fun, gen()) as ma:
         for _, (i, DVAVPi), _, _ in ma:
             if DVAVPi is None: continue
@@ -150,7 +148,6 @@ def sker17(ztop, vp, vs, rh, \
         yield w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH
 
 
-# _____________________________________
 def sker17_1(ztop, vp, vs, rh,
     Waves, Types, Modes, Freqs, **kwargs):
     """sker17_1 : same as sker17 with slightely more convenient input (no need to repeat wave, type and mode)
@@ -192,7 +189,6 @@ if __name__ == "__main__":
 
     from srfpython.standalone.display import plt
     from srfpython.utils import readargv
-    from srfpython.Herrmann.Herrmann import dispersion_1
     from srfpython.depthdisp.dispcurves import freqspace
     from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
     import numpy as np
@@ -220,15 +216,17 @@ if __name__ == "__main__":
     # ##compute dispersion curves
     fig1 = plt.figure(figsize=(8,8))
     fig1.subplots_adjust(wspace=0.3)
+    hc = HerrmannCallerFromGroupedLists(Waves, Types, Modes, Freqs, h=0.005, ddc=0.005)
     with Timer('dispersion'):
-        out = list(dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs))
+        curves_out = hc(ztop, vp, vs, rh)
     ax1 = fig1.add_subplot(223)
     dm.show(ax1)
     ax1.grid(True, linestyle=":", color="k")
     plt.legend()
     ax2 = fig1.add_subplot(222)
-    for w, t, m, fs, us in out:
-        ax2.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
+    for curve in curves_out:
+        #ax2.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
+        curve.plot(ax2, "+-")
     ax2.set_ylabel('velocity (km/s)')
     ax2.grid(True, which="major")
     ax2.grid(True, which="minor")
@@ -244,7 +242,7 @@ if __name__ == "__main__":
             sker17_1(ztop, vp, vs, rh,
                      Waves, Types, Modes, Freqs,
                      dz=0.001, dlogvs=.01, dlogpr=.01, dlogrh=.01, norm=norm,
-                     h=0.005, dcl=0.005, dcr=0.005):
+                     h=0.005, ddc=0.005):
 
         # ------
         _depth_ = np.concatenate((ztop, [1.1 * ztop[-1]]))

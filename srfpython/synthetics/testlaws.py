@@ -1,7 +1,7 @@
 import numpy as np
 from srfpython.depthdisp.dispcurves import mklaws, igroupbywtm
 from srfpython.depthdisp.depthmodels import depthmodel_from_arrays
-from srfpython.Herrmann.Herrmann import dispersion
+from srfpython.Herrmann.Herrmann import HerrmannCaller, Curve
 
 # depth model
 ztop = [0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80]  # km, top layer depth
@@ -16,19 +16,21 @@ dm = depthmodel_from_arrays(ztop, vp, vs, rh)
 f = np.logspace(np.log10(0.1), np.log10(10.), 100) # frequency array, km/s
 
 # dispersion curves
-curves = [('R', 'C', 0, f),
-          ('R', 'C', 1, f),
-          ('R', 'C', 2, f),
-          ('R', 'C', 3, f),
-          ('R', 'C', 4, f),
-          ('R', 'C', 5, f),
-          ('R', 'C', 6, f)]
+curves = [Curve(wave='R', type='C', mode=0, freqs=f),
+          Curve(wave='R', type='C', mode=1, freqs=f),
+          Curve(wave='R', type='C', mode=2, freqs=f),
+          Curve(wave='R', type='C', mode=3, freqs=f),
+          Curve(wave='R', type='C', mode=4, freqs=f),
+          Curve(wave='R', type='C', mode=5, freqs=f),
+          Curve(wave='R', type='C', mode=6, freqs=f)]
 
 # compute dispersion laws
-Waves, Types, Modes, Freqs = zip(*curves)
-waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
-values = dispersion(ztop, vp, vs, rh, waves, types, modes, freqs)
-laws = mklaws(waves, types, modes, freqs, values, dvalues=None)
+#Waves, Types, Modes, Freqs = zip(*curves)
+#waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
+hc = HerrmannCaller(curves)
+#values = dispersion(ztop, vp, vs, rh, waves, types, modes, freqs)
+values = hc.disperse(ztop, vp, vs, rh)
+laws = mklaws(hc.waves, hc.types, hc.modes, hc.freqs, values, dvalues=None)
 c0, c1, c2, c3 = laws[:4]
 
 if __name__ == "__main__":
@@ -40,6 +42,6 @@ if __name__ == "__main__":
 
     plt.figure()
     for law in laws:
-        law.show(gca())
+        law.show(gca(), period=True)
     plt.legend()
     showme()

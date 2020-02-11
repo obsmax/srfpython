@@ -122,9 +122,9 @@ def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
     CC1 = np.asarray(A[5::6], float)  # phase velocity at t1 if phase only else at t1b, in km/s;
 
     n = len(W)
-    I = T1B == 0. #True means phase only
-    L = W == 0    #True means Love
-    R = ~L        #assume only R or L
+    I = T1B == 0.  # True means phase only
+    L = W == 0     # True means Love
+    R = ~L         # assume only R or L
 
     nI = ~I
     T, C, U = np.zeros(n, float), np.zeros(n, float), np.zeros(n, float) * np.nan
@@ -296,7 +296,7 @@ class HerrmannCaller(object):
         self.curve_end_index = np.cumsum([curve.nfreqs for curve in curves])
         self.curve_begin_index = np.concatenate(([0], self.curve_end_index[:-1]))
 
-    def __call__(self, ztop, vp, vs, rh, keepnans=False):
+    def disperse(self, ztop, vp, vs, rh):
 
         srfdis96input = \
             "{depthmodel_string:s}\n".format(
@@ -308,11 +308,17 @@ class HerrmannCaller(object):
         if len(stderr):
             raise CPiSError('srfdis96 failed with error : {}'.format(stderr))
 
-        values = readsrfdis96(srfdis96stdout=srfdis96output,
-                              waves=self.waves,
-                              types=self.types,
-                              modes=self.modes,
-                              freqs=self.freqs)
+        values = readsrfdis96(
+            srfdis96stdout=srfdis96output,
+            waves=self.waves,
+            types=self.types,
+            modes=self.modes,
+            freqs=self.freqs)
+        return values
+
+    def __call__(self, ztop, vp, vs, rh, keepnans=False):
+
+        values = self.disperse(ztop, vp, vs, rh)
 
         curves = []
         for b, e in zip(self.curve_begin_index, self.curve_end_index):
@@ -335,6 +341,39 @@ class HerrmannCaller(object):
             curve.freqs, curve.values = curve.freqs[~I], curve.values[~I]
             curves_out.append(curve)
         return curves_out
+
+
+class HerrmannCallerFromLists(HerrmannCaller):
+    def __init__(self, waves, types, modes, freqs, h=0.005, ddc=0.005):
+
+        curves = []
+        for w, t, m, freqs, _ in groupbywtm(
+                waves=waves, types=types,
+                modes=modes, freqs=freqs,
+                values=np.ones_like(freqs)):
+            curve = Curve(
+                wave=w, type=t,
+                mode=m, freqs=freqs,
+                values=None, dvalues=None)
+
+            curves.append(curve)
+
+        HerrmannCaller.__init__(self, curves=curves, h=h, ddc=ddc)
+
+
+class HerrmannCallerFromGroupedLists(HerrmannCaller):
+    def __init__(self, Waves, Types, Modes, Freqs, h=0.005, ddc=0.005):
+
+        curves = []
+        for w, t, m, freqs in zip(Waves, Types, Modes, Freqs):
+            curve = Curve(
+                wave=w, type=t,
+                mode=m, freqs=freqs,
+                values=None, dvalues=None)
+
+            curves.append(curve)
+
+        HerrmannCaller.__init__(self, curves=curves, h=h, ddc=ddc)
 
 
 def check_herrmann_codes():
