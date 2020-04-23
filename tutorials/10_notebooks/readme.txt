@@ -8,5 +8,5 @@ source activate srfpython
 
 jupyter notebook
 
-3/ clic on tutorial.ipynb
+3/ open the desired notebook
 
