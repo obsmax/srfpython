@@ -98,7 +98,7 @@ class Datacoder_log(Datacoder):
 
 
 # ------------------
-def makedatacoder(s96, which = Datacoder_log):
+def makedatacoder(s96, which=Datacoder_log):
     if os.path.exists(s96):
         s = surf96reader(s96)
     else:

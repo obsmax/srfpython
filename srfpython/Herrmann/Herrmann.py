@@ -280,6 +280,11 @@ class HerrmannCaller(object):
         return out
 
     def __init__(self, curves, h=0.005, ddc=0.005):
+        """
+        :param curves: a list of Curve objects with the data points at which to compute dispersion
+        :param h: factor to convert phase to group see CPS
+        :param ddc:
+        """
         self.curves = curves
 
         srfpre96input = self.curves2srfpre96input(curves=curves)
@@ -297,7 +302,13 @@ class HerrmannCaller(object):
         self.curve_begin_index = np.concatenate(([0], self.curve_end_index[:-1]))
 
     def disperse(self, ztop, vp, vs, rh):
-
+        """
+        :param ztop: top layer depth array, km, first = 0
+        :param vp: in km/s, array 1d
+        :param vs: in km/s, array 1d
+        :param rh: density in g/cm3, array 1d
+        :return values: dispersion values in km/s, or nan
+        """
         srfdis96input = \
             "{depthmodel_string:s}\n".format(
                 depthmodel_string=self.depthmodel_arrays_to_string(ztop, vp, vs, rh)) \
@@ -317,6 +328,15 @@ class HerrmannCaller(object):
         return values
 
     def __call__(self, ztop, vp, vs, rh, keepnans=False):
+        """
+        call Herrmann codes for a depth model
+        :param ztop: top layer depth array, km, first = 0
+        :param vp: in km/s, array 1d
+        :param vs: in km/s, array 1d
+        :param rh: density in g/cm3, array 1d
+        :param keepnans: whether nans must be kept or not
+        :return curves: a list of curves object with the computed values
+        """
 
         values = self.disperse(ztop, vp, vs, rh)
 
@@ -345,6 +365,20 @@ class HerrmannCaller(object):
 
 class HerrmannCallerFromLists(HerrmannCaller):
     def __init__(self, waves, types, modes, freqs, h=0.005, ddc=0.005):
+        """
+        initiate HerrmannCaller with 4 zippable arrays with same length
+        :param waves: 1d array with the wave type letter 'R' for Rayleigh, 'L' for Love
+        :param types: 1d array with the wave type letter 'C' for phase vel, 'U' from group vel
+        :param modes: 1d array with mode numbers 0=fundamental mode, 1=1st overtone, ...
+        :param freqs: 1d array with frequency values, in Hz
+        e.g.
+        waves = ['R', 'R', 'R', 'L', 'L', 'L']
+        types = ['C', 'C', 'C', 'C', 'C', 'C']
+        modes = [  0,   0,   0,   0,   0,   0]
+        freqs = [ 1.,  2.,  3.,  1.,  2.,  3.]
+        :param h: see HerrmannCaller
+        :param ddc: see HerrmannCaller
+        """
 
         curves = []
         for w, t, m, freqs, _ in groupbywtm(
@@ -363,7 +397,20 @@ class HerrmannCallerFromLists(HerrmannCaller):
 
 class HerrmannCallerFromGroupedLists(HerrmannCaller):
     def __init__(self, Waves, Types, Modes, Freqs, h=0.005, ddc=0.005):
-
+        """
+        initiate HerrmannCaller with curves data grouped by dispersion curves into arrays
+        :param Waves: list of wave letters (one per dispersion curve) ('R' or 'L')
+        :param Types: list of wave letters (one per dispersion curve) ('C' or 'U')
+        :param Modes: list of mode numbers (one per dispersion curve)
+        :param Freqs: list of frequency arrays (one per dispersion curve)
+        e.g.
+        Waves = ['R', 'L']
+        Types = ['C', 'C']
+        Modes = [  0,   0]
+        Freqs = [ [1.,  2.,  3.],  [1.,  2.,  3.]]
+        :param h: see HerrmannCaller
+        :param ddc: see HerrmannCaller
+        """
         curves = []
         for w, t, m, freqs in zip(Waves, Types, Modes, Freqs):
             curve = Curve(

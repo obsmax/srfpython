@@ -104,7 +104,7 @@ def run(argv, verbose, mapkwargs):
                 raise Exception('unexpected runmode %s' % runmode)
 
             # ---------------------------------
-            for chainid in xrange(Nchain):
+            for chainid in range(Nchain):
                 M0 = np.random.rand(len(p.MINF)) * (p.MSUP - p.MINF) + p.MINF
                 MSTD = p.MSTD
                 yield Job(runfile=runfile,

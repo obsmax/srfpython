@@ -9,7 +9,6 @@ import numpy as np
 Parameterizer : object to convert an array of parameters into smth that can be understood by Herrmann.dispersion
 Theory        : object to convert a model array into a data array
 Datacoder     : object to convert output from Herrmann.dispersion to an array of data
-
                           a model array (m)                        
   |                          ^    |
   |                          |    |
@@ -19,14 +18,14 @@ Datacoder     : object to convert output from Herrmann.dispersion to an array of
   |                        depth model 
   |                     (ztop, vp, vs, rh)
   |                            |
- theory                 Herrmann.dispersion
+ theory                  Herrmann.HerrmannCaller.disperse
  (forward problem)             |
   |                            v
   |                       dispersion data 
   |                      (waves, types, modes, freqs, values, (dvalues))
   |                          ^    |
   |                          |    |
-  |     surf96file ----->   datacoder      --------> d_obs, CD
+  |     surf96file ----->   datacoder      --------> d_obs, CD => logRHOD
   |      (target)            |    |
   v                          |    v
                           a data array (d)
@@ -46,8 +45,12 @@ class Theory(object):
             h=h, ddc=ddc)
 
     def __call__(self, m):
-        ztop, vp, vs, rh = self.parameterizer.inv(m)   # recover model from parameterized array (m)
+        """solves the forward problem"""
 
+        # recover model from parameterized array (m)
+        ztop, vp, vs, rh = self.parameterizer.inv(m)
+
+        # call Herrmann's codes
         values = self.herrmanncaller.disperse(ztop, vp, vs, rh)
 
         return self.datacoder(values)  # convert dispersion data to coded array  (d)

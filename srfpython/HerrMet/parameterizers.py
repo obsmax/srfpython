@@ -17,7 +17,7 @@ Datacoder     : object to convert output from Herrmann.dispersion to an array of
   |                        depth model 
   |                     (ztop, vp, vs, rh)
   |                            |
- theory                 Herrmann.dispersion
+ theory                  Herrmann.HerrmannCaller.disperse
  (forward problem)             |
   |                            v
   |                       dispersion data 
