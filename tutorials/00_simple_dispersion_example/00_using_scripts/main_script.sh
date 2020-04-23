@@ -1,3 +1,5 @@
+#!/usr/bin/env bash 
+
 ## simple example on how to compute dispersion curves in a 1d model
 # run the following command in a terminal (under the right env)
 
