@@ -53,32 +53,29 @@ class Theory(object):
         # call Herrmann's codes
         values = self.herrmanncaller.disperse(ztop, vp, vs, rh)
 
-        return self.datacoder(values)  # convert dispersion data to coded array  (d)
+        # convert and return dispersion data to coded array (d)
+        return self.datacoder(values)
 
 
-def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **mapkwargs):
-    """extrapolate dispersion curves"""
+class _OverdispCore(object):
+    def __init__(self, herrmanncaller):
+        self.herrmanncaller = herrmanncaller
 
-    herrmanncaller = HerrmannCallerFromLists(
-        waves=overwaves, types=overtypes,
-        modes=overmodes, freqs=overfreqs,
-        h=0.005, ddc=0.005)
-
-    def fun(mms):
+    def __call__(self, mms):
         ztop, vp, vs, rh = mms
         try:
-            overvalues = herrmanncaller.dispersion(ztop, vp, vs, rh)
+            overvalues = self.herrmanncaller.dispersion(ztop, vp, vs, rh)
 
         except KeyboardInterrupt:
             raise
 
         except Exception:
             h = ztop[1:] - ztop[:-1]
-            # assume failuer was caused by rounding issues
+            # assume failure was caused by rounding issues
             h[h <= 0.001] = 0.001001
             ztop = np.concatenate(([0.], h.cumsum()))
             try:  # again
-                overvalues = herrmanncaller.disperse(ztop, vp, vs, rh)
+                overvalues = self.herrmanncaller.disperse(ztop, vp, vs, rh)
 
             except KeyboardInterrupt:
                 raise
@@ -89,7 +86,19 @@ def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **map
 
         return mms, overvalues
 
-    with MapSync(fun, (Job(mms) for mms in ms), **mapkwargs) as ma:
+
+def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **mapkwargs):
+    """extrapolate dispersion curves"""
+
+    herrmanncaller = HerrmannCallerFromLists(
+        waves=overwaves, types=overtypes,
+        modes=overmodes, freqs=overfreqs,
+        h=0.005, ddc=0.005)
+
+    fun = _OverdispCore(herrmanncaller)
+    gen = (Job(mms) for mms in ms)
+
+    with MapSync(fun, gen, **mapkwargs) as ma:
         if verbose: wb = waitbar('overdisp')
         Njobs = len(ms) - 1.
         for jobid, (mms, overvalues), _, _ in ma:
