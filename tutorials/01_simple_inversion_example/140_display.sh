@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-for n in 10 100 1000 10000
+for n in 10 100 1000
 do
     HerrMet --display _HerrMet_data010 \
         -plot best $n 0 1 \

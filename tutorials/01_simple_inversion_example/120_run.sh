@@ -9,6 +9,6 @@
 #    [use -w option before --run to control the maximum number of chains to run simultaneously]   
     
 HerrMet -w 8 --run _HerrMet_data010 \
-    -mode restart\
+    -mode append \
     -nchain 8 \
     -nkeep 2000
