@@ -166,7 +166,7 @@ if __name__ == "__main__":
 
         if "save" not in argv.keys():
             logtick(axdsp, "xy")
-            plt.legend()
+            # plt.legend()
             showme()
         sys.exit()
 

@@ -65,18 +65,18 @@ ipython kernel install --user
 ## try the tutorials
 for a simple dispersion curve example 
 ```
-cd ~/git/srfpython/tutorials/simple_dispersion_example
+cd ~/git/srfpython/tutorials/00_simple_dispersion_example
 # follow instructions in readme.txt 
 ```
 
 for an depth inversion example 
 ```
-cd ~/git/srfpython/tutorials/inversion_example
+cd ~/git/srfpython/tutorials/01_simple_inversion_example
 # follow instructions in readme.txt 
 ```
 
 more in the jupyter notebooks
 ```
-cd ~/git/srfpython/tutorials/tutorial0
+cd ~/git/srfpython/tutorials/10_notebooks
 jupyter notebook 
 ```
