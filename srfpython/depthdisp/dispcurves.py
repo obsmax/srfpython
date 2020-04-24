@@ -131,7 +131,8 @@ class freqinterpolator(object):
         assert np.all(freq[1:] > freq[:-1])  # sorted asc
         assert np.all(freq >= 0.)  # positive frequencies only
         if self.require_positive_values:
-            assert np.all(value > 0.)
+            if not (value > 0.).all():
+                raise ValueError(value[value <= 0.])
 
         if dvalue is not None:  # array of uncertaitnies on "value"
             assert isinstance(dvalue, np.ndarray)
