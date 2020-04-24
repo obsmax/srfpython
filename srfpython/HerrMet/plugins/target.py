@@ -8,13 +8,17 @@ from srfpython.depthdisp.dispcurves import Claw, surf96reader, freqspace
 authorized_keys = ["-resamp", "-lunc", "-unc", "-ot"]
 
 # ------------------------------ help messages
-short_help = "--target     set the target data, create temporary directories (rootnames)"
+short_help = "--target     set the target data, create temporary directories for each location"
 
 long_help = """\
---target     s [s..] set the target dispersion curve(s) from surf96 file(s) (not modified)
-                     for each target, I create a directory in . for temporary files
-                     the data will be reproduced into a target file that can be customized manually
-                     (to remove unwanted points, resample dispersion curves...) 
+--target     s [s..] A target designate a surf96 file containing a set of 
+                     dispersion curves to invert for one specific location
+                     for each surf96 file, I create a directory in . for temporary files
+                     the target file in this directory is a copy of the input surf96 file 
+                     it can be edited before inversion
+                     (to remove unwanted points or resample dispersion curves...) 
+                     it the target file is AAAA.surf96, the temporary directory will be named 
+                     _HerrMet_AAAA, this name is referred to as the "rootname" in the later plugins
     -resamp  f f i s resample the dispersion curve in the target file, 
                      requires fmin(Hz), fmax(Hz), nfreq, fscale 
                      (flin=linear in freq domain, plin=linear in period or log=logarithmic scaling)
