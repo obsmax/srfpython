@@ -7,29 +7,7 @@ from srfpython.depthdisp.depthmodels import depthmodel1D
 R43 = np.sqrt(4. / 3.)
 
 """
-Parameterizer : object to convert an array of parameters into smth that can be understood by Herrmann.dispersion
-Theory        : object to convert a model array into a data array
-Datacoder     : object to convert output from Herrmann.dispersion to an array of data
-                          a model array (m)                        
-  |                          ^    |
-  |                          |    |
-  |      mod96file ----->  parameterizer   --------> m_apr, CM
-  |      (apriori)           |    |
-  |                          |    v
-  |                        depth model 
-  |                     (ztop, vp, vs, rh)
-  |                            |
- theory                  Herrmann.HerrmannCaller.disperse
- (forward problem)             |
-  |                            v
-  |                       dispersion data 
-  |                      (waves, types, modes, freqs, values, (dvalues))
-  |                          ^    |
-  |                          |    |
-  |     surf96file ----->   datacoder      --------> d_obs, CD => logRHOD
-  |      (target)            |    |
-  v                          |    v
-                          a data array (d)
+see theory.py
 """
 
 
@@ -81,7 +59,7 @@ class Parameterizer(object):
         self.MSTD = None
 
         # default offsets to use for Frechet derivatives
-        self.dz = 0.001    # km
+        self.dz = 0.01    # km
         self.dvp = 0.01    # km/s
         self.dvs = 0.01    # km/s
         self.dpr = 0.01    # no dimension (vp/vs)
@@ -105,13 +83,9 @@ class Parameterizer(object):
         based on columns VINF and VSUP in the parameterization file
         warning : the lower model is not necessarily obtained when all parameters reach their lowest boundary (VINF)
         please return lowest and highest depthmodels stored as depthmodel1D
-        vplow, vphgh,
-        vslow, vshgh,
-        rhlow, rhhgh,
-        prlow, prhgh
+        this method is the default behavior, to be customized in subclasses if needed
         """
 
-        # default behavior, to be customized if needed
         Ztopsup, VPlow, VSlow, RHlow = self.inv(self.MINF)
         Ztopinf, VPhgh, VShgh, RHhgh = self.inv(self.MSUP)
         z = np.sort(np.unique(np.concatenate((Ztopinf, Ztopsup))))
@@ -190,6 +164,7 @@ class Parameterizer(object):
         """define the array offset values to use for each inverted parameter
         for the computation of the frechet derivatives
         :return deltam: the array of values to use for the perturbation of the model parameters
+            ** warning ** the output must correspond to the parameters that are not locked
         dg/dm = (g(m + deltam) - g(m)) / deltam
         """
         raise NotImplementedError  # the default behavior, each subclass must define this method
@@ -208,20 +183,20 @@ class Parameterizer_mZVSPRRH(Parameterizer):
             print("Warning : all parameters are locked")
 
         self.NLAYER = A.metadata['NLAYER']
-        self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP'] #index of dimension used, other parameters are kept constant
+        self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']  # index of dimension used, other parameters are kept constant
 
-        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP']) #used for dimensions that are not part of the model
+        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])  # used for dimensions that are not part of the model
         self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]
-        self.MINF  = A.data['VINF'][self.IDXNOTLOCK]
-        self.MSUP  = A.data['VSUP'][self.IDXNOTLOCK]
-        self.MSTD  = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]
+        self.MINF = A.data['VINF'][self.IDXNOTLOCK]
+        self.MSUP = A.data['VSUP'][self.IDXNOTLOCK]
+        self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]
 
     def boundaries(self):
         """see Parameterizer"""
         Ztopsup, VPlow, VSlow, RHlow = self.inv(self.MINF)
         Ztopinf, VPhgh, VShgh, RHhgh = self.inv(self.MSUP)
         z = np.sort(np.unique(np.concatenate((Ztopinf, Ztopsup))))
-        PRlow = VPlow / VSlow #because it is the way it has been defined in self.inv
+        PRlow = VPlow / VSlow  # because it is the way it has been defined in self.inv
         PRhgh = VPhgh / VShgh
         del VPlow, VPhgh
 
@@ -255,11 +230,11 @@ class Parameterizer_mZVSPRRH(Parameterizer):
 
     def frechet_deltas(self):
         deltam = np.hstack((
-            [self.dz  for _ in range(1, self.NLAYER)],
+            [self.dz for _ in range(1, self.NLAYER)],
             [self.dvs for _ in range(self.NLAYER)],
             [self.dpr for _ in range(self.NLAYER)],
             [self.drh for _ in range(self.NLAYER)]))
-        return deltam
+        return deltam[self.IDXNOTLOCK] 
 
     def __call__(self, ZTOP, VP, VS, RH):
         """see Parameterizer"""
@@ -269,9 +244,9 @@ class Parameterizer_mZVSPRRH(Parameterizer):
     def inv(self, m):
         """see Parameterizer"""
         M = self.MDEFAULT.copy()
-        M[self.IDXNOTLOCK] = m #overwrites default values with the one provided in m
+        M[self.IDXNOTLOCK] = m  # overwrites default values with the one provided in m
 
-        nlayer = self.NLAYER#(len(M) + 1) / 4
+        nlayer = self.NLAYER  # (len(M) + 1) / 4
         ZTOP = np.concatenate(([0.], -1.0 * M[: 1 * nlayer - 1]))
         VS = M[1 * nlayer - 1: 2 * nlayer - 1]
         PR = M[2 * nlayer - 1: 3 * nlayer - 1]
@@ -295,11 +270,11 @@ class Parameterizer_mZVSVPRH(Parameterizer):
         self.NLAYER = A.metadata['NLAYER']
         self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']
 
-        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])      # value to use if not a parameter
-        self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]                     #
-        self.MINF = A.data['VINF'][self.IDXNOTLOCK]                        # lower boundary for each parameter
-        self.MSUP = A.data['VSUP'][self.IDXNOTLOCK]                        # upper boundary for each parameter
-        self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]  # markov proposal for each parameter
+        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
+        self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]
+        self.MINF = A.data['VINF'][self.IDXNOTLOCK]
+        self.MSUP = A.data['VSUP'][self.IDXNOTLOCK]
+        self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]
 
     def boundaries(self):
         """see Parameterizer"""
@@ -340,7 +315,7 @@ class Parameterizer_mZVSVPRH(Parameterizer):
             [self.dvs for _ in range(self.NLAYER)],
             [self.dvp for _ in range(self.NLAYER)],
             [self.drh for _ in range(self.NLAYER)]))
-        return deltam
+        return deltam[self.IDXNOTLOCK]
 
     def __call__(self, ZTOP, VP, VS, RH):
         """see Parameterizer"""
@@ -401,7 +376,7 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
         deltam = np.hstack((
             [self.dz for _ in range(1, self.NLAYER)],
             [self.dvs for _ in range(self.NLAYER)]))
-        return deltam
+        return deltam[self.IDXNOTLOCK]
 
     def __call__(self, ZTOP, VP, VS, RH):
         """see Parameterizer"""
@@ -466,7 +441,7 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
         deltam = np.hstack((
             [self.dz for _ in range(1, self.NLAYER)],
             [self.dvs for _ in range(self.NLAYER)]))
-        return deltam
+        return deltam[self.IDXNOTLOCK]
 
     def __call__(self, ZTOP, VP, VS, RH):
         """VP and RH are ignored since they are not parameters of the model"""
@@ -570,7 +545,7 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
         deltam = np.hstack((
             [self.dz for _ in range(1, self.NLAYER)],
             [self.dvs for _ in range(self.NLAYER)]))
-        return deltam
+        return deltam[self.IDXNOTLOCK]
 
     def __call__(self, ZTOP, VP, VS, RH):
         """VP and RH are ignored since they are not parameters of the model"""

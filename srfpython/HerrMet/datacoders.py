@@ -3,30 +3,7 @@ import numpy as np
 import os
 
 """
-Parameterizer : object to convert an array of parameters into smth that can be understood by Herrmann.dispersion
-Theory        : object to convert a model array into a data array
-Datacoder     : object to convert output from Herrmann.dispersion to an array of data
-
-                          a model array (m)                        
-  |                          ^    |
-  |                          |    |
-  |      mod96file ----->  parameterizer   --------> m_apr, CM
-  |      (apriori)           |    |
-  |                          |    v
-  |                        depth model 
-  |                     (ztop, vp, vs, rh)
-  |                            |
- theory                 Herrmann.dispersion
- (forward problem)             |
-  |                            v
-  |                       dispersion data 
-  |                      (waves, types, modes, freqs, values, (dvalues))
-  |                          ^    |
-  |                          |    |
-  |     surf96file ----->   datacoder      --------> d_obs, CD
-  |      (target)            |    |
-  v                          |    v
-                          a data array (d)
+see theory.py
 """
 
 
@@ -78,26 +55,22 @@ class Datacoder_log(Datacoder):
     def __init__(self, waves, types, modes, freqs, values, dvalues):
         Datacoder.__init__(self, waves, types, modes, freqs, values, dvalues)
 
-    # ------------------
     def target(self):
         dobs   = np.log(self.values)
         CDinv  = (self.dvalues / self.values) ** -2.
         return dobs, CDinv
 
-    # ------------------
     def __call__(self, values):
         assert len(values) == len(self.values)
-        return map(log_nofail, values)
+        return np.asarray(map(log_nofail, values), float)
         # d = np.log(values)
         # return d
 
-    # ------------------
     def inv(self, d):
         values = np.exp(d)
         return values
 
 
-# ------------------
 def makedatacoder(s96, which=Datacoder_log):
     if os.path.exists(s96):
         s = surf96reader(s96)
