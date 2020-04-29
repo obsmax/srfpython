@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os, glob
 import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
@@ -87,7 +89,7 @@ HerrMet --display \\
 
 
 # -------------------------------------
-def _display_function(rootname, argv, verbose, mapkwargs):
+def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=False):
     """private"""
     targetfile = "%s/_HerrMet.target" % rootname
     paramfile = "%s/_HerrMet.param" % rootname
@@ -96,17 +98,17 @@ def _display_function(rootname, argv, verbose, mapkwargs):
     #HerrLininitfile = '%s/_HerrLin.init' % rootname
 
     # ------ Initiate the displayer using the target data if exists
-    if "-compact" in argv.keys(): # compact mode
+    if "-compact" in argv.keys():  # compact mode
         which_displayer = DepthDispDisplayCompact
     else:
         which_displayer = DepthDispDisplay
 
     if os.path.exists(targetfile):
-        rd = which_displayer(targetfile=targetfile)
+        rd = which_displayer(targetfile=targetfile, fig=fig)
         d = makedatacoder(targetfile, which=Datacoder_log)  # datacoder based on observations
         dobs, _ = d.target()
     else:
-        print "no target file found in %s" % rootname
+        print("no target file found in %s" % rootname)
         rd = which_displayer()
 
     # ------ Display run results if exist
@@ -128,7 +130,8 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                     else:
                         raise Exception()
 
-                    print "plot : %s, limit %d, llkmin %f, step %d" % (plot_mode, plot_limit, plot_llkmin, plot_step),
+                    print("plot : %s, limit %d, llkmin %f, step %d" %
+                        (plot_mode, plot_limit, plot_llkmin, plot_step), end=' ')
                     if plot_mode == "best":
                         chainids, weights, llks, ms, ds = \
                             rundb.getzip(limit=plot_limit,
@@ -155,7 +158,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         overwaves, overtypes, overmodes, _, _ = zip(
                             *list(groupbywtm(waves, types, modes, freqs, np.arange(len(freqs)), None, True)))
                         overfreqs = [freqspace(0.6 * min(freqs), 1.4 * max(freqs), 100, "plog") for _ in
-                                     xrange(len(overwaves))]
+                                     range(len(overwaves))]
                         overwaves, overtypes, overmodes, overfreqs = \
                             igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
                         for llk, (mms, dds) in zip(llks[::-1],
@@ -170,7 +173,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                             except KeyboardInterrupt:
                                 raise
                             except Exception as e:
-                                print "Error : could not plot dispersion curve (%s)" % str(e)
+                                print("Error : could not plot dispersion curve (%s)" % str(e))
 
                         # cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
                         # pos = rd.axdisp[-1].get_position()
@@ -209,7 +212,8 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                     else:
                         raise Exception()
 
-                    print "pdf : %s, limit %d, llkmin %f, step %d" % (pdf_mode, pdf_limit, pdf_llkmin, pdf_step),
+                    print("pdf : %s, limit %d, llkmin %f, step %d" %
+                          (pdf_mode, pdf_limit, pdf_llkmin, pdf_step), end=' ')
                     if pdf_mode == "best":
                         chainids, weights, llks, ms, ds = \
                             rundb.getzip(limit=pdf_limit,
@@ -249,7 +253,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         except KeyboardInterrupt:
                             raise
                         except Exception as e:
-                            print "Error", str(e)
+                            print("Error", str(e))
 
                     # display the disp pdf
                     for p, (wpc, tpc, mpc, fpc, vpc) in \
@@ -266,7 +270,7 @@ def _display_function(rootname, argv, verbose, mapkwargs):
                         except KeyboardInterrupt:
                             raise
                         except Exception as e:
-                            print "Error", str(e)
+                            print("Error", str(e))
 
     # ------
     if os.path.exists(paramfile):
@@ -333,22 +337,29 @@ def _display_function(rootname, argv, verbose, mapkwargs):
 
         rd.set_zlim(np.array([0, zmax]))
     else:
-        print "call option --param to see prior depth boundaries"
+        print("call option --param to see prior depth boundaries")
 
     # --------------------
     if "-m96" in argv.keys():  # plot user data on top
         for m96 in argv['-m96']:
             try:
                 dm = depthmodel_from_mod96(m96)
-                dm.vp.show(rd.axdepth['VP'], "m", linewidth=3, label=m96)
-                dm.vs.show(rd.axdepth['VS'], "m", linewidth=3)
-                dm.rh.show(rd.axdepth['RH'], "m", linewidth=3)
-                dm.pr().show(rd.axdepth['PR'], "m", linewidth=3)
+                if "-compact" in argv.keys():  # compact mode 
+                     dm.vs.show(rd.axdepth['VS'], "m", linewidth=3)               
+                     rd.axdepth['VS'].legend(loc=3)
+                     
+                else:
+                    dm.vp.show(rd.axdepth['VP'], "m", linewidth=3, label=m96)
+                    dm.vs.show(rd.axdepth['VS'], "m", linewidth=3)
+                    dm.rh.show(rd.axdepth['RH'], "m", linewidth=3)
+                    dm.pr().show(rd.axdepth['PR'], "m", linewidth=3)
+                    rd.axdepth['VP'].legend(loc=3)
+
             except KeyboardInterrupt:
                 raise
-            except :#Exception as e:
-                print 'could not read or display %s (reason : %s)' % (m96, str(e))
-            rd.axdepth['VP'].legend(loc=3)
+            except Exception as e:
+                print('could not read or display %s (reason : %s)' % (m96, str(e)))
+
     # if "-ritt" in argv.keys():
     #     a = AsciiFile('/mnt/labex2/home/max/data/boreholes/GRT1/GRT1.logsonic')
     #
@@ -381,13 +392,17 @@ def _display_function(rootname, argv, verbose, mapkwargs):
     if "-png" in argv.keys():
         dpi = argv['-png'][0] if len(argv['-png']) else default_dpi
         if verbose:
-            print "writing %s" % pngfile
+            print("writing %s" % pngfile)
         rd.fig.savefig(pngfile, dpi=dpi)
     elif "-inline" in argv.keys():
         plt.show()
     else:
         showme()
-    plt.close(rd.fig)
+
+    if return_fig:
+        return rd.fig  # caution not for parallel apps
+    else:
+        plt.close(rd.fig)
 
 
 # ------------------------------
@@ -431,12 +446,14 @@ def display(argv, verbose, mapkwargs):
 
         if "-png" not in argv.keys():
             # display mode, cannot parallelize
+            fig = None
             for rootname in rootnames:
-                _display_function(rootname, argv=argv, verbose=verbose, mapkwargs=mapkwargs)
+                fig = _display_function(
+                    rootname, argv=argv, verbose=verbose, mapkwargs=mapkwargs, fig=fig, return_fig=True)
         else:
             def gen():
                 for rootname in rootnames:
-                    yield Job(rootname, argv, verbose=verbose, mapkwargs=mapkwargs)
+                    yield Job(rootname, argv, verbose=verbose, mapkwargs=mapkwargs, return_fig=False)
 
             with MapAsync(_display_function, gen(), **mapkwargs) as ma:
                 for _ in ma:
