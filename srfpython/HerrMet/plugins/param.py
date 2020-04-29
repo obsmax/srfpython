@@ -89,7 +89,8 @@ def param(argv):
             raise Exception('option %s is not recognized' % k)
 
     if "-op" not in argv.keys():
-        assert not os.path.exists('_HerrMet.param')
+        if os.path.exists('_HerrMet.param'):
+            raise IOError('_HerrMet.param exists already, use -op to overwrite')
 
     nlayer = int(argv["main"][0])
     zbot = float(argv["main"][1])
