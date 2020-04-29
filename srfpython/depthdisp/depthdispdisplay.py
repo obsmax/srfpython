@@ -14,6 +14,7 @@ class DepthDispDisplay(object):
             self.fig = plt.figure(figsize=(12, 6))#figsize=(18, 10))
             self.fig.subplots_adjust(wspace=0.05)
         else:
+            fig.clf()
             self.fig = fig
 
         self.axdepth = {}
@@ -257,6 +258,7 @@ class DepthDispDisplayCompact(DepthDispDisplay):
             self.fig = plt.figure(figsize=(5, 6))#figsize=(18, 10))
             self.fig.subplots_adjust(wspace=0.05)
         else:
+            fig.clf()
             self.fig = fig
 
         self.axdepth = {}
