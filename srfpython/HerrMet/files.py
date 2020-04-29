@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from srfpython.standalone.database import Database
 from srfpython.standalone.asciifile import AsciiFile
 from priorpdf import DefaultLogRhoM, LogRhoM_DVS, LogRhoM_DVPDVSDRH, LogRhoM_DVPDVSDRHDPR
@@ -29,7 +31,6 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
     else:
         raise NotImplementedError('please specify either dvs alone, or dvp, dvs and drh, or dvp, dvs, drh and dpr')
 
-    # ------
     # TODO : attach this to the parameterizers via the default_param_file method
     if which_parameterizer == "mZVSPRRH":
         if basedon is None:
@@ -78,7 +79,7 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
 
         A.write() #to screen
         A.write('_HerrMet.param') #to file
-    # ----------------------------
+
     elif which_parameterizer == "mZVSVPRH":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
@@ -129,7 +130,7 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
 
         A.write() #to screen
         A.write('_HerrMet.param') #to file
-    # ----------------------------
+
     elif which_parameterizer == "mZVSPRzRHvp":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
@@ -171,7 +172,7 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
 
         A.write() #to screen
         A.write('_HerrMet.param') #to file
-    # ----------------------------
+
     elif which_parameterizer == "mZVSPRzRHz":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
@@ -213,7 +214,7 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
 
         A.write() #to screen
         A.write('_HerrMet.param') #to file
-    # ----------------------------
+
     elif which_parameterizer == "mZVSVPvsRHvp":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
@@ -261,17 +262,14 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
 
         A.write()  # to screen
         A.write('_HerrMet.param')  # to file
-    # ----------------------------
     else:
         raise NotImplementedError('no such parameter file type implemented %s' % which_parameterizer)
 
 
-# -------------------------------------
 def load_paramfile(paramfile):
     """initiate one of the parameterizer and prior pdf according to the param file"""
     A = AsciiFile(paramfile)
 
-    # ------------------------
     if A.metadata['TYPE'] == "mZVSVPRH":
         p = Parameterizer_mZVSVPRH(A)
     elif A.metadata['TYPE'] == "mZVSPRRH":
@@ -285,7 +283,6 @@ def load_paramfile(paramfile):
     else:
         raise Exception('could not load %s (TYPE not recognized)' % paramfile)
 
-    # ------------------------
     if not "PRIORTYPE" in A.metadata.keys():
         logRHOM = DefaultLogRhoM(p)
 
@@ -316,9 +313,8 @@ def load_paramfile(paramfile):
     else:
         raise Exception('could not load %s (PRIORTYPE not recognized)' % paramfile)
 
-    # ------------------------
-    print "parameter type : ", p.__class__.__name__
-    print "prior type     : ", logRHOM.__class__.__name__
+    print("parameter type : ", p.__class__.__name__)
+    print ("prior type     : ", logRHOM.__class__.__name__)
     return p, logRHOM
 
 
@@ -327,7 +323,6 @@ def load_paramfile(paramfile):
 # -------------------------------------
 class RunFile(Database):
 
-    # ----------------------------
     def drop(self):
         """erase existing tables and recreate them"""
 
@@ -385,10 +380,9 @@ class RunFile(Database):
             DISPVAL       real not null) --null leads to issues when grouping, insert -1.0 instead
             ''')
 
-    # -------------------
     def reset(self, nlayer, waves, types, modes, freqs):
         """populate the parameter and disppoints tables"""
-        assert np.all([len(waves) == len(_) for _ in types, modes, freqs])
+        assert np.all([len(waves) == len(_) for _ in (types, modes, freqs)])
 
         if self.select('select * from PARAMETERS limit 1') is not None:
             raise Exception('PARAMETERS table is not empty')
@@ -412,12 +406,10 @@ class RunFile(Database):
         except:
             self.rollback(crash=True)
 
-    # -------------------
     def insert(self, algo, models, datas, weights, llks, parameterizer, datacoder):
         """insert the result of 1 chain (metropolis)"""
         # assume transaction open
 
-        # -------------------
         # give a number to this insertion
         s = self.select('select max(CHAINID) from CHAINS').next()[0]
         if s is None:
@@ -425,7 +417,6 @@ class RunFile(Database):
         else:
             chainid = s + 1
 
-        # ------------------
         # determine the parameter ids and point ids
         mdl = models[0]
         ztop, vp, vs, rh = parameterizer.inv(mdl)
@@ -452,7 +443,7 @@ class RunFile(Database):
                  '''select POINTID from DISPPOINTS where 
                         WAVE=? and TYPE=? and MODE=? and FREQ=?''',
                  (w, t, m, f)).fetchall()[0][0])
-        # ------------------
+
         # create the chain
         self.cursor.execute('insert into CHAINS (CHAINID, ALGORITHM) values (?, ?)', (chainid, algo))
 
@@ -482,7 +473,6 @@ class RunFile(Database):
                 ''', [(modelid, pointid, dispval)
                       for pointid, dispval in zip(pointids, dispvals)])
 
-    # ----------------------------
     def get(self, llkmin=None, limit=None, step=None, algo=None):
         """
         get best models from the database, ordered by decreasing likelihood
@@ -553,11 +543,9 @@ class RunFile(Database):
                    llksql=llksql,
                    limitsql=limitsql)
 
-        # -----------------
         s = self.select(sql)
         if s is None: return
 
-        # -----------------
         for n, (MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT,PL, PV, W, T, M, F, DV) in enumerate(s):
             if n % step: continue
 
@@ -579,7 +567,6 @@ class RunFile(Database):
 
             yield MODELID, CHAINID, WEIGHT, LLK, NLAYER, (Z, VP, VS, RH), (W, T, M, F, DV)
 
-    # ----------------------------
     def getzip(self, *args, **kwargs):
         """
         zipped output from self.get
@@ -589,14 +576,13 @@ class RunFile(Database):
         if not len(out):
             return [np.array([]) for _ in range(5)]
 
-        print "retrieved %d models in %.6fs " % (len(out), time.time() - start)
+        print ("retrieved %d models in %.6fs " % (len(out), time.time() - start))
         _, chainids, weights, llks, _, ms, ds = zip(*out)
 
         return np.asarray(chainids, int), \
             np.asarray(weights, float), \
             np.asarray(llks, float), ms, ds
 
-    # ----------------------------
     def getpack(self, *args, **kwargs):
         """
         same as get except that
@@ -614,7 +600,6 @@ class RunFile(Database):
             sr = surf96reader_from_arrays(W, T, M, F, DV, None)
             yield MODELID, CHAINID, WEIGHT, LLK, NLAYER, dm, sr
 
-    # ----------------------------
     def getlasts(self, llkmin=None, limit=None, step=None, algo=None):
         """same as self.get to collect the last models generated by the chains (not the best ones)
         """
@@ -670,11 +655,9 @@ class RunFile(Database):
                    llksql=llksql,
                    limitsql=limitsql)
 
-        # -----------------
         s = self.select(sql)
         if s is None: return
 
-        # -----------------
         for n, (MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT, PL, PV, W, T, M, F, DV) in enumerate(s):
             if n % step: continue
 
@@ -696,7 +679,6 @@ class RunFile(Database):
 
             yield MODELID, CHAINID, WEIGHT, LLK, NLAYER, (Z, VP, VS, RH), (W, T, M, F, DV)
 
-    # ----------------------------
     def getlastszip(self, *args, **kwargs):
         """
         zipped output from self.getlasts
@@ -706,14 +688,13 @@ class RunFile(Database):
         if not len(out):
             return [np.array([]) for _ in range(5)]
 
-        print "retrieved %d models in %.6fs " % (len(out), time.time() - start)
+        print ("retrieved %d models in %.6fs " % (len(out), time.time() - start))
         _, chainids, weights, llks, _, ms, ds = zip(*out)
 
         return np.asarray(chainids, int), \
                np.asarray(weights, float), \
                np.asarray(llks, float), ms, ds
 
-    # ----------------------------
     def summary(self, head=""):
         """summarize the content of this runfile"""
         s = self.select('''
@@ -726,12 +707,11 @@ class RunFile(Database):
         filesize = os.stat(self.sqlitefile).st_size
         NCHAIN, NMODEL, LLKMIN, LLKMAX = s.next()
         if NCHAIN:
-            print "%s%6d chains, %6d models, worst %10f, best %10f, filesize %dM" % \
-              (head,NCHAIN, NMODEL, LLKMIN, LLKMAX, filesize / 1024 / 1024)
+            print ("%s%6d chains, %6d models, worst %10f, best %10f, filesize %dM" %
+                   (head, NCHAIN, NMODEL, LLKMIN, LLKMAX, filesize / 1024 / 1024))
         else:
-            print head, "no chains"
+            print (head, "no chains")
 
-    # ----------------------------
     def stats(self, head=""):
         """print details about the content of this runfile"""
         s = self.select('''
@@ -741,9 +721,8 @@ class RunFile(Database):
             ''')
         if s is None: return
         for CHAINID, N, MLLK in s:
-            print "%schain : %6d  models : %6d maxllk : %f" % (head, CHAINID, N, MLLK)
+            print ("%schain : %6d  models : %6d maxllk : %f" % (head, CHAINID, N, MLLK))
 
-    # ----------------------------
     def del_sql(self, sql=None):
         """delete models based on a sql command, private"""
         # switch off foerign keys for a moment, otherwise the deletion is fucking slow
@@ -771,12 +750,10 @@ class RunFile(Database):
         finally:
             self.cursor.execute('''PRAGMA FOREIGN_KEYS = ON; ''')
 
-    # ----------------------------
     def del_bad(self, llkmin):
         sql = "where LLK < {llkmin}".format(llkmin=llkmin)
         self.del_sql(sql=sql)
 
-    # ----------------------------
     def del_chain(self, chainid):
         """delete one or more chains using their chainids,
            deletes only the models, dispvalues and paramvalues,
@@ -791,10 +768,9 @@ class RunFile(Database):
         self.del_sql(sql=sql)
 
 
-# --------------------
 if __name__ == "__main__":
     write_default_paramfile(nlayer=7, zbot=3,
                             which_parameterizer="mZVSPRRH", basedon=None,
                             dvp=None, dvs=None, drh=None, dpr=None)
     A = load_paramfile("_HerrMet.param")
-    print A
+    print (A)

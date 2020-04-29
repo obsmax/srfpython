@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import numpy as np
 from srfpython.utils import minmax
@@ -113,7 +115,11 @@ def param(argv):
 
     if not type in default_parameterization_list:
         raise Exception('please pick one type in %s' % str(default_parameterization_list))
-    write_default_paramfile(nlayer, zbot, which_parameterizer=type, basedon=basedon, dvp=dvp, dvs=dvs, drh=drh, dpr=dpr)
-    print "please customize _HerrMet.param, do not change line orders and metadata"
-    print "use option --display to see the depth boundaries"
-    # sys.exit()
+
+    write_default_paramfile(
+        nlayer, zbot, which_parameterizer=type, basedon=basedon, dvp=dvp, dvs=dvs, drh=drh, dpr=dpr)
+
+    print("you can edit _HerrMet.param to adjust parameters boundaries, "
+          "do not change line orders")
+    print("use option --display to see the depth boundaries of your parameter file")
+    print("use option --send to copy the parameter file to each temporary directory")
