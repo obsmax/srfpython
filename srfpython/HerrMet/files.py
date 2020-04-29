@@ -20,7 +20,7 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
     """create a default parameter file to be customized by user"""
     # ------
 
-    if np.all([_ is None for _ in dvs, dvp, drh, dpr]):
+    if np.all([_ is None for _ in (dvs, dvp, drh, dpr)]):
         which_prior = DefaultLogRhoM
     elif dvs is not None and dvp is None and drh is None and dpr is None:
         which_prior = LogRhoM_DVS

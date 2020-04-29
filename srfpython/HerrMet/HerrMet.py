@@ -5,6 +5,7 @@ HerrMet : code for depth inversion of multimodal/multitypes surface waves
 This is the main program to be called from command lines with arguments,
 this program will call plugins with corresponding arguments
 """
+from __future__ import print_function
 
 import os, sys, matplotlib
 if "-png" in sys.argv[1:]: matplotlib.use('agg')
@@ -82,7 +83,7 @@ if __name__ == "__main__":
     # ------------------------------------- NO ARGUMENT, NAIVE CALL
     if argv == {}:
         # no arguments
-        print help
+        print(help)
         sys.exit()
 
     # ------------------------------------- READ ARGUMENTS, CHECK
@@ -98,7 +99,7 @@ if __name__ == "__main__":
 
     # ------------------------------------- VERSION
     if "-v" in argv.keys() or "-version" in argv.keys():
-        print "version : %s" % version
+        print("version : %s" % version)
         sys.exit()
 
     # ------------------------------------- HELP
@@ -111,12 +112,11 @@ if __name__ == "__main__":
             #print specific help for some plugins
             for plugin_name in argv[key]:
                 try:
-                    print eval('%s.long_help' % plugin_name)
+                    print(eval('%s.long_help' % plugin_name))
                 except NameError:
-                    print "%s is not a valid plugin (long_help not found)"
+                    print("%s is not a valid plugin (long_help not found)")
                     continue
-                except:
-                    raise
+
 
         sys.exit()
 
@@ -129,9 +129,9 @@ if __name__ == "__main__":
             #print specific help for some plugins
             for plugin_name in argv[key]:
                 try:
-                    print eval('%s.example' % plugin_name)
+                    print(eval('%s.example' % plugin_name))
                 except NameError:
-                    print "%s is not a valid plugin (example not found)"
+                    print("%s is not a valid plugin (example not found)")
                     continue
                 except:
                     raise

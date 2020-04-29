@@ -2,7 +2,8 @@ from __future__ import print_function
 
 import numpy as np
 from srfpython.HerrMet.relation import Relation
-from srfpython.depthdisp.depthmodels import depthmodel1D
+from srfpython.depthdisp.depthmodels import \
+    depthmodel1D, depthmodel_from_mod96, depthmodel_from_arrays, depthspace
 
 R43 = np.sqrt(4. / 3.)
 
@@ -10,23 +11,7 @@ R43 = np.sqrt(4. / 3.)
 see theory.py
 """
 
-
-def check_parameter_file(A):
-    """
-    :param A: a read AsciiFile object corresponding to a parameter file
-    :return:
-    """
-    metakeys = A.metadata.keys()
-    if not "NLAYER" in metakeys:
-        raise ValueError('NLAYER not found in file metadata')
-    if not "TYPE" in metakeys:
-        raise ValueError('TYPE not found in file metadata')
-    if not len(A.data['KEY']) == len(np.unique(A.data['KEY'])):
-        raise ValueError('there are repeated entries in column KEYS')
-    if np.any(A.data['VINF'] > A.data['VSUP']):
-        raise ValueError('VSUP cannot be lower than VINF')
-
-    # TODO add more verifications in common to all parameterizers here
+# TODO : move the sections of files.write_default_paramfile into the subclass versions of this method
 
 
 class Parameterizer(object):
@@ -36,11 +21,14 @@ class Parameterizer(object):
 
     def __init__(self, A):
         """
-        :param A: AsciiFile with parameterization
+        :param A: an initialized AsciiFile with the parameters
 
         please set up attributes :
         self.NLAYER : int, the number of layers including half space
         self.MDEFAULT : array, all the parameters including those that should not be inverted (not-masked)
+        self.KEYS : array, all the parameter names including those that should not be inverted (not-masked)
+        self.DELTAM : array with the parameters offsets used for Frechet derivatives
+
         self.IDXNOTLOCK : boolean array, mask used to determine the parameters to be inverted, the others will
                  keep constant and equal to self.MDEFAULT
         self.MINF = array, lower boundary for each parameter, masked by self.IDXNOTLOCK
@@ -48,10 +36,12 @@ class Parameterizer(object):
         self.MMEAN = array, the mean model, masked by self.IDXNOTLOCK
         self.MSTD = array, markov proposal for each parameter, masked by self.IDXNOTLOCK
         """
-        check_parameter_file(A)
+        self.check_parameter_file(A)
 
         self.NLAYER = None
         self.MDEFAULT = None
+        self.KEYS = None
+
         self.IDXNOTLOCK = None
         self.MINF = None
         self.MSUP = None
@@ -64,8 +54,26 @@ class Parameterizer(object):
         self.dvs = 0.01    # km/s
         self.dpr = 0.01    # no dimension (vp/vs)
         self.drh = 0.01    # g/cm3
+        self.DELTAM = None
 
-        # no more code here, please use subclasses
+    @staticmethod
+    def check_parameter_file(A):
+        """
+        :param A: a read AsciiFile object corresponding to a parameter file
+        :return:
+        """
+        metakeys = A.metadata.keys()
+        if not "NLAYER" in metakeys:
+            raise ValueError('NLAYER not found in file metadata')
+
+        if not "TYPE" in metakeys:
+            raise ValueError('TYPE not found in file metadata')
+
+        if not len(A.data['KEY']) == len(np.unique(A.data['KEY'])):
+            raise ValueError('there are repeated entries in column KEYS')
+
+        if np.any(A.data['VINF'] > A.data['VSUP']):
+            raise ValueError('VSUP cannot be lower than VINF')
 
     def meanmodel(self):
         Ztopmean, VPmean, VSmean, RHmean = self.inv(self.MMEAN)
@@ -113,15 +121,19 @@ class Parameterizer(object):
 
     def keys(self):
         """a method to provide the name of the inverted parameters
-
-        please return the masked version of the array, to return only the keys that
-        are actually inverted (use the boolean array self.IDXNOTLOCK)
-
-        e.g. keys = np.array(['Z1', 'VP0', 'VP1', 'VS0', 'VS1', 'RH0', 'RH1'])[self.IDXNOTLOCK]
-
+        return the masked version of the array, i.e. only the keys that
+        are actually inverted (uses the boolean array self.IDXNOTLOCK)
         :return: array or list of parameters
         """
-        raise NotImplementedError  # the default behavior, each subclass must define this method
+        return self.KEYS[self.IDXNOTLOCK]  # do not subclass
+
+    def frechet_deltas(self):
+        """define the array offset values to use for each inverted parameter
+        for the computation of the frechet derivatives
+        :return deltam: the array of values to use for the perturbation of the model parameters
+        dg/dm = (g(m + deltam) - g(m)) / deltam
+        """
+        return self.DELTAM[self.IDXNOTLOCK]  # do not subclass
 
     def __call__(self, ZTOP, VP, VS, RH):
         """the method that is called to convert
@@ -152,20 +164,9 @@ class Parameterizer(object):
         """
         raise NotImplementedError  # the default behavior, each subclass must define this method
 
-    @staticmethod
-    def default_param_file(zbot, nlayer, basedon=None):
+    def default_param_file(self, zbot, nlayer, basedon=None):
         """a method to help writing the default parameter file
         if this parameterizer is used
-        """
-        # TODO : move the sections of files.write_default_paramfile into the subclass versions of this method
-        raise NotImplementedError  # the default behavior, each subclass must define this method
-
-    def frechet_deltas(self):
-        """define the array offset values to use for each inverted parameter
-        for the computation of the frechet derivatives
-        :return deltam: the array of values to use for the perturbation of the model parameters
-            ** warning ** the output must correspond to the parameters that are not locked
-        dg/dm = (g(m + deltam) - g(m)) / deltam
         """
         raise NotImplementedError  # the default behavior, each subclass must define this method
 
@@ -183,6 +184,17 @@ class Parameterizer_mZVSPRRH(Parameterizer):
             print("Warning : all parameters are locked")
 
         self.NLAYER = A.metadata['NLAYER']
+        self.KEYS = np.hstack((
+            ["-Z%d" % i for i in range(1, self.NLAYER)],
+            ['VS%d' % i for i in range(self.NLAYER)],
+            ['PR%d' % i for i in range(self.NLAYER)],
+            ['RH%d' % i for i in range(self.NLAYER)]))
+        self.DELTAM = np.hstack((
+            [self.dz for _ in range(1, self.NLAYER)],
+            [self.dvs for _ in range(self.NLAYER)],
+            [self.dpr for _ in range(self.NLAYER)],
+            [self.drh for _ in range(self.NLAYER)]))
+
         self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']  # index of dimension used, other parameters are kept constant
 
         self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])  # used for dimensions that are not part of the model
@@ -219,23 +231,6 @@ class Parameterizer_mZVSPRRH(Parameterizer):
 
         return vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh
 
-    def keys(self):
-        """see Parameterizer"""
-        keys = np.hstack((
-            ["-Z%d" % i for i in range(1, self.NLAYER)],
-            ['VS%d' % i for i in range(self.NLAYER)],
-            ['PR%d' % i for i in range(self.NLAYER)],
-            ['RH%d' % i for i in range(self.NLAYER)]))
-        return keys[self.IDXNOTLOCK]
-
-    def frechet_deltas(self):
-        deltam = np.hstack((
-            [self.dz for _ in range(1, self.NLAYER)],
-            [self.dvs for _ in range(self.NLAYER)],
-            [self.dpr for _ in range(self.NLAYER)],
-            [self.drh for _ in range(self.NLAYER)]))
-        return deltam[self.IDXNOTLOCK] 
-
     def __call__(self, ZTOP, VP, VS, RH):
         """see Parameterizer"""
         m = np.concatenate((-1.0 * ZTOP[1:], VS, VP / VS, RH))[self.IDXNOTLOCK]
@@ -271,10 +266,21 @@ class Parameterizer_mZVSVPRH(Parameterizer):
         self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']
 
         self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
+        self.KEYS = np.hstack(
+            (["-Z%d" % i for i in range(1, self.NLAYER)],
+             ['VS%d' % i for i in range(self.NLAYER)],
+             ['VP%d' % i for i in range(self.NLAYER)],
+             ['RH%d' % i for i in range(self.NLAYER)]))
+
         self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]
         self.MINF = A.data['VINF'][self.IDXNOTLOCK]
         self.MSUP = A.data['VSUP'][self.IDXNOTLOCK]
         self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]
+        self.DELTAM = np.hstack((
+            [self.dz for _ in range(1, self.NLAYER)],
+            [self.dvs for _ in range(self.NLAYER)],
+            [self.dvp for _ in range(self.NLAYER)],
+            [self.drh for _ in range(self.NLAYER)]))
 
     def boundaries(self):
         """see Parameterizer"""
@@ -300,22 +306,6 @@ class Parameterizer_mZVSVPRH(Parameterizer):
         prhgh = depthmodel1D(z, vplow.values / vshgh.values)
 
         return vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh
-
-    def keys(self):
-        """see Parameterizer"""
-        k = ["-Z%d" % i for i in range(1, self.NLAYER)] + \
-            ['VS%d' % i for i in range(self.NLAYER)] + \
-            ['VP%d' % i for i in range(self.NLAYER)] + \
-            ['RH%d' % i for i in range(self.NLAYER)]
-        return np.asarray(k)[self.IDXNOTLOCK]
-
-    def frechet_deltas(self):
-        deltam = np.hstack((
-            [self.dz for _ in range(1, self.NLAYER)],
-            [self.dvs for _ in range(self.NLAYER)],
-            [self.dvp for _ in range(self.NLAYER)],
-            [self.drh for _ in range(self.NLAYER)]))
-        return deltam[self.IDXNOTLOCK]
 
     def __call__(self, ZTOP, VP, VS, RH):
         """see Parameterizer"""
@@ -348,6 +338,13 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
             print ("Warning : all parameters are locked")
 
         self.NLAYER = A.metadata['NLAYER']
+        self.KEYS = np.hstack(
+            (["-Z%d" % i for i in range(1, self.NLAYER)],
+             ['VS%d' % i for i in range(self.NLAYER)]))
+        self.DELTAM = np.hstack((
+            [self.dz for _ in range(1, self.NLAYER)],
+            [self.dvs for _ in range(self.NLAYER)]))
+
         self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']
 
         self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
@@ -365,18 +362,6 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
         """see Parameterizer"""
         print("boundaries method not implemented for %s, using default one" % self.__class__.__name__)
         return Parameterizer.boundaries(self)
-
-    def keys(self):
-        """see Parameterizer"""
-        k = ["-Z%d" % i for i in range(1, self.NLAYER)] + \
-            ['VS%d' % i for i in range(self.NLAYER)]
-        return np.asarray(k)[self.IDXNOTLOCK]
-
-    def frechet_deltas(self):
-        deltam = np.hstack((
-            [self.dz for _ in range(1, self.NLAYER)],
-            [self.dvs for _ in range(self.NLAYER)]))
-        return deltam[self.IDXNOTLOCK]
 
     def __call__(self, ZTOP, VP, VS, RH):
         """see Parameterizer"""
@@ -414,6 +399,12 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
             print ("Warning : all parameters are locked")
 
         self.NLAYER = A.metadata['NLAYER']
+        self.KEYS = np.hstack(
+            (["-Z%d" % i for i in range(1, self.NLAYER)],
+             ['VS%d' % i for i in range(self.NLAYER)]))
+        self.DELTAM = np.hstack((
+            [self.dz for _ in range(1, self.NLAYER)],
+            [self.dvs for _ in range(self.NLAYER)]))
         self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']
 
         self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
@@ -430,18 +421,6 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
     def boundaries(self):
         print ("boundaries method not implemented for %s, using default one" % self.__class__.__name__)
         return Parameterizer.boundaries(self)
-
-    def keys(self):
-        """see Parameterizer"""
-        k = ["-Z%d" % i for i in range(1, self.NLAYER)] + \
-            ['VS%d' % i for i in range(self.NLAYER)]
-        return np.asarray(k)[self.IDXNOTLOCK]
-
-    def frechet_deltas(self):
-        deltam = np.hstack((
-            [self.dz for _ in range(1, self.NLAYER)],
-            [self.dvs for _ in range(self.NLAYER)]))
-        return deltam[self.IDXNOTLOCK]
 
     def __call__(self, ZTOP, VP, VS, RH):
         """VP and RH are ignored since they are not parameters of the model"""
@@ -478,6 +457,12 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
 
         self.NLAYER = A.metadata['NLAYER']
         self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']
+        self.KEYS = np.hstack(
+            (["-Z%d" % i for i in range(1, self.NLAYER)],
+             ['VS%d' % i for i in range(self.NLAYER)]))
+        self.DELTAM = np.hstack((
+            [self.dz for _ in range(1, self.NLAYER)],
+            [self.dvs for _ in range(self.NLAYER)]))
 
         self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
         self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]
@@ -534,18 +519,6 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
         rhhgh = depthmodel1D(z, self.RHvp(VP=vphgh.values))
 
         return vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh
-
-    def keys(self):
-        """see Parameterizer"""
-        k = ["-Z%d" % i for i in range(1, self.NLAYER)] + \
-            ['VS%d' % i for i in range(self.NLAYER)]
-        return np.asarray(k)[self.IDXNOTLOCK]
-
-    def frechet_deltas(self):
-        deltam = np.hstack((
-            [self.dz for _ in range(1, self.NLAYER)],
-            [self.dvs for _ in range(self.NLAYER)]))
-        return deltam[self.IDXNOTLOCK]
 
     def __call__(self, ZTOP, VP, VS, RH):
         """VP and RH are ignored since they are not parameters of the model"""
