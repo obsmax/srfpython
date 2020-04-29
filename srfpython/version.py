@@ -4,5 +4,5 @@
 # please keep up-to-date with the tag name, this is the only place where to update the version number 
 
 global __version__
-__version__ = "v1.1"
+__version__ = "v1.2"
 
