@@ -57,10 +57,10 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
             rhinf = b.rh.values.copy()
             rhsup = b.rh.values.copy()
 
-        keys = ["-Z%d" % i for i in xrange(1, nlayer)] + \
-               ["VS%d" % i for i in xrange(nlayer)] + \
-               ["PR%d" % i for i in xrange(nlayer)] + \
-               ["RH%d" % i for i in xrange(nlayer)]
+        keys = ["-Z%d" % i for i in range(1, nlayer)] + \
+               ["VS%d" % i for i in range(nlayer)] + \
+               ["PR%d" % i for i in range(nlayer)] + \
+               ["RH%d" % i for i in range(nlayer)]
         vinfs = np.concatenate((ztopinf, vsinf, prinf, rhinf))
         vsups = np.concatenate((ztopsup, vssup, prsup, rhsup))
         with open('_HerrMet.param', 'w') as fid:
@@ -106,10 +106,10 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
             rhinf = b.rh.values.copy()
             rhsup = b.rh.values.copy()
 
-        keys = ["-Z%d" % i for i in xrange(1, nlayer)] + \
-               ["VS%d" % i for i in xrange(nlayer)] + \
-               ["VP%d" % i for i in xrange(nlayer)] + \
-               ["RH%d" % i for i in xrange(nlayer)]
+        keys = ["-Z%d" % i for i in range(1, nlayer)] + \
+               ["VS%d" % i for i in range(nlayer)] + \
+               ["VP%d" % i for i in range(nlayer)] + \
+               ["RH%d" % i for i in range(nlayer)]
 
         vinfs = np.concatenate((ztopinf, vsinf, vpinf, rhinf))
         vsups = np.concatenate((ztopsup, vssup, vpsup, rhsup))
@@ -148,8 +148,8 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
             vsinf = b.vs.values.copy()
             vssup = b.vs.values.copy()
 
-        keys = ["-Z%d" % i for i in xrange(1, nlayer)] + \
-               ["VS%d" % i for i in xrange(nlayer)]
+        keys = ["-Z%d" % i for i in range(1, nlayer)] + \
+               ["VS%d" % i for i in range(nlayer)]
 
         vinfs = np.concatenate((ztopinf, vsinf))
         vsups = np.concatenate((ztopsup, vssup))
@@ -190,8 +190,8 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
             vsinf = b.vs.values.copy()
             vssup = b.vs.values.copy()
 
-        keys = ["-Z%d" % i for i in xrange(1, nlayer)] + \
-               ["VS%d" % i for i in xrange(nlayer)]
+        keys = ["-Z%d" % i for i in range(1, nlayer)] + \
+               ["VS%d" % i for i in range(nlayer)]
 
         vinfs = np.concatenate((ztopinf, vsinf))
         vsups = np.concatenate((ztopsup, vssup))
@@ -225,8 +225,8 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
         else:
             raise NotImplementedError('option -basedon not implemented for mZVSVPvsRHvp')
 
-        keys = ["-Z%d" % i for i in xrange(1, nlayer)] + \
-               ["VS%d" % i for i in xrange(nlayer)]
+        keys = ["-Z%d" % i for i in range(1, nlayer)] + \
+               ["VS%d" % i for i in range(nlayer)]
 
         vinfs = np.concatenate((ztopinf, vsinf))
         vsups = np.concatenate((ztopsup, vssup))
@@ -237,14 +237,14 @@ def write_default_paramfile(nlayer, zbot, which_parameterizer="mZVSPRRH", basedo
             fid.write('# BROCHER2005\n')
             fid.write(
                 '#met VPvs = "def VPvs(VS):'
-                '  0.9409 '
+                'return  0.9409 '
                 '+ 2.0947 * VS '
                 '- 0.8206 * VS ** 2.0 '
                 '+ 0.2683 * VS ** 3.0 '
                 '- 0.0251 * VS ** 4.0"  \n')
             fid.write(
                 '#met RHvp = "def RHvp(VP):'
-                '  1.6612 * VP '
+                'return  1.6612 * VP '
                 '- 0.4721 * VP ** 2.0 '
                 '+ 0.0671 * VP ** 3.0 '
                 '- 0.0043 * VP ** 4.0 '
@@ -398,7 +398,7 @@ class RunFile(Database):
 
         self.begintransaction()
         try:
-            for n in xrange( nlayer):
+            for n in range( nlayer):
                 if n:
                     self.cursor.execute('insert into PARAMETERS (TYPE, LAYER, UNIT) values (?, ?, ?)', ("Z", n, "KM"))
                 self.cursor.execute('insert into PARAMETERS (TYPE, LAYER, UNIT) values (?, ?, ?)', ("VP", n, "KM/S"))
@@ -433,16 +433,16 @@ class RunFile(Database):
         paramids = [] #paramids corresponding to np.concatenate((ztop[1:], vp, vs, rh))
         pointids = [] #pointids corresponding to values
 
-        for i in xrange(1, nlayer):
+        for i in range(1, nlayer):
             paramids.append(self.cursor.execute(
                 'select PARAMID from PARAMETERS where TYPE = "Z" and LAYER = ?', (i, )).fetchall()[0][0])
-        for i in xrange(nlayer):
+        for i in range(nlayer):
             paramids.append(self.cursor.execute(
                 'select PARAMID from PARAMETERS where TYPE = "VP" and LAYER = ?', (i, )).fetchall()[0][0])
-        for i in xrange(nlayer):
+        for i in range(nlayer):
             paramids.append(self.cursor.execute(
                 'select PARAMID from PARAMETERS where TYPE = "VS" and LAYER = ?', (i, )).fetchall()[0][0])
-        for i in xrange(nlayer):
+        for i in range(nlayer):
             paramids.append(self.cursor.execute(
                 'select PARAMID from PARAMETERS where TYPE = "RH" and LAYER = ?', (i, )).fetchall()[0][0])
 
@@ -564,7 +564,7 @@ class RunFile(Database):
             PT = np.asarray(PT.split(','), '|S2')  # parameter type
             PL = np.asarray(PL.split(','), int)    # parameter layer
             PV = np.asarray(PV.split(','), float)  # parameter value
-            Z, VP, VS, RH = [np.zeros(NLAYER, float) for _ in xrange(4)]  # do not rename variables!!
+            Z, VP, VS, RH = [np.zeros(NLAYER, float) for _ in range(4)]  # do not rename variables!!
             for pt, pl, pv in zip(PT, PL, PV):
                 #_ = eval(pt)  # Z, VP, VS or RH
                 #_[pl] = pv
@@ -587,7 +587,7 @@ class RunFile(Database):
         start = time.time()
         out = list(self.get(*args, **kwargs))
         if not len(out):
-            return [np.array([]) for _ in xrange(5)]
+            return [np.array([]) for _ in range(5)]
 
         print "retrieved %d models in %.6fs " % (len(out), time.time() - start)
         _, chainids, weights, llks, _, ms, ds = zip(*out)
@@ -681,7 +681,7 @@ class RunFile(Database):
             PT = np.asarray(PT.split(','), '|S2')  # parameter type
             PL = np.asarray(PL.split(','), int)  # parameter layer
             PV = np.asarray(PV.split(','), float)  # parameter value
-            Z, VP, VS, RH = [np.zeros(NLAYER, float) for _ in xrange(4)]  # do not rename variables!!
+            Z, VP, VS, RH = [np.zeros(NLAYER, float) for _ in range(4)]  # do not rename variables!!
             for pt, pl, pv in zip(PT, PL, PV):
                 # _ = eval(pt)  # Z, VP, VS or RH
                 # _[pl] = pv
@@ -704,7 +704,7 @@ class RunFile(Database):
         start = time.time()
         out = list(self.getlasts(*args, **kwargs))
         if not len(out):
-            return [np.array([]) for _ in xrange(5)]
+            return [np.array([]) for _ in range(5)]
 
         print "retrieved %d models in %.6fs " % (len(out), time.time() - start)
         _, chainids, weights, llks, _, ms, ds = zip(*out)

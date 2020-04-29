@@ -53,7 +53,7 @@ if __name__ == "__main__":
         gca().grid(True)
         gca().set_xlabel("period (s)")
         gca().set_ylabel("velocity (km/s)")
-        plt.legend()
+        # plt.legend()
         showme()
         sys.exit()
 

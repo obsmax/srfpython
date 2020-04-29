@@ -12,13 +12,12 @@ short_help = "--target     set the target data, create temporary directories for
 
 long_help = """\
 --target     s [s..] A target designate a surf96 file containing a set of 
-                     dispersion curves to invert for one specific location
-                     for each surf96 file, I create a directory in . for temporary files
-                     the target file in this directory is a copy of the input surf96 file 
-                     it can be edited before inversion
-                     (to remove unwanted points or resample dispersion curves...) 
+                     dispersion curves to invert for one specific location.
+                     For each surf96 file, I create a directory in . for temporary files
+                     the target file in this directory is a copy of the input surf96 file. 
+                     It can be edited before inversion to remove unwanted points or resample dispersion curves... 
                      it the target file is AAAA.surf96, the temporary directory will be named 
-                     _HerrMet_AAAA, this name is referred to as the "rootname" in the later plugins
+                     _HerrMet_AAAA, this name is referred to as the "rootname" in the other plugins
     -resamp  f f i s resample the dispersion curve in the target file, 
                      requires fmin(Hz), fmax(Hz), nfreq, fscale 
                      (flin=linear in freq domain, plin=linear in period or log=logarithmic scaling)
