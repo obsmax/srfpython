@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 from numpy import array, zeros, ones #needed for eval
 
@@ -27,10 +29,8 @@ demo="""
 """
 
 
-# ----------------------------
 class AsciiFile_fromstring(object):
 
-    # -----------------------------
     def __init__(self, string):
         self.metadata = {} #dictionnary with metadata evaluated from ascii file
         self.data = None #structured array, see https://docs.scipy.org/doc/numpy-1.13.0/user/basics.rec.html
@@ -39,7 +39,7 @@ class AsciiFile_fromstring(object):
         self.fmtline = ""
         self.units = None
         self.comments = []
-
+        dtype = None
         for l in string.split('\n'):
             l = l.strip()
             if l == "": continue
@@ -83,11 +83,9 @@ class AsciiFile_fromstring(object):
                     self.data.append(values)
         self.data = np.array(self.data, dtype=dtype)
 
-    # -----------------------------
     def __len__(self):
         return len(self.data)
 
-    # -----------------------------
     def __str__(self):
         out = ""
         if len(self.comments):
@@ -104,16 +102,13 @@ class AsciiFile_fromstring(object):
             out += self.fmtline % tuple(line) + "\n"
         return out
 
-    # -----------------------------
     def write(self, filename=None):
         if filename is None:
-            print self.__str__()
+            print (self.__str__())
         else:
             with open(filename, 'w') as fid:
                 fid.write(self.__str__())
 
-
-    # -----------------------------
     def __getitem__(self, item):
         if isinstance(item, str):
             "item is a field name, return the column"
@@ -124,7 +119,6 @@ class AsciiFile_fromstring(object):
         raise IndexError('indexing with object of type %s is not implemented' % str(type(item)))
 
 
-# ----------------------------
 class AsciiFile(AsciiFile_fromstring):
     def __init__(self, filename):
         with open(filename, 'r') as fid:
@@ -132,12 +126,11 @@ class AsciiFile(AsciiFile_fromstring):
         AsciiFile_fromstring.__init__(self, string)
 
 
-# ----------------------------
 if __name__ == "__main__":
     a = AsciiFile_fromstring(demo)
-    print a.metadata
-    print "---"
-    print a.data
-    print "---"
-    print a
+    print(a.metadata)
+    print ("---")
+    print (a.data)
+    print ("---")
+    print (a)
 
