@@ -7,12 +7,6 @@ from srfpython import *
 # top layers array first at 0, positive, growing, km
 ztop = np.linspace(0., 2.8, 50)
 
-# vp/vs
-pr = 1.73 + .4 * np.exp(-ztop / 1.5) + \
-     .01 * np.sin(2. * np.pi * ztop / 1.) + \
-     .02 * np.sin(2. * np.pi * ztop / 2.) + \
-     .005 * np.cos(2. * np.pi * ztop / 3.)
-
 # vs in km/s
 vs = (3.5 - .86) / (ztop[-1] - ztop[0]) * (ztop - 0.) + .86 + \
      -.7 * np.exp(-ztop / .1) + \
@@ -21,15 +15,11 @@ vs = (3.5 - .86) / (ztop[-1] - ztop[0]) * (ztop - 0.) + .86 + \
      .1 * np.cos(2. * np.pi * ztop / 2.) + \
      .15 * np.cos(2. * np.pi * ztop / 3.)
 
-# density in g/cm3
-rh = (2.65 - 2.39) / (ztop[-1] - ztop[0]) * (ztop - 0.) + 2.39 + \
-     .03 * np.sin(2. * np.pi * ztop / 1.) + \
-     .01 * np.sin(2. * np.pi * ztop / 2.) + \
-     .02 * np.cos(2. * np.pi * ztop / 3.)
+vp, rh = brocher2005(vs)
 
 # create the depthmodel object, use a subclass that is to be intitiated with arrays
 # see also depthmodel, depthmodel1D, depthmodel_from_mod96, ...
-dm = depthmodel_from_arrays(ztop, np.array(pr) * np.array(vs), vs, rh)
+dm = depthmodel_from_arrays(ztop, vp, vs, rh)
 
 # __str__ returns the file content at mod96 format, (see Herrmann CPS documentation)
 print(dm)

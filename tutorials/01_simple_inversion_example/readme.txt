@@ -2,7 +2,7 @@
 bash clear.sh
 
 
-########## GENERATE A SYNTHETIC MODEL TO INVERSE
+########## GENERATE A SYNTHETIC MODEL
 # create a depth model => .mod96
 python 000_create_model.py
 
