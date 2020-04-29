@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os, glob
 import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
@@ -78,9 +80,9 @@ def run(argv, verbose, mapkwargs):
             elif runmode == "restart" and os.path.exists(runfile):
                 os.remove(runfile)
             elif runmode == "skip" and os.path.exists(runfile):
-                print "skip %s" % rootname
+                print("skip %s" % rootname)
                 continue
-
+            print(rootname)
             # ------
             p, logRHOM = load_paramfile(paramfile)
             # ------
@@ -89,7 +91,7 @@ def run(argv, verbose, mapkwargs):
             duncs = CDinv ** -.5
             ND = len(dobs)
             dinfs = d(0.1 * np.ones_like(d.values))
-            dsups = d(3.5 * np.ones_like(d.values))
+            dsups = d(3.8 * np.ones_like(d.values))
             logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
             # ------
             G = Theory(parameterizer=p, datacoder=d)
@@ -150,7 +152,7 @@ def run(argv, verbose, mapkwargs):
         for jobid, answer, _, _ in ma:
             runfile, models, datas, weights, llks, p, d = answer
             if verbose:
-                print '=> write to %s' % runfile
+                print ('=> write to %s' % runfile)
             with RunFile(runfile, verbose=False) as rundb:
                 rundb.begintransaction()
                 try:
