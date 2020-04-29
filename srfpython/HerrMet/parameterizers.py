@@ -72,11 +72,11 @@ class Relation(object):
 
                 import imp
                 modulename = "{}".format(self.name)
-                pyfilename = "./{}.py".format(modulename)
+                pyfilename = "./_relation_{}.py".format(modulename)
                 funcname = self.name
-                if not os.path.isfile(pyfilename):
-                    with open(pyfilename, 'w') as fid:
-                        fid.write(self.string + "\n")
+
+                with open(pyfilename, 'w') as fid:
+                    fid.write(self.string + "\n")
 
                 self.fun = getattr(imp.load_source(modulename, pyfilename), funcname)
                 return self.fun(*args, **kwargs)
@@ -265,10 +265,10 @@ class Parameterizer_mZVSPRRH(Parameterizer):
     # ------------------
     def keys(self):
         """see Parameterizer"""
-        k = ["-Z%d" % i for i in xrange(1, self.NLAYER)] + \
-             ['VS%d' % i for i in xrange(self.NLAYER)] + \
-             ['PR%d' % i for i in xrange(self.NLAYER)] + \
-             ['RH%d' % i for i in xrange(self.NLAYER)]
+        k = ["-Z%d" % i for i in range(1, self.NLAYER)] + \
+             ['VS%d' % i for i in range(self.NLAYER)] + \
+             ['PR%d' % i for i in range(self.NLAYER)] + \
+             ['RH%d' % i for i in range(self.NLAYER)]
         return np.asarray(k)[self.I]
 
     # ------------------
@@ -548,15 +548,20 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
 
         try:
             vs = self.VPvs(VS=1.0)
-            assert isinstance(vs, float)
-            assert vs > 0.0
+            if not isinstance(vs, float):
+                raise TypeError('VP=f(VS) must return a float (got {})'.format(str(type(vs))))
+            if not vs > 0.0:
+                raise ValueError('VP=f(VS) must return positive numbers')
         except Exception as e:
             raise ValueError('could not execute VP=f(VS), ', str(e))
 
         try:
             rh = self.RHvp(VP=1.0)
-            assert isinstance(rh, float)
-            assert rh >= 1.0
+            if not isinstance(rh, float):
+                raise TypeError('RH=f(VP) must return a float (got {})'.format(str(type(rh))))
+
+            if not rh >= 1.0:
+                raise ValueError('RH=f(VP) must return numbers >= 1')
         except Exception as e:
             raise ValueError('could not execute RH=f(VP), ', str(e))
     # ------------------
@@ -591,8 +596,8 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
     # ------------------
     def keys(self):
         """see Parameterizer"""
-        k = ["-Z%d" % i for i in xrange(1, self.NLAYER)] + \
-            ['VS%d' % i for i in xrange(self.NLAYER)]
+        k = ["-Z%d" % i for i in range(1, self.NLAYER)] + \
+            ['VS%d' % i for i in range(self.NLAYER)]
         return np.asarray(k)[self.I]
 
     # ------------------
