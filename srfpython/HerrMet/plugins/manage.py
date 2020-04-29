@@ -78,7 +78,10 @@ def manage(argv, verbose, mapkwargs):
         showfun = plt.show
 
     # more options
-    if np.any([opt in argv.keys() for opt in "-stats", "-delbad", "-delchains", "-plot"]):
+    if np.any([opt in argv.keys() for opt in ["-stats", "-delbad", "-delchains", "-plot"]]):
+        if "-plot" in argv.keys():
+            fig = plt.figure(figsize=(8, 4))
+
         for rootname, runfile in zip(rootnames, runfiles):
 
             with RunFile(runfile, verbose=verbose) as rundb:
@@ -100,9 +103,9 @@ def manage(argv, verbose, mapkwargs):
                     select CHAINID, group_concat(NITER), group_concat(LLK) from MODELS
                         group by CHAINID 
                         ''')
-                    plt.figure(figsize=(8,4))
-                    ax0 = gcf().add_subplot(121)
-                    ax1 = gcf().add_subplot(122, sharey=ax0)
+                    fig.clf()
+                    ax0 = fig.add_subplot(121)
+                    ax1 = fig.add_subplot(122, sharey=ax0)
                     LLKs = []
                     for CHAINID, NITER, LLK in s:
                         NITER = np.asarray(NITER.split(','), int)
@@ -119,7 +122,9 @@ def manage(argv, verbose, mapkwargs):
                     ax1.set_xlabel('# rank')
                     ax0.grid(True, linestyle=":")
                     ax1.grid(True, linestyle = ":")
-                    gcf().suptitle(rootname.split('_HerrMet_')[-1])
+                    fig.suptitle(rootname.split('_HerrMet_')[-1])
                     showfun()
-                    gcf().savefig("%s/_HerrMet.stats.png" % rootname)
-                    plt.close(gcf())
+                    fig.savefig("%s/_HerrMet.stats.png" % rootname)
+
+        if "-plot" in argv.keys():
+            plt.close(fig)
