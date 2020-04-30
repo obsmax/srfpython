@@ -4,7 +4,7 @@ from srfpython import depthmodel_from_mod96, depthspace, AsciiFile
 from srfpython.HerrMet.parameterizers import Parameterizer_mZVSVPRH, Parameterizer_mZVSPRRH, Parameterizer_mZVSPRzRHvp, \
     Parameterizer_mZVSPRzRHz, Parameterizer_mZVSVPvsRHvp
 from srfpython.HerrMet.priorpdf import DefaultLogRhoM, LogRhoM_DVS, LogRhoM_DVPDVSDRH, LogRhoM_DVPDVSDRHDPR
-
+from srfpython.HerrMet.files import HERRMETPARAMFILELOCAL
 
 """
 """
@@ -61,7 +61,7 @@ def write_default_paramfile(nlayer, zbot,
                ["RH%d" % i for i in range(nlayer)]
         vinfs = np.concatenate((ztopinf, vsinf, prinf, rhinf))
         vsups = np.concatenate((ztopsup, vssup, prsup, rhsup))
-        with open('_HerrMet.param', 'w') as fid:
+        with open(HERRMETPARAMFILELOCAL, 'w') as fid:
             fid.write('#met TYPE = "mZVSPRRH"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
 
@@ -72,10 +72,10 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#fmt %5s %16f %16f\n')
             for k, vinf, vsup in zip(keys, vinfs, vsups):
                 fid.write('%s %s %s\n' % (k, vinf, vsup))
-        A = AsciiFile('_HerrMet.param')
+        A = AsciiFile(HERRMETPARAMFILELOCAL)
 
         A.write() #to screen
-        A.write('_HerrMet.param') #to file
+        A.write(HERRMETPARAMFILELOCAL) #to file
 
     elif which_parameterizer == "mZVSVPRH":
         if basedon is None:
@@ -112,7 +112,7 @@ def write_default_paramfile(nlayer, zbot,
         vinfs = np.concatenate((ztopinf, vsinf, vpinf, rhinf))
         vsups = np.concatenate((ztopsup, vssup, vpsup, rhsup))
 
-        with open('_HerrMet.param', 'w') as fid:
+        with open(HERRMETPARAMFILELOCAL, 'w') as fid:
             fid.write('#met TYPE = "mZVSVPRH"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
 
@@ -123,10 +123,10 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#fmt %5s %16f %16f\n')
             for k, vinf, vsup in zip(keys, vinfs, vsups):
                 fid.write('%s %s %s\n' % (k, vinf, vsup))
-        A = AsciiFile('_HerrMet.param')
+        A = AsciiFile(HERRMETPARAMFILELOCAL)
 
         A.write()  # to screen
-        A.write('_HerrMet.param')  # to file
+        A.write(HERRMETPARAMFILELOCAL)  # to file
 
     elif which_parameterizer == "mZVSPRzRHvp":
         if basedon is None:
@@ -152,7 +152,7 @@ def write_default_paramfile(nlayer, zbot,
         vinfs = np.concatenate((ztopinf, vsinf))
         vsups = np.concatenate((ztopsup, vssup))
 
-        with open('_HerrMet.param', 'w') as fid:
+        with open(HERRMETPARAMFILELOCAL, 'w') as fid:
             fid.write('#met TYPE = "mZVSPRzRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
             fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
@@ -165,10 +165,10 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#fmt %5s %16f %16f\n')
             for k, vinf, vsup in zip(keys, vinfs, vsups):
                 fid.write('%s %s %s\n' % (k, vinf, vsup))
-        A = AsciiFile('_HerrMet.param')
+        A = AsciiFile(HERRMETPARAMFILELOCAL)
 
         A.write() #to screen
-        A.write('_HerrMet.param') #to file
+        A.write(HERRMETPARAMFILELOCAL) #to file
 
     elif which_parameterizer == "mZVSPRzRHz":
         if basedon is None:
@@ -194,7 +194,7 @@ def write_default_paramfile(nlayer, zbot,
         vinfs = np.concatenate((ztopinf, vsinf))
         vsups = np.concatenate((ztopsup, vssup))
 
-        with open('_HerrMet.param', 'w') as fid:
+        with open(HERRMETPARAMFILELOCAL, 'w') as fid:
             fid.write('#met TYPE = "mZVSPRzRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
             fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
@@ -207,10 +207,10 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#fmt %5s %16f %16f\n')
             for k, vinf, vsup in zip(keys, vinfs, vsups):
                 fid.write('%s %s %s\n' % (k, vinf, vsup))
-        A = AsciiFile('_HerrMet.param')
+        A = AsciiFile(HERRMETPARAMFILELOCAL)
 
         A.write() #to screen
-        A.write('_HerrMet.param') #to file
+        A.write(HERRMETPARAMFILELOCAL) #to file
 
     elif which_parameterizer == "mZVSVPvsRHvp":
         if basedon is None:
@@ -229,7 +229,7 @@ def write_default_paramfile(nlayer, zbot,
         vinfs = np.concatenate((ztopinf, vsinf))
         vsups = np.concatenate((ztopsup, vssup))
 
-        with open('_HerrMet.param', 'w') as fid:
+        with open(HERRMETPARAMFILELOCAL, 'w') as fid:
             fid.write('#met TYPE = "mZVSVPvsRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
             fid.write('# BROCHER2005\n')
@@ -255,10 +255,10 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#fmt %5s %16f %16f\n')
             for k, vinf, vsup in zip(keys, vinfs, vsups):
                 fid.write('%s %s %s\n' % (k, vinf, vsup))
-        A = AsciiFile('_HerrMet.param')
+        A = AsciiFile(HERRMETPARAMFILELOCAL)
 
         A.write()  # to screen
-        A.write('_HerrMet.param')  # to file
+        A.write(HERRMETPARAMFILELOCAL)  # to file
     else:
         raise NotImplementedError('no such parameter file type implemented %s' % which_parameterizer)
 
@@ -321,6 +321,6 @@ if __name__ == "__main__":
                             which_parameterizer="mZVSPRRH", basedon=None,
                             dvp=None, dvs=None, drh=None, dpr=None)
 
-    A = load_paramfile("_HerrMet.param")
+    A = load_paramfile(HERRMETPARAMFILELOCAL)
 
     print (A)

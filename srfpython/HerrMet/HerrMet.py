@@ -13,13 +13,15 @@ if "-png" in sys.argv[1:]: matplotlib.use('agg')
 from srfpython.utils import readargv1
 from srfpython.Herrmann.Herrmann import check_herrmann_codes
 from srfpython.HerrMet.plugins import target, param, send, run, \
-    manage, neldermead, extract, display, default
+    manage, extract, display, default
+
 check_herrmann_codes()
 
 # -------------------------------------
 version = "6.0"
 default_verbose=1
-default_rootnames = "_HerrMet_*"
+from srfpython.HerrMet.files import DEFAULTROOTNAMES
+default_rootnames = DEFAULTROOTNAMES
 default_nworkers = None
 default_taskset = None
 
@@ -38,7 +40,6 @@ authorized_keys = \
      "--send",
      "--run",
      "--manage",
-     "--neldermead",
      "--extract",
      "--display"]
 
@@ -58,7 +59,6 @@ help = '''HerrMet V{version}
 {send_help}
 {run_help}
 {manage_help}
-{neldermead_help}
 {extract_help}
 {display_help}
 '''.format(
@@ -71,7 +71,6 @@ help = '''HerrMet V{version}
     send_help=send.short_help,
     run_help=run.short_help,
     manage_help=manage.short_help,
-    neldermead_help=neldermead.short_help,
     extract_help=extract.short_help,
     display_help=display.short_help)
 
@@ -107,7 +106,7 @@ if __name__ == "__main__":
         key = "-h" if "-h" in argv.keys() else "-help"
         if argv[key] == []:
             #print full synthteized help
-            print help
+            print (help)
         else:
             #print specific help for some plugins
             for plugin_name in argv[key]:
@@ -116,8 +115,6 @@ if __name__ == "__main__":
                 except NameError:
                     print("%s is not a valid plugin (long_help not found)")
                     continue
-
-
         sys.exit()
 
     # ------------------------------------- EXAMPLES USAGE
@@ -180,8 +177,8 @@ if __name__ == "__main__":
         manage.manage(argv['--manage'], verbose, mapkwargs)
 
     # ------
-    if "--neldermead" in argv.keys():
-        neldermead.neldermead(argv['--neldermead'], verbose, mapkwargs)
+    # if "--neldermead" in argv.keys():
+    #     neldermead.neldermead(argv['--neldermead'], verbose, mapkwargs)
 
     # ------
     if "--extract" in argv.keys():

@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 """
 a node file is an ascii file with 3 columns and one line header 
@@ -13,6 +14,11 @@ a node file is an ascii file with 3 columns and one line header
 
 class NodeFileString(object):
     def __init__(self, string):
+        """
+
+        :param string:
+        """
+
         lines = string.split('\n')
 
         lons, lats, nodes = [], [], []
@@ -32,6 +38,7 @@ class NodeFileString(object):
         self.lons = np.asarray(lons, float)
         self.lats = np.asarray(lats, float)
         self.nodes = np.asarray(nodes, str)
+
         assert len(self.nodes) == len(np.unique(self.nodes))
 
     def __str__(self):
@@ -47,6 +54,10 @@ class NodeFileString(object):
 
 class NodeFile(NodeFileString):
     def __init__(self, filename):
+        """
+
+        :param filename:
+        """
         with open(filename, "r") as fid:
             NodeFileString.__init__(self, "".join(fid.readlines()))
 

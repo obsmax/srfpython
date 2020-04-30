@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os, glob
 import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
@@ -6,10 +8,12 @@ from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.disppdfs import dispstats
 from srfpython.HerrMet.runfile import RunFile
-
+from srfpython.HerrMet.files import DEFAULTROOTNAMES, HERRMETRUNFILE,\
+    HERRMETEXTRACTBESTMODELFILE, HERRMETEXTRACTPDFMODELFILE, HERRMETEXTRACTPDFDISPFILE
 
 # ------------------------------ defaults
-default_rootnames = "_HerrMet_*"
+default_rootnames = DEFAULTROOTNAMES
+
 default_extract_mode = "last"
 default_extract_limit = 0
 default_extract_llkmin = 0
@@ -38,8 +42,7 @@ long_help = """\
                      second argument = lowest log likelihood value to include (<=0.0, 0.0 means all)  
                      third argument = include only one model over "step" (>=1)
                      default {default_top_limit} {default_top_llkmin} {default_top_step}
-                     """.format(\
-           default_rootnames=default_rootnames,
+""".format(default_rootnames=default_rootnames,
            default_extract_mode=default_extract_mode,
            default_extract_limit=default_extract_limit,
            default_extract_llkmin=default_extract_llkmin,
@@ -54,16 +57,12 @@ example = """\
 ## EXTRACT
 # compute pdf using the best 1000 models 
 
-HerrMet --extract -pdf last 1000 0. 1 -top 10 0. 1
+HerrMet --extract -pdf best 1000 0. 1 -top 10 0. 1
 """
-
-RUNFILE = "{rootname}/_HerrMet.run"
-EXTRACTMODELFILE = '{rootname}/_HerrMet.{extract_mode}_{extract_limit}_{extract_llkmin}_{extract_step}.p{percentile:.2f}.mod96'
-EXTRACTDISPFILE = '{rootname}/_HerrMet.{extract_mode}_{extract_limit}_{extract_llkmin}_{extract_step}.p{percentile:.2f}.surf96'
 
 
 def _find_runfile(rootname):
-    runfile = RUNFILE.format(rootname=rootname)
+    runfile = HERRMETRUNFILE.format(rootname=rootname)
     if not os.path.isfile(runfile):
         err = '{} not found'.format(runfile)
         raise IOError(err)
@@ -79,14 +78,14 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
     assert np.all(percentiles[1:] > percentiles[:-1])
 
     for p in percentiles:
-        extract_disp_file = EXTRACTDISPFILE.format(
+        extract_disp_file = HERRMETEXTRACTPDFDISPFILE.format(
             rootname=rootname,
             extract_mode=extract_mode,
             extract_limit=extract_limit,
             extract_llkmin=extract_llkmin,
             extract_step=extract_step,
             percentile=p)
-        extract_model_file = EXTRACTMODELFILE.format(
+        extract_model_file = HERRMETEXTRACTPDFMODELFILE.format(
             rootname=rootname,
             extract_mode=extract_mode,
             extract_limit=extract_limit,
@@ -107,7 +106,7 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
         return
 
     with RunFile(runfile, verbose=verbose) as rundb:
-        print "extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step),
+        print("extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step))
         if extract_mode == "best":
             chainids, weights, llks, ms, ds = \
                 rundb.getzip(limit=extract_limit,
@@ -121,7 +120,7 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
                                   step=extract_step,
                                   algo="METROPOLIS")
         else:
-            raise Exception('unexpected extract mode %s' % extract_mode)
+            raise Exception('unexpected extract mode {}'.format(extract_mode))
 
     if not len(ms):
         return
@@ -136,7 +135,7 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
                      **mapkwargs):
         try:
             dmout = depthmodel(vppc, vspc, rhpc)
-            extract_model_file = EXTRACTMODELFILE.format(
+            extract_model_file = HERRMETEXTRACTPDFMODELFILE.format(
                 rootname=rootname,
                 extract_mode=extract_mode,
                 extract_limit=extract_limit,
@@ -144,15 +143,15 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
                 extract_step=extract_step,
                 percentile=p)
             if verbose:
-                print "writing %s" % extract_model_file
+                print("writing {}" .format(extract_model_file))
             dmout.write96(extract_model_file)  # , overwrite=True)
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            print "Error", str(e)
+            print ("Error", str(e))
 
     for p in percentiles:
-        extract_disp_file = EXTRACTDISPFILE.format(
+        extract_disp_file = HERRMETEXTRACTPDFDISPFILE.format(
             rootname=rootname,
             extract_mode=extract_mode,
             extract_limit=extract_limit,
@@ -170,7 +169,7 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
                       **mapkwargs):
         try:
             srout = surf96reader_from_arrays(wpc, tpc, mpc, fpc, vpc)
-            extract_disp_file = EXTRACTDISPFILE.format(
+            extract_disp_file = HERRMETEXTRACTPDFDISPFILE.format(
                 rootname=rootname,
                 extract_mode=extract_mode,
                 extract_limit=extract_limit,
@@ -178,14 +177,14 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
                 extract_step=extract_step,
                 percentile=p)
             if verbose:
-                print "writing to {}".format(extract_disp_file)
+                print ("writing to {}".format(extract_disp_file))
             with open(extract_disp_file, 'a') as fid:
                 fid.write(srout.__str__())
                 fid.write('\n')
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            print "Error", str(e)
+            print ("Error", str(e))
 
 
 def _extract_top(rootname, extract_limit, extract_llkmin, extract_step, verbose):
@@ -197,7 +196,7 @@ def _extract_top(rootname, extract_limit, extract_llkmin, extract_step, verbose)
         return
 
     with RunFile(runfile, verbose=verbose) as rundb:
-        print "extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step),
+        print ("extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step), end=' ')
 
         modelids, chainids, weights, llks, nlayers, dms, srs = zip(*list(
             rundb.getpack(limit=extract_limit,
@@ -213,18 +212,21 @@ def _extract_top(rootname, extract_limit, extract_llkmin, extract_step, verbose)
     for rank, (modelid, chainid, weight, llk, nlayer, dm, sr) in \
             enumerate(zip(modelids, chainids, weights, llks, nlayers, dms, srs)):
         try:
-            out = '{}/_HerrMet.rank{}.modelid{}.chainid{}.llk{}.mod96'.format(
-                rootname, rank, modelid, chainid, llk)
+            modelfileout = HERRMETEXTRACTBESTMODELFILE.format(
+                rootname=rootname,
+                rank=rank,
+                modelid=modelid,
+                chainid=chainid,
+                llk=llk)
             if verbose:
-                print "writing %s" % out
-            dm.write96(out)  # , overwrite=True)
+                print ("writing %s" % modelfileout)
+            dm.write96(modelfileout)  # , overwrite=True)
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            print "Error", str(e)
+            print ("Error", str(e))
 
 
-# ------------------------------
 def extract(argv, verbose, mapkwargs):
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
@@ -240,9 +242,7 @@ def extract(argv, verbose, mapkwargs):
 
     for rootname in rootnames:
         if not os.path.isdir(rootname):
-            raise ValueError('%s does not exist' % rootname)
-        elif not rootname.startswith('_HerrMet_'):
-            raise ValueError('%s does not start with _HerrMet_' % rootname)
+            raise IOError('{} does not exist'.format(rootname))
 
     if "-pdf" in argv.keys():
         if len(argv['-pdf']) == 0:
