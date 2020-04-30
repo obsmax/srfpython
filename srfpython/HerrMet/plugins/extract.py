@@ -71,6 +71,7 @@ def _find_runfile(rootname):
 
 def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_step, verbose, percentiles, mapkwargs):
     """private"""
+    ndepth = 100
     percentiles = np.array(percentiles, float)
     assert len(np.unique(percentiles)) == len(percentiles)
     assert np.all(0 < percentiles)
@@ -129,7 +130,7 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
     for p, (vppc, vspc, rhpc, prpc) in \
             dmstats1(dms,
                      percentiles=percentiles,
-                     Ndepth=100,
+                     Ndepth=ndepth,
                      Nvalue=100,
                      weights=weights,
                      **mapkwargs):
