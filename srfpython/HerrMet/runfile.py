@@ -2,6 +2,7 @@ from __future__ import print_function
 from srfpython.standalone.database import Database
 from srfpython.depthdisp.depthmodels import depthmodel_from_arrays
 from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
+import warnings
 import numpy as np
 import time, os
 
@@ -97,6 +98,9 @@ class RunFile(Database):
     def insert(self, algo, models, datas, weights, llks, parameterizer, datacoder):
         """insert the result of 1 chain (metropolis)"""
         # assume transaction open
+        if len(models) == 0:
+            warnings.warn('no models provided')
+            return
 
         # give a number to this insertion
         s = self.select('select max(CHAINID) from CHAINS').next()[0]

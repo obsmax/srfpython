@@ -1,4 +1,5 @@
 import os, glob
+import warnings
 import numpy as np
 from srfpython.depthdisp.depthdispdisplay import plt, showme
 from srfpython.HerrMet.runfile import RunFile
@@ -104,8 +105,10 @@ def manage(argv, verbose, mapkwargs):
                         group by CHAINID 
                         ''')
                     if s is None:
-                        raise Exception('no chains found, if the inversion is running, '
-                                        'please wait for the next commit')
+                        warnings.warn('no chains found, if the inversion is running, '
+                                      'please wait for the next commit')
+                        continue
+
                     fig.clf()
                     ax0 = fig.add_subplot(121)
                     ax1 = fig.add_subplot(122, sharey=ax0)
