@@ -15,7 +15,7 @@ from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, DepthDispDisp
 from srfpython.HerrMet.runfile import RunFile
 from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
-from srfpython.HerrMet.theory import overdisp
+from srfpython.HerrMet.overdisp import overdisp
 from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, \
     Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp, Parameterizer_mZVSVPvsRHvp
 
