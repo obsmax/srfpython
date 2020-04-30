@@ -4,7 +4,7 @@ import numpy as np
 from srfpython.HerrMet.relation import Relation
 from srfpython.depthdisp.depthmodels import \
     depthmodel1D, depthmodel_from_mod96, depthmodel_from_arrays, depthspace
-
+from srfpython.standalone.asciifile import AsciiFile_fromstring
 R43 = np.sqrt(4. / 3.)
 
 """
@@ -19,9 +19,9 @@ class Parameterizer(object):
        be understood by the theory function (ZTOP, VP, VS, RH)
        this is the default class, methods must be overwritten by subclasses"""
 
-    def __init__(self, A):
+    def __init__(self, ascii_file):
         """
-        :param A: an initialized AsciiFile with the parameters
+        :param ascii_file: an initialized AsciiFile of AsciiFile_fromstring with the parameters
 
         please set up attributes :
         self.NLAYER : int, the number of layers including half space
@@ -36,7 +36,7 @@ class Parameterizer(object):
         self.MMEAN = array, the mean model, masked by self.IDXNOTLOCK
         self.MSTD = array, markov proposal for each parameter, masked by self.IDXNOTLOCK
         """
-        self.check_parameter_file(A)
+        self.check_parameter_file(ascii_file)
 
         self.NLAYER = None
         self.MDEFAULT = None
@@ -57,22 +57,25 @@ class Parameterizer(object):
         self.DELTAM = None
 
     @staticmethod
-    def check_parameter_file(A):
+    def check_parameter_file(ascii_file):
         """
-        :param A: a read AsciiFile object corresponding to a parameter file
+        :param ascii_file: a read AsciiFile object corresponding to a parameter file
         :return:
         """
-        metakeys = A.metadata.keys()
+        if not isinstance(ascii_file, AsciiFile_fromstring):
+            raise TypeError(type(ascii_file))
+
+        metakeys = ascii_file.metadata.keys()
         if not "NLAYER" in metakeys:
             raise ValueError('NLAYER not found in file metadata')
 
         if not "TYPE" in metakeys:
             raise ValueError('TYPE not found in file metadata')
 
-        if not len(A.data['KEY']) == len(np.unique(A.data['KEY'])):
+        if not len(ascii_file.data['KEY']) == len(np.unique(ascii_file.data['KEY'])):
             raise ValueError('there are repeated entries in column KEYS')
 
-        if np.any(A.data['VINF'] > A.data['VSUP']):
+        if np.any(ascii_file.data['VINF'] > ascii_file.data['VSUP']):
             raise ValueError('VSUP cannot be lower than VINF')
 
     def meanmodel(self):
@@ -173,17 +176,17 @@ class Parameterizer(object):
 
 class Parameterizer_mZVSPRRH(Parameterizer):
 
-    def __init__(self, A):
+    def __init__(self, ascii_file):
         """see Parameterizer"""
 
-        Parameterizer.__init__(self, A=A)
+        Parameterizer.__init__(self, ascii_file=ascii_file)
 
-        assert A.metadata['TYPE'] == "mZVSPRRH"
-        assert np.all(A.data['VINF'] <= A.data['VSUP'])
-        if np.all(A.data['VINF'] == A.data['VSUP']):
+        assert ascii_file.metadata['TYPE'] == "mZVSPRRH"
+        assert np.all(ascii_file.data['VINF'] <= ascii_file.data['VSUP'])
+        if np.all(ascii_file.data['VINF'] == ascii_file.data['VSUP']):
             print("Warning : all parameters are locked")
 
-        self.NLAYER = A.metadata['NLAYER']
+        self.NLAYER = ascii_file.metadata['NLAYER']
         self.KEYS = np.hstack((
             ["-Z%d" % i for i in range(1, self.NLAYER)],
             ['VS%d' % i for i in range(self.NLAYER)],
@@ -195,13 +198,13 @@ class Parameterizer_mZVSPRRH(Parameterizer):
             [self.dpr for _ in range(self.NLAYER)],
             [self.drh for _ in range(self.NLAYER)]))
 
-        self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']  # index of dimension used, other parameters are kept constant
+        self.IDXNOTLOCK = ascii_file.data['VINF'] < ascii_file.data['VSUP']  # index of dimension used, other parameters are kept constant
 
-        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])  # used for dimensions that are not part of the model
+        self.MDEFAULT = 0.5 * (ascii_file.data['VINF'] + ascii_file.data['VSUP'])  # used for dimensions that are not part of the model
         self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]
-        self.MINF = A.data['VINF'][self.IDXNOTLOCK]
-        self.MSUP = A.data['VSUP'][self.IDXNOTLOCK]
-        self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]
+        self.MINF = ascii_file.data['VINF'][self.IDXNOTLOCK]
+        self.MSUP = ascii_file.data['VSUP'][self.IDXNOTLOCK]
+        self.MSTD = 0.5 * (ascii_file.data['VSUP'] - ascii_file.data['VINF'])[self.IDXNOTLOCK]
 
     def boundaries(self):
         """see Parameterizer"""
@@ -253,19 +256,19 @@ class Parameterizer_mZVSPRRH(Parameterizer):
 
 class Parameterizer_mZVSVPRH(Parameterizer):
     """see Parameterizer_mZVSPRRH for doc"""
-    def __init__(self, A):
+    def __init__(self, ascii_file):
 
-        Parameterizer.__init__(self, A=A)
+        Parameterizer.__init__(self, ascii_file=ascii_file)
 
-        assert A.metadata['TYPE'] == "mZVSVPRH"
-        assert np.all(A.data['VINF'] <= A.data['VSUP'])
-        if np.all(A.data['VINF'] == A.data['VSUP']):
+        assert ascii_file.metadata['TYPE'] == "mZVSVPRH"
+        assert np.all(ascii_file.data['VINF'] <= ascii_file.data['VSUP'])
+        if np.all(ascii_file.data['VINF'] == ascii_file.data['VSUP']):
             print("Warning : all parameters are locked")
 
-        self.NLAYER = A.metadata['NLAYER']
-        self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']
+        self.NLAYER = ascii_file.metadata['NLAYER']
+        self.IDXNOTLOCK = ascii_file.data['VINF'] < ascii_file.data['VSUP']
 
-        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
+        self.MDEFAULT = 0.5 * (ascii_file.data['VINF'] + ascii_file.data['VSUP'])
         self.KEYS = np.hstack(
             (["-Z%d" % i for i in range(1, self.NLAYER)],
              ['VS%d' % i for i in range(self.NLAYER)],
@@ -273,9 +276,9 @@ class Parameterizer_mZVSVPRH(Parameterizer):
              ['RH%d' % i for i in range(self.NLAYER)]))
 
         self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]
-        self.MINF = A.data['VINF'][self.IDXNOTLOCK]
-        self.MSUP = A.data['VSUP'][self.IDXNOTLOCK]
-        self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]
+        self.MINF = ascii_file.data['VINF'][self.IDXNOTLOCK]
+        self.MSUP = ascii_file.data['VSUP'][self.IDXNOTLOCK]
+        self.MSTD = 0.5 * (ascii_file.data['VSUP'] - ascii_file.data['VINF'])[self.IDXNOTLOCK]
         self.DELTAM = np.hstack((
             [self.dz for _ in range(1, self.NLAYER)],
             [self.dvs for _ in range(self.NLAYER)],
@@ -329,15 +332,15 @@ class Parameterizer_mZVSVPRH(Parameterizer):
 class Parameterizer_mZVSPRzRHvp(Parameterizer):
     """see Parameterizer_mZVSPRRH for doc"""
 
-    def __init__(self, A):
+    def __init__(self, ascii_file):
         """see Parameterizer"""
-        Parameterizer.__init__(self, A=A)
-        assert A.metadata['TYPE'] == "mZVSPRzRHvp"
-        assert np.all(A.data['VINF'] <= A.data['VSUP'])
-        if np.all(A.data['VINF'] == A.data['VSUP']):
+        Parameterizer.__init__(self, ascii_file=ascii_file)
+        assert ascii_file.metadata['TYPE'] == "mZVSPRzRHvp"
+        assert np.all(ascii_file.data['VINF'] <= ascii_file.data['VSUP'])
+        if np.all(ascii_file.data['VINF'] == ascii_file.data['VSUP']):
             print ("Warning : all parameters are locked")
 
-        self.NLAYER = A.metadata['NLAYER']
+        self.NLAYER = ascii_file.metadata['NLAYER']
         self.KEYS = np.hstack(
             (["-Z%d" % i for i in range(1, self.NLAYER)],
              ['VS%d' % i for i in range(self.NLAYER)]))
@@ -345,18 +348,18 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
             [self.dz for _ in range(1, self.NLAYER)],
             [self.dvs for _ in range(self.NLAYER)]))
 
-        self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']
+        self.IDXNOTLOCK = ascii_file.data['VINF'] < ascii_file.data['VSUP']
 
-        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
+        self.MDEFAULT = 0.5 * (ascii_file.data['VINF'] + ascii_file.data['VSUP'])
         self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]
-        self.MINF = A.data['VINF'][self.IDXNOTLOCK]
-        self.MSUP = A.data['VSUP'][self.IDXNOTLOCK]
-        self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]
+        self.MINF = ascii_file.data['VINF'][self.IDXNOTLOCK]
+        self.MSUP = ascii_file.data['VSUP'][self.IDXNOTLOCK]
+        self.MSTD = 0.5 * (ascii_file.data['VSUP'] - ascii_file.data['VINF'])[self.IDXNOTLOCK]
 
         self.PRzName = 'VP/VS=f(Z)'
         self.RHvpName = 'RH=f(VP)'
-        self.PRz = Relation('PRz', A.metadata['PRz'])
-        self.RHvp = Relation('RHvp', A.metadata['RHvp'])
+        self.PRz = Relation('PRz', ascii_file.metadata['PRz'])
+        self.RHvp = Relation('RHvp', ascii_file.metadata['RHvp'])
 
     def boundaries(self):
         """see Parameterizer"""
@@ -388,35 +391,35 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
 class Parameterizer_mZVSPRzRHz(Parameterizer):
     """see Parameterizer_mZVSPRRH for doc"""
 
-    def __init__(self, A):
+    def __init__(self, ascii_file):
         """see Parameterizer"""
 
-        Parameterizer.__init__(self, A=A)
+        Parameterizer.__init__(self, ascii_file=ascii_file)
 
-        assert A.metadata['TYPE'] == "mZVSPRzRHz"
-        assert np.all(A.data['VINF'] <= A.data['VSUP'])
-        if np.all(A.data['VINF'] == A.data['VSUP']):
+        assert ascii_file.metadata['TYPE'] == "mZVSPRzRHz"
+        assert np.all(ascii_file.data['VINF'] <= ascii_file.data['VSUP'])
+        if np.all(ascii_file.data['VINF'] == ascii_file.data['VSUP']):
             print ("Warning : all parameters are locked")
 
-        self.NLAYER = A.metadata['NLAYER']
+        self.NLAYER = ascii_file.metadata['NLAYER']
         self.KEYS = np.hstack(
             (["-Z%d" % i for i in range(1, self.NLAYER)],
              ['VS%d' % i for i in range(self.NLAYER)]))
         self.DELTAM = np.hstack((
             [self.dz for _ in range(1, self.NLAYER)],
             [self.dvs for _ in range(self.NLAYER)]))
-        self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']
+        self.IDXNOTLOCK = ascii_file.data['VINF'] < ascii_file.data['VSUP']
 
-        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
+        self.MDEFAULT = 0.5 * (ascii_file.data['VINF'] + ascii_file.data['VSUP'])
         self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]
-        self.MINF = A.data['VINF'][self.IDXNOTLOCK]
-        self.MSUP = A.data['VSUP'][self.IDXNOTLOCK]
-        self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]
+        self.MINF = ascii_file.data['VINF'][self.IDXNOTLOCK]
+        self.MSUP = ascii_file.data['VSUP'][self.IDXNOTLOCK]
+        self.MSTD = 0.5 * (ascii_file.data['VSUP'] - ascii_file.data['VINF'])[self.IDXNOTLOCK]
 
         self.PRzName = 'VP/VS=f(Z)'
         self.RHzName = 'RH=f(Z)'
-        self.PRz = Relation('PRz', A.metadata['PRz'])
-        self.RHz = Relation('RHz', A.metadata['RHz'])
+        self.PRz = Relation('PRz', ascii_file.metadata['PRz'])
+        self.RHz = Relation('RHz', ascii_file.metadata['RHz'])
 
     def boundaries(self):
         print ("boundaries method not implemented for %s, using default one" % self.__class__.__name__)
@@ -447,16 +450,16 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
 class Parameterizer_mZVSVPvsRHvp(Parameterizer):
     """see Parameterizer_mZVSPRRH for doc"""
 
-    def __init__(self, A):
+    def __init__(self, ascii_file):
         """see Parameterizer"""
-        Parameterizer.__init__(self, A=A)
-        assert A.metadata['TYPE'] == "mZVSVPvsRHvp"
-        assert np.all(A.data['VINF'] <= A.data['VSUP'])
-        if np.all(A.data['VINF'] == A.data['VSUP']):
+        Parameterizer.__init__(self, ascii_file=ascii_file)
+        assert ascii_file.metadata['TYPE'] == "mZVSVPvsRHvp"
+        assert np.all(ascii_file.data['VINF'] <= ascii_file.data['VSUP'])
+        if np.all(ascii_file.data['VINF'] == ascii_file.data['VSUP']):
             print ("Warning : all parameters are locked")
 
-        self.NLAYER = A.metadata['NLAYER']
-        self.IDXNOTLOCK = A.data['VINF'] < A.data['VSUP']
+        self.NLAYER = ascii_file.metadata['NLAYER']
+        self.IDXNOTLOCK = ascii_file.data['VINF'] < ascii_file.data['VSUP']
         self.KEYS = np.hstack(
             (["-Z%d" % i for i in range(1, self.NLAYER)],
              ['VS%d' % i for i in range(self.NLAYER)]))
@@ -464,16 +467,16 @@ class Parameterizer_mZVSVPvsRHvp(Parameterizer):
             [self.dz for _ in range(1, self.NLAYER)],
             [self.dvs for _ in range(self.NLAYER)]))
 
-        self.MDEFAULT = 0.5 * (A.data['VINF'] + A.data['VSUP'])
+        self.MDEFAULT = 0.5 * (ascii_file.data['VINF'] + ascii_file.data['VSUP'])
         self.MMEAN = self.MDEFAULT[self.IDXNOTLOCK]
-        self.MINF = A.data['VINF'][self.IDXNOTLOCK]
-        self.MSUP = A.data['VSUP'][self.IDXNOTLOCK]
-        self.MSTD = 0.5 * (A.data['VSUP'] - A.data['VINF'])[self.IDXNOTLOCK]
+        self.MINF = ascii_file.data['VINF'][self.IDXNOTLOCK]
+        self.MSUP = ascii_file.data['VSUP'][self.IDXNOTLOCK]
+        self.MSTD = 0.5 * (ascii_file.data['VSUP'] - ascii_file.data['VINF'])[self.IDXNOTLOCK]
 
         self.VPvsName = 'VP=f(VS)'
         self.RHvpName = 'RH=f(VP)'
-        self.VPvs = Relation('VPvs', A.metadata['VPvs'])
-        self.RHvp = Relation('RHvp', A.metadata['RHvp'])
+        self.VPvs = Relation('VPvs', ascii_file.metadata['VPvs'])
+        self.RHvp = Relation('RHvp', ascii_file.metadata['RHvp'])
 
         try:
             vs = self.VPvs(VS=1.0)
