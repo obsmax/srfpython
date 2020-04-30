@@ -12,7 +12,8 @@ from srfpython.depthdisp.dispcurves import freqspace
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.disppdfs import dispstats
 from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, DepthDispDisplayCompact, plt, showme
-from srfpython.HerrMet.files import load_paramfile, RunFile
+from srfpython.HerrMet.runfile import RunFile
+from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import overdisp
 from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, \
