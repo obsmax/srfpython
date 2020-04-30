@@ -103,6 +103,9 @@ def manage(argv, verbose, mapkwargs):
                     select CHAINID, group_concat(NITER), group_concat(LLK) from MODELS
                         group by CHAINID 
                         ''')
+                    if s is None:
+                        raise Exception('no chains found, if the inversion is running, '
+                                        'please wait for the next commit')
                     fig.clf()
                     ax0 = fig.add_subplot(121)
                     ax1 = fig.add_subplot(122, sharey=ax0)
