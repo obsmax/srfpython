@@ -18,7 +18,11 @@ class NodeFileString(object):
         lons, lats, nodes = [], [], []
         for line in lines:
             line = line.strip()
-            if not len(line): continue
+            if line.startswith("#"):
+                continue
+
+            if not len(line):
+                continue
 
             lon, lat, node = line.split()
             lons.append(lon)
@@ -27,7 +31,8 @@ class NodeFileString(object):
 
         self.lons = np.asarray(lons, float)
         self.lats = np.asarray(lats, float)
-        self.nodes = np.asarray(nodes, float)
+        self.nodes = np.asarray(nodes, str)
+        assert len(self.nodes) == len(np.unique(self.nodes))
 
     def __str__(self):
         s = "# longitude_deg latitude_deg node\n"
