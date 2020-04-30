@@ -1,7 +1,7 @@
 import os, glob
 import numpy as np
 from srfpython.depthdisp.depthdispdisplay import plt, showme, gcf, gca
-from srfpython.HerrMet.files import RunFile
+from srfpython.HerrMet.runfile import RunFile
 
 # ------------------------------ defaults
 default_rootnames = "_HerrMet_*"

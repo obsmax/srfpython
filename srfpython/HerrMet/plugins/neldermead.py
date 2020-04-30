@@ -3,7 +3,8 @@ import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
 from srfpython.inversion.metropolis2 import LogGaussND
 from srfpython.inversion.neldermead2 import neldermead as neldermead_function
-from srfpython.HerrMet.files import load_paramfile, RunFile
+from srfpython.HerrMet.runfile import RunFile
+from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import Theory
 from srfpython.depthdisp.depthdispdisplay import * #DepthDispDisplay, *

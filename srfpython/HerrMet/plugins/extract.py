@@ -5,7 +5,7 @@ from srfpython.depthdisp.depthmodels import depthmodel, depthmodel_from_arrays
 from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.disppdfs import dispstats
-from srfpython.HerrMet.files import RunFile
+from srfpython.HerrMet.runfile import RunFile
 
 
 # ------------------------------ defaults

@@ -3,7 +3,7 @@ from __future__ import print_function
 import os
 import numpy as np
 from srfpython.utils import minmax
-from srfpython.HerrMet.files import write_default_paramfile
+from srfpython.HerrMet.paramfile import write_default_paramfile
 
 # ------------------------------ defaults
 default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRzRHz', 'mZVSVPvsRHvp']

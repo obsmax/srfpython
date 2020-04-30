@@ -377,9 +377,9 @@ class Parameterizer_mZVSPRzRHvp(Parameterizer):
         ZTOP = np.concatenate(([0.], -1.0 * M[: 1 * nlayer - 1]))
         VS = M[1 * nlayer - 1: 2 * nlayer - 1]
 
-        #infer VP and RH from VS and input laws
+        # infer VP and RH from VS and input laws
         ZMID = np.concatenate((0.5 * (ZTOP[1:] + ZTOP[:-1]), [1.5 * ZTOP[-1]]))
-        VP = VS * self.PRz(Z = ZMID)
+        VP = VS * self.PRz(Z=ZMID)
         RH = self.RHvp(VP)
 
         return ZTOP, VP, VS, RH
@@ -436,7 +436,7 @@ class Parameterizer_mZVSPRzRHz(Parameterizer):
         ZTOP = np.concatenate(([0.], -1.0 * M[: 1 * nlayer - 1]))
         VS = M[1 * nlayer - 1: 2 * nlayer - 1]
 
-        #infer VP and RH from VS and input laws
+        # infer VP and RH from VS and input laws
         ZMID = np.concatenate((0.5 * (ZTOP[1:] + ZTOP[:-1]), [1.5 * ZTOP[-1]]))
         VP = VS * self.PRz(Z=ZMID)
         RH = self.RHz(Z=ZMID)
