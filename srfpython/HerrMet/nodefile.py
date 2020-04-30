@@ -1,5 +1,7 @@
-import numpy as np
 import os
+import numpy as np
+from srfpython.HerrMet.files import ROOTNAME, HERRMETPARAMFILE, HERRMETTARGETFILE
+
 
 """
 a node file is an ascii file with 3 columns and one line header 
@@ -22,6 +24,9 @@ class NodeFileString(object):
         lines = string.split('\n')
 
         lons, lats, nodes = [], [], []
+        paramfiles = []
+        targetfiles = []
+
         for line in lines:
             line = line.strip()
             if line.startswith("#"):
@@ -35,11 +40,22 @@ class NodeFileString(object):
             lats.append(lat)
             nodes.append(node)
 
+            rootname = ROOTNAME.format(node=node)
+            paramfile = HERRMETPARAMFILE.format(rootname=rootname)
+            targetfile = HERRMETTARGETFILE.format(rootname=rootname)
+            paramfiles.append(paramfile)
+            targetfiles.append(targetfile)
+
         self.lons = np.asarray(lons, float)
         self.lats = np.asarray(lats, float)
         self.nodes = np.asarray(nodes, str)
+        self.paramfiles = np.asarray(paramfiles, str)
+        self.targetfiles = np.asarray(targetfiles, str)
+        if not len(self.nodes) == len(np.unique(self.nodes)):
+            raise ValueError('node names are not unique')
 
-        assert len(self.nodes) == len(np.unique(self.nodes))
+    def __len__(self):
+        return len(self.nodes)
 
     def __str__(self):
         s = "# longitude_deg latitude_deg node\n"
@@ -55,9 +71,7 @@ class NodeFileString(object):
 class NodeFile(NodeFileString):
     def __init__(self, filename):
         """
-
         :param filename:
         """
         with open(filename, "r") as fid:
             NodeFileString.__init__(self, "".join(fid.readlines()))
-

@@ -209,7 +209,7 @@ SURF96 R U T 0 0.500000 0.929962 0.1
     A = AsciiFile_fromstring(parameter_file_string)
     # p = Parameterizer_mZVSPRRH(A)
     p = Parameterizer_mZVSVPvsRHvp(A)
-    d = makedatacoder(s96=dispersion_file_string, which=Datacoder_log)
+    d = makedatacoder(surf96filename=dispersion_file_string, which=Datacoder_log)
 
     t = Theory(parameterizer=p, datacoder=d)
 

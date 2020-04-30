@@ -1,11 +1,13 @@
 from __future__ import print_function
+import os
 import numpy as np
-from srfpython import depthmodel_from_mod96, depthspace, AsciiFile
-from srfpython.HerrMet.parameterizers import Parameterizer_mZVSVPRH, Parameterizer_mZVSPRRH, Parameterizer_mZVSPRzRHvp, \
-    Parameterizer_mZVSPRzRHz, Parameterizer_mZVSVPvsRHvp
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthspace
+from srfpython.standalone.asciifile import AsciiFile, AsciiFile_fromstring
 from srfpython.HerrMet.priorpdf import DefaultLogRhoM, LogRhoM_DVS, LogRhoM_DVPDVSDRH, LogRhoM_DVPDVSDRHDPR
 from srfpython.HerrMet.files import HERRMETPARAMFILELOCAL
-
+from srfpython.HerrMet.parameterizers import \
+    Parameterizer_mZVSVPRH, Parameterizer_mZVSPRRH, Parameterizer_mZVSPRzRHvp, \
+    Parameterizer_mZVSPRzRHz, Parameterizer_mZVSVPvsRHvp
 """
 """
 
@@ -155,8 +157,10 @@ def write_default_paramfile(nlayer, zbot,
         with open(HERRMETPARAMFILELOCAL, 'w') as fid:
             fid.write('#met TYPE = "mZVSPRzRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
-            fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
-            fid.write('#met RHvp = "def RHvp(VP): return 1.74 * VP ** 0.25"\n')
+            # fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
+            # fid.write('#met RHvp = "def RHvp(VP): return 1.74 * VP ** 0.25"\n')
+            fid.write('#met PRz  = "lambda Z: 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
+            fid.write('#met RHvp = "lambda VP: 1.74 * VP ** 0.25"\n')
 
             fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
 
@@ -197,8 +201,10 @@ def write_default_paramfile(nlayer, zbot,
         with open(HERRMETPARAMFILELOCAL, 'w') as fid:
             fid.write('#met TYPE = "mZVSPRzRHvp"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
-            fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
-            fid.write('#met RHz  = "def RHz(Z): return Z * 0. + 2.67"\n')
+            # fid.write('#met PRz  = "def PRz(Z): return 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
+            # fid.write('#met RHz  = "def RHz(Z): return Z * 0. + 2.67"\n')
+            fid.write('#met PRz  = "lambda Z: 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
+            fid.write('#met RHz  = "lambda Z: Z * 0. + 2.67"\n')
 
             fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
 
@@ -234,19 +240,13 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#met NLAYER = %d\n' % nlayer)
             fid.write('# BROCHER2005\n')
             fid.write(
-                '#met VPvs = "def VPvs(VS):'
-                'return  0.9409 '
-                '+ 2.0947 * VS '
-                '- 0.8206 * VS ** 2.0 '
-                '+ 0.2683 * VS ** 3.0 '
-                '- 0.0251 * VS ** 4.0"  \n')
+               '#met VPvs = "lambda VS: '
+               '0.9409 + 2.0947 * VS - 0.8206 * VS ** 2.0 + 0.2683 * VS ** 3.0 '
+               '- 0.0251 * VS ** 4.0"\n')
             fid.write(
-                '#met RHvp = "def RHvp(VP):'
-                'return  1.6612 * VP '
-                '- 0.4721 * VP ** 2.0 '
-                '+ 0.0671 * VP ** 3.0 '
-                '- 0.0043 * VP ** 4.0 '
-                '+ 0.000106 * VP ** 5.0" \n')
+                '#met RHvp = "lambda VP: '
+                '1.6612 * VP - 0.4721 * VP ** 2.0 + 0.0671 * VP ** 3.0 '
+                '- 0.0043 * VP ** 4.0 + 0.000106 * VP ** 5.0"\n')
 
             fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
 
@@ -263,33 +263,45 @@ def write_default_paramfile(nlayer, zbot,
         raise NotImplementedError('no such parameter file type implemented %s' % which_parameterizer)
 
 
-def load_paramfile(paramfile):
+def load_paramfile(paramfile, verbose=True):
     """initiate one of the parameterizer and prior pdf according to the param file"""
-    A = AsciiFile(paramfile)
+    if os.path.isfile(paramfile):
+        A = AsciiFile(paramfile)
+    elif "#fld" in paramfile:
+        A = AsciiFile_fromstring(paramfile)
+    else:
+        raise ValueError
 
+    # ==========================
     if A.metadata['TYPE'] == "mZVSVPRH":
-        p = Parameterizer_mZVSVPRH(A)
+        parameterizer = Parameterizer_mZVSVPRH(A)
+
     elif A.metadata['TYPE'] == "mZVSPRRH":
-        p = Parameterizer_mZVSPRRH(A)
+        parameterizer = Parameterizer_mZVSPRRH(A)
+
     elif A.metadata['TYPE'] == "mZVSPRzRHvp":
-        p = Parameterizer_mZVSPRzRHvp(A)
+        parameterizer = Parameterizer_mZVSPRzRHvp(A)
+
     elif A.metadata['TYPE'] == "mZVSPRzRHz":
-        p = Parameterizer_mZVSPRzRHz(A)
+        parameterizer = Parameterizer_mZVSPRzRHz(A)
+
     elif A.metadata['TYPE'] == "mZVSVPvsRHvp":
-        p = Parameterizer_mZVSVPvsRHvp(A)
+        parameterizer = Parameterizer_mZVSVPvsRHvp(A)
+
     else:
         raise Exception('could not load %s (TYPE not recognized)' % paramfile)
 
+    # ==========================
     if not "PRIORTYPE" in A.metadata.keys():
-        logRHOM = DefaultLogRhoM(p)
+        logRHOM = DefaultLogRhoM(parameterizer)
 
     elif A.metadata['PRIORTYPE'] == "DVS":
-        logRHOM = LogRhoM_DVS(p,
+        logRHOM = LogRhoM_DVS(parameterizer,
                     dvsmin=A.metadata['DVSMIN'],
                     dvsmax=A.metadata['DVSMAX'])
 
     elif A.metadata['PRIORTYPE'] == "DVPDVSDRH":
-        logRHOM = LogRhoM_DVPDVSDRH(p,
+        logRHOM = LogRhoM_DVPDVSDRH(parameterizer,
                     dvpmin=A.metadata['DVPMIN'],
                     dvpmax=A.metadata['DVPMAX'],
                     dvsmin=A.metadata['DVSMIN'],
@@ -298,7 +310,7 @@ def load_paramfile(paramfile):
                     drhmax=A.metadata['DRHMAX'])
 
     elif A.metadata['PRIORTYPE'] == "DVPDVSDRHDPR":
-        logRHOM = LogRhoM_DVPDVSDRHDPR(p,
+        logRHOM = LogRhoM_DVPDVSDRHDPR(parameterizer,
                     dvpmin=A.metadata['DVPMIN'],
                     dvpmax=A.metadata['DVPMAX'],
                     dvsmin=A.metadata['DVSMIN'],
@@ -310,9 +322,10 @@ def load_paramfile(paramfile):
     else:
         raise Exception('could not load %s (PRIORTYPE not recognized)' % paramfile)
 
-    print("parameter type : ", p.__class__.__name__)
-    print ("prior type     : ", logRHOM.__class__.__name__)
-    return p, logRHOM
+    if verbose:
+        print("parameter type : ", parameterizer.__class__.__name__)
+        print("prior type     : ", logRHOM.__class__.__name__)
+    return parameterizer, logRHOM
 
 
 if __name__ == "__main__":

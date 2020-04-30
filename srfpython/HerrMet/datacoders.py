@@ -71,11 +71,21 @@ class Datacoder_log(Datacoder):
         return values
 
 
-def makedatacoder(s96, which=Datacoder_log):
-    if os.path.exists(s96):
-        s = surf96reader(s96)
+def makedatacoder(surf96filename, which=Datacoder_log):
+    """
+    :param surf96filename:
+    :type surf96filename: str
+    :param which: which datacoder to use
+    :type which: type
+    :return:
+    """
+    if not isinstance(which, type):
+        raise TypeError("which must be the class of the datacoder to use")
+
+    if os.path.exists(surf96filename):
+        s = surf96reader(surf96filename)
     else:
-        s = surf96reader_from_surf96string(s96)
+        s = surf96reader_from_surf96string(surf96filename)
 
     waves, types, modes, freqs, values, dvalues = s.wtmfvd()
     return which(waves, types, modes, freqs, values, dvalues)
