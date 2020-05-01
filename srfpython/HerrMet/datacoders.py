@@ -7,6 +7,17 @@ see theory.py
 """
 
 
+def log_nofail(x):
+    if np.isnan(x):
+        return x
+    elif x < 0.:
+        return np.nan
+    elif x == 0.:
+        return -np.inf
+    else:
+        return np.log(x)
+
+
 class Datacoder(object):
     def __init__(self, waves, types, modes, freqs, values, dvalues):
         """init with the target data and uncertainty"""
@@ -40,24 +51,13 @@ class Datacoder(object):
         return d  # the default behavior is identity, see subclasses for advanced conversions
 
 
-def log_nofail(x):
-    if np.isnan(x):
-        return x
-    elif x < 0.:
-        return np.nan
-    elif x == 0.:
-        return -np.inf
-    else:
-        return np.log(x)
-
-
 class Datacoder_log(Datacoder):
     def __init__(self, waves, types, modes, freqs, values, dvalues):
         Datacoder.__init__(self, waves, types, modes, freqs, values, dvalues)
 
     def target(self):
-        dobs   = np.log(self.values)
-        CDinv  = (self.dvalues / self.values) ** -2.
+        dobs = np.log(self.values)
+        CDinv = (self.dvalues / self.values) ** -2.
         return dobs, CDinv
 
     def __call__(self, values):
@@ -77,7 +77,8 @@ def makedatacoder(surf96filename, which=Datacoder_log):
     :type surf96filename: str
     :param which: which datacoder to use
     :type which: type
-    :return:
+    :return datacoder: a datacoder object initialized from the data found in surf96filename
+    :rtype datacoder: DataCoder
     """
     if not isinstance(which, type):
         raise TypeError("which must be the class of the datacoder to use")
