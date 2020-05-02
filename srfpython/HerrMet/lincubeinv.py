@@ -13,7 +13,8 @@ from scipy.sparse import diags, csr_matrix, save_npz as save_sparse_npz, load_np
 
 """
 """
-rootdir = "/home/max/prog/git/srfpython/tutorials/02_cube_inversion_example/inversion"
+rootdir = "../../tutorials/02_cube_inversion_example/inversion"
+nodefile = "../../tutorials/02_cube_inversion_example/nodes.txt"
 # resample the aposteri median at ztop defined below
 ztop = np.linspace(0., 3.0, 30)
 # povide the parameters used for the aposteriory pdf extraction
@@ -22,17 +23,26 @@ extract_limit = 1000
 extract_llkmin = 0
 extract_step = 1
 
-# search the extracted files
-search_path = \
-    HERRMETEXTRACTPDFMODELFILE.format(
-    rootname=os.path.join(rootdir, ROOTNAME.format(node="*")),
+# node file
+nf = NodeFile(nodefile, rootdir=rootdir)
+nf.fill_extraction_files(
     extract_mode=extract_mode,
     extract_limit=extract_limit,
     extract_llkmin=extract_llkmin,
-    extract_step=extract_step,
-    percentile=0.5)
+    extract_step=extract_step)
 
-extract_files = glob.glob(search_path)[:5]
+# exit()
+# # search the extracted files
+# search_path = \
+#     HERRMETEXTRACTPDFMODELFILE.format(
+#     rootname=os.path.join(rootdir, ROOTNAME.format(node="*")),
+#     extract_mode=extract_mode,
+#     extract_limit=extract_limit,
+#     extract_llkmin=extract_llkmin,
+#     extract_step=extract_step,
+#     percentile=0.5)
+#
+# extract_files = glob.glob(search_path)[:5]
 # =====================================
 G_current_row = 0
 G_current_col = 0
@@ -42,16 +52,19 @@ G_fd_data = np.array([], float)
 CDinv_diag_data = np.array([], float)
 Dobs = np.array([], float)
 Dcalc = np.array([], float)
-for nnode, m96 in enumerate(extract_files):
 
-    # find the corresponding target file
-    s96 = HERRMETTARGETFILE.format(
-        rootname=os.path.dirname(m96))
-    s96 = os.path.join(rootdir, s96)
-    assert os.path.isfile(s96)
+# for nnode, m96 in enumerate(extract_files):
+for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(nf):
+
+    print(node, lon, lat)
+    print("    ", targetfile)
+    print("    ", paramfile)
+    print("    ", medianfile)
+    print("    ", p16file)
+    print("    ", p84file)
 
     # load the extracted file
-    dm = depthmodel_from_mod96(m96)
+    dm = depthmodel_from_mod96(medianfile)
 
     # resample to ztop
     vs = dm.vs.interp(ztop)
@@ -79,7 +92,7 @@ for nnode, m96 in enumerate(extract_files):
 
     # initiate the parameterizer and datacoder
     parameterizer, _ = load_paramfile(parameter_string, verbose=False)
-    datacoder = makedatacoder(s96, which=Datacoder_log)
+    datacoder = makedatacoder(targetfile, which=Datacoder_log)
 
     # initiate the theory operator (g)
     theory = Theory(parameterizer=parameterizer, datacoder=datacoder)

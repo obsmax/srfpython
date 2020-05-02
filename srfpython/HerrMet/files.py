@@ -25,15 +25,15 @@ HERRMETSTATSFILE = os.path.join("{rootname}", "_HerrMet.stats.png")
 # the name of the extraction files in each temporary directory
 HERRMETEXTRACTPDFMODELFILE = os.path.join(
     '{rootname}',
-    '_HerrMet.{extract_mode}_{extract_limit}_{extract_llkmin}_{extract_step}.p{percentile:.2f}.mod96')
+    '_HerrMet.{extract_mode:s}_{extract_limit:d}_{extract_llkmin:d}_{extract_step:d}.p{percentile:.2f}.mod96')
 
 HERRMETEXTRACTPDFDISPFILE = os.path.join(
     '{rootname}',
-    '_HerrMet.{extract_mode}_{extract_limit}_{extract_llkmin}_{extract_step}.p{percentile:.2f}.surf96')
+    '_HerrMet.{extract_mode:s}_{extract_limit:d}_{extract_llkmin:d}_{extract_step:d}.p{percentile:.2f}.surf96')
 
 HERRMETEXTRACTBESTMODELFILE = os.path.join(
     '{rootname}',
-    '_HerrMet.rank{rank}.modelid{modelid}.chainid{chainid}.llk{llk}.mod96')
+    '_HerrMet.rank{rank:d}.modelid{modelid:d}.chainid{chainid:d}.llk{llk:f}.mod96')
 
 # the rootnames to use as default in several plugins
 DEFAULTROOTNAMES = os.path.dirname(HERRMETTARGETFILE.format(rootname=ROOTNAME.format(node="*")))
