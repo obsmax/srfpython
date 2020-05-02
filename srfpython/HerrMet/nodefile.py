@@ -98,23 +98,28 @@ class NodeFileString(object):
         self.p16files = np.asarray(self.p16files, str)
         self.p84files = np.asarray(self.p84files, str)
 
+    def copy(self):
+        import copy
+        return copy.deepcopy(self)
+
     def __iter__(self):
-        self._current = 0
+        # warning does not work for double iteration
+        self._iter_index = 0
         return self
 
     def __next__(self):
-        if self._current >= len(self):
+        if self._iter_index >= len(self):
             raise StopIteration
 
-        out = [self.nodes[self._current],
-               self.lons[self._current],
-               self.lats[self._current],
-               self.targetfiles[self._current],
-               self.paramfiles[self._current],
-               self.medianfiles[self._current],
-               self.p16files[self._current],
-               self.p84files[self._current]]
-        self._current += 1
+        out = [self.nodes[self._iter_index],
+               self.lons[self._iter_index],
+               self.lats[self._iter_index],
+               self.targetfiles[self._iter_index],
+               self.paramfiles[self._iter_index],
+               self.medianfiles[self._iter_index],
+               self.p16files[self._iter_index],
+               self.p84files[self._iter_index]]
+        self._iter_index += 1
         return out
 
     next = __next__  # python 2
