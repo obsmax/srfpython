@@ -115,7 +115,6 @@ def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
     :return:
     """
     """converts output from max_srfdis96"""
-    print(srfdis96stdout)
     periods = 1. / freqs
 
     # ==== transform the input string
