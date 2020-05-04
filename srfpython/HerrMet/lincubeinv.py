@@ -1,5 +1,5 @@
 from __future__ import print_function
-from builtins import  input
+from builtins import input
 import sys, glob, os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,16 +17,16 @@ from scipy.sparse import diags, csr_matrix, csc_matrix, save_npz as save_sparse_
 rootdir = "../../tutorials/02_cube_inversion_example/inversion"
 nodefile = "../../tutorials/02_cube_inversion_example/nodes.txt"
 # resample the aposteri median at ztop defined below
-#ztop = np.linspace(0., 3.0, 50)
-ztop = depthspace(3, 12)
+ztop = np.linspace(0., 3.0, 30)
+# ztop = depthspace(3, 12)
 # povide the parameters used for the aposteriory pdf extraction
 extract_mode = "best"
 extract_limit = 1000
 extract_llkmin = 0
 extract_step = 1
 
-horizontal_smoohting_distance = 50.0 * np.ones_like(ztop)  # one smoothing distance per layer
-vertical_smoothing_distance = 1.
+horizontal_smoohting_distance = 5000.0 * np.ones_like(ztop)  # one smoothing distance per layer
+vertical_smoothing_distance = 2000.0
 
 # node file
 nf = NodeFile(nodefile, rootdir=rootdir)
@@ -76,7 +76,7 @@ for n in range(len(nf)):
 
     # determine the vertical correlation coeff in cell n
     if vertical_smoothing_distance > 0:
-        rhonn = np.exp(-np.abs(ztop - ztop[:, np.newaxis]) / vertical_smoothing_distance)
+        rhonn = np.exp(-0.5 * ((ztop - ztop[:, np.newaxis]) / vertical_smoothing_distance) ** 2.)
         covnn = vs_unc_n[:, np.newaxis] * vs_unc_n * rhonn
 
         row_ind, col_ind = np.meshgrid(range(len(ztop)), range(len(ztop)))
@@ -103,7 +103,7 @@ for n in range(len(nf)):
         # vs_unc_m = np.ones_like(vs_unc_m)  ################### test
 
         dnm = haversine(lonn, latn, lonm, latm)
-        rhonm_diags = np.exp(-dnm / horizontal_smoohting_distance)
+        rhonm_diags = np.exp(-(dnm / horizontal_smoohting_distance) ** 2.)
         covnm_diags = vs_unc_n * vs_unc_m * rhonm_diags
 
         CM_row_ind = np.hstack((CM_row_ind, n * len(ztop) + np.arange(len(ztop))))
@@ -122,6 +122,7 @@ if False:
     plt.figure()
     plt.imshow(CM)
     plt.show()
+    exit()
 save_sparse_npz('CM.npz', CM)
 
 # from scipy.sparse.linalg import inv as sparseinv
@@ -139,7 +140,9 @@ G_col_ind = np.array([], int)
 G_fd_data = np.array([], float)
 CDinv_diag_data = np.array([], float)
 Dobs = np.array([], float)
-Dcalc = np.array([], float)
+Mprior = np.array([], float)
+parameterizer_strings = []
+datacoder_strings = []
 for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(nf):
 
     print(node, lon, lat)
@@ -182,6 +185,9 @@ for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file)
         parameter_string += "VS{} {} {}\n".format(i, vs[i]-0.01, vs[i]+0.01)
 
     # initiate the parameterizer and datacoder
+    parameterizer_strings.append(parameter_string)
+    with open(targetfile, 'r') as fid:
+        datacoder_strings.append("".join(fid.readlines()))
     parameterizer, _ = load_paramfile(parameter_string, verbose=False)
     datacoder = makedatacoder(targetfile, which=Datacoder_log)
 
@@ -191,7 +197,7 @@ for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file)
     # compute Frechet derivatives near parameterizer.MMEAN
     m = parameterizer.MMEAN
     gm = theory(m)
-    Dcalc = np.concatenate((Dcalc, gm))
+    Mprior = np.concatenate((Mprior, m))
 
     fd = theory.frechet_derivatives(m=m, gm=gm)
     fd_col_ind, fd_row_ind = np.meshgrid(range(fd.shape[1]), range(fd.shape[0]))
@@ -224,29 +230,32 @@ for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file)
 G = csr_matrix((G_fd_data, (G_row_ind, G_col_ind)), shape=(G_current_row, G_current_col))
 CD = diags(CDinv_diag_data ** -1.0, offsets=0, format="csr", dtype=float)
 CDinv = diags(CDinv_diag_data, offsets=0, format="csr", dtype=float)
-
+parameterizer_strings = np.asarray(parameterizer_strings, str)
+datacoder_strings = np.asarray(datacoder_strings, str)
 # np.save('CDinv_diag.npy', CDinv_diag, allow_pickle=False)
 save_sparse_npz('G.npz', G)
 save_sparse_npz('CD.npz', CDinv)
 save_sparse_npz('CDinv.npz', CDinv)
 np.save('Dobs.npy', Dobs, allow_pickle=False)
-np.save('Dcalc.npy', Dcalc, allow_pickle=False)
+np.save('Mprior.npy', Mprior, allow_pickle=False)
+np.save('paramterizer_strings.npy', parameterizer_strings, allow_pickle=False)
+np.save('datacoder_strings.npy', datacoder_strings, allow_pickle=False)
 
 
-# =============================
-del G
-del CDinv
-G = load_sparse_npz('G.npz')
-#CDinv_diag = np.load('CDinv_diag.npy')
-CDinv = load_sparse_npz('CDinv.npz')
-Dobs = np.load('Dobs.npy')
-Dcalc = np.load('Dcalc.npy')
-
-
-if False:
-    input('sure?')
-    G = G.toarray()
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.imshow(G) #.toarray())
-    plt.show()
+# # =============================
+# del G
+# del CDinv
+# G = load_sparse_npz('G.npz')
+# #CDinv_diag = np.load('CDinv_diag.npy')
+# CDinv = load_sparse_npz('CDinv.npz')
+# Dobs = np.load('Dobs.npy')
+# Dcalc = np.load('Dcalc.npy')
+#
+#
+# if False:
+#     input('sure?')
+#     G = G.toarray()
+#     import matplotlib.pyplot as plt
+#     plt.figure()
+#     plt.imshow(G) #.toarray())
+#     plt.show()
