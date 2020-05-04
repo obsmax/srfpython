@@ -14,3 +14,12 @@
 srfpython/Herrmann/bin/max_srfdis96
 srfpython/Herrmann/bin/max_srfpre96
 /tutorials/02_cube_inversion_example/inversion/
+/srfpython/HerrMet/CM.npz
+/srfpython/HerrMet/CDinv.npz
+/srfpython/HerrMet/_HerrMet.param
+/srfpython/HerrMet/CD.npz
+/srfpython/HerrMet/datacoder_strings.npy
+/srfpython/HerrMet/Dobs.npy
+/srfpython/HerrMet/G.npz
+/srfpython/HerrMet/Mprior.npy
+/srfpython/HerrMet/paramterizer_strings.npy
