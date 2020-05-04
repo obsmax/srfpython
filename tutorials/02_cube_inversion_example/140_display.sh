@@ -12,7 +12,7 @@ do
       -m96 ../models/$node.mod96 \
       -png \
       || exit 1 ;
-#      -overdisp \
+# -overdisp \
 done
 eog _HerrMet_*/_HerrMet.png
 

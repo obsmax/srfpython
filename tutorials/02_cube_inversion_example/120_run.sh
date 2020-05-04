@@ -19,5 +19,5 @@ cd inversion || exit 1;
 
 HerrMet -w 8 --run  \
     -mode restart \
-    -nchain 8 \
+    -nchain 4 \
     -nkeep 1000

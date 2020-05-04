@@ -11,5 +11,3 @@ mkdir --parents data
 rm -f data/node???.surf96
 
 mv ./node???.surf96 data/
-
-m96 --disp node014.mod96 -RU0 0.2 2.0 20 plog -RU1 0.2 2.0 20 plog
