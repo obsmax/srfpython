@@ -126,10 +126,6 @@ def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
     # strip
     srfdis96stdout = srfdis96stdout.strip().rstrip('\n').split('\n')
 
-    # add one more space for mode numbers higher than 10
-    # TODO fix that directly in srfdis96
-    # srfdis96stdout = [_[:2] + " " + _[2:] for _ in srfdis96stdout]
-
     # concatenate rows
     srfdis96stdout = (" ".join(srfdis96stdout)).split()
 
@@ -160,6 +156,12 @@ def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
         C[nI] = np.sqrt(CC0[nI] * CC1[nI])   # Jeffreys average #A[nI,4:6].mean(axis = 1)
         LnI = (log(CC1[nI]) - log(CC0[nI])) / (log(T1A[nI]) - log(T1B[nI]))
         U[nI] = C[nI] / (1. - LnI)
+
+        # for overtones near the cut-off period
+        # one can get same values for CC0 and CC1 => which leads to U=C
+        # it seems innacurate
+        J = nI & (CC0 == CC1) & (M > 0)
+        U[J] = np.nan
 
     # arange available data
     umodes = np.arange(max(modes) + 1)
