@@ -106,20 +106,42 @@ def argcrossfind(X, Y):
 
 
 def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
+    """
+    :param srfdis96stdout:
+    :param waves:
+    :param types:
+    :param modes:
+    :param freqs:
+    :return:
+    """
     """converts output from max_srfdis96"""
-    periods = 1./freqs
+    print(srfdis96stdout)
+    periods = 1. / freqs
 
-    srfdis96stdout = srfdis96stdout.replace('**************', ' 0            ') #??? what the fuck
+    # ==== transform the input string
+    # remove artifacts whose origin is not known...
+    srfdis96stdout = srfdis96stdout.replace(
+        '**************', ' 0            ')  # ??? what the fuck
+
+    # strip
     srfdis96stdout = srfdis96stdout.strip().rstrip('\n').split('\n')
-    srfdis96stdout = [_[:2] + " " + _[2:] for _ in srfdis96stdout] # add one more space for mode numbers higher than 10
 
-    A = (" ".join(srfdis96stdout)).split()
-    W   = np.asarray(A[::6],  int)-1  # wave type 0 = Love, 1 = Rayleigh
-    M   = np.asarray(A[1::6], int)    # (iq-1) mode number, 0 = fundamental
-    T1A = np.asarray(A[2::6], float)  # t1 if phase only else lower period = t1/(1+h), in s
-    T1B = np.asarray(A[3::6], float)  # 0. if phase only else upper period = t1/(1-h), in s;
-    CC0 = np.asarray(A[4::6], float)  # phase velocity at t1 if phase only else at t1a, in km/s;
-    CC1 = np.asarray(A[5::6], float)  # phase velocity at t1 if phase only else at t1b, in km/s;
+    # add one more space for mode numbers higher than 10
+    # TODO fix that directly in srfdis96
+    # srfdis96stdout = [_[:2] + " " + _[2:] for _ in srfdis96stdout]
+
+    # concatenate rows
+    srfdis96stdout = (" ".join(srfdis96stdout)).split()
+
+    # ==== load data
+    W   = np.asarray(srfdis96stdout[::6],  int)-1  # wave type 0 = Love, 1 = Rayleigh
+    M   = np.asarray(srfdis96stdout[1::6], int)    # (iq-1) mode number, 0 = fundamental
+    T1A = np.asarray(srfdis96stdout[2::6], float)  # t1 if phase only else lower period = t1/(1+h), in s
+    T1B = np.asarray(srfdis96stdout[3::6], float)  # 0. if phase only else upper period = t1/(1-h), in s;
+    CC0 = np.asarray(srfdis96stdout[4::6], float)  # phase velocity at t1 if phase only else at t1a, in km/s;
+    CC1 = np.asarray(srfdis96stdout[5::6], float)  # phase velocity at t1 if phase only else at t1b, in km/s;
+    print(W)
+    print(M)
 
     n = len(W)
     I = T1B == 0.  # True means phase only
