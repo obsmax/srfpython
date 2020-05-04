@@ -29,6 +29,7 @@ def smoothinv(xi, di, si,
 
     CmGT = np.dot(Cm, G.T)
     Sinv = np.linalg.inv(Cd + np.dot(G, CmGT))
+    # Sinv = np.diag(np.diag(Sinv)) # ???
 
     model = modelprior + np.dot(CmGT, np.dot(Sinv, (di - np.dot(G, modelprior))))
 
@@ -59,8 +60,9 @@ if __name__ == '__main__':
     correlation_length = 0.1
     smoothinv(xi, di, si, xmodel, modelprior, sigmamodel, correlation_length)
 
-    correlation_length = 2.0
+    correlation_length = 0.5
     smoothinv(xi, di, si, xmodel, modelprior, sigmamodel, correlation_length)
+
     # modelprior = smoothinv(xi, di, si, xmodel, modelprior, sigmamodel, correlation_length)
     # modelprior = smoothinv(xi, di, si, xmodel, modelprior, sigmamodel, correlation_length)
     # modelprior = smoothinv(xi, di, si, xmodel, modelprior, sigmamodel, correlation_length)
