@@ -39,7 +39,7 @@ default_dpi = 100
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-compact", "-ftsz", "-inline", "-ritt"]
+authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-compact", "-ftsz", "-inline", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
@@ -63,6 +63,7 @@ long_help = """\
     -compact         display only vs and the dispersion curves, default False
     -ftsz  i         set font size, default {default_fontsize}
     -inline          do not pause (use in jupyter notebooks)
+    -h, -help        display the help message for this plugin     
     """.format(
                herrmetparamfilelocal=HERRMETPARAMFILELOCAL,
                default_rootnames=default_rootnames,
@@ -365,9 +366,6 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
             except Exception as e:
                 print('could not read or display %s (reason : %s)' % (m96, str(e)))
 
-    # if "-ritt" in argv.keys():
-    #     a = AsciiFile('/mnt/labex2/home/max/data/boreholes/GRT1/GRT1.logsonic')
-    #
     #     for what, where in zip([a.data['VS'], a.data['VP'], a.data['VP']/a.data['VS']], [rd.axdepth['VS'], rd.axdepth['VP'], rd.axdepth['PR']]):
     #         if where is not None:
     #             where.plot(what, a.data['TVD']/1000., "m", alpha=0.5)
@@ -412,6 +410,10 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
 
 # ------------------------------
 def display(argv, verbose, mapkwargs):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
 
     for k in argv.keys():
         if k in ['main', "_keyorder"]:

@@ -24,7 +24,7 @@ default_top_llkmin = 0.
 default_top_step = 1
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-pdf", "-top"]
+authorized_keys = ["-pdf", "-top", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--extract    compute and write posterior pdf"
@@ -42,6 +42,7 @@ long_help = """\
                      second argument = lowest log likelihood value to include (<=0.0, 0.0 means all)  
                      third argument = include only one model over "step" (>=1)
                      default {default_top_limit} {default_top_llkmin} {default_top_step}
+    -h, -help        display the help message for this plugin 
 """.format(default_rootnames=default_rootnames,
            default_extract_mode=default_extract_mode,
            default_extract_limit=default_extract_limit,
@@ -229,6 +230,11 @@ def _extract_top(rootname, extract_limit, extract_llkmin, extract_step, verbose)
 
 
 def extract(argv, verbose, mapkwargs):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
+
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
             continue  # private keys

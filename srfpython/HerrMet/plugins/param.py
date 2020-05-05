@@ -11,7 +11,7 @@ default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRz
 default_parameterization = default_parameterization_list[0]
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-basedon", "-t", "-dvp", "-dvs", "-drh", "-dpr", "-growing", "-op"]
+authorized_keys = ["-basedon", "-t", "-dvp", "-dvs", "-drh", "-dpr", "-growing", "-op", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--param      create a template parameterization file"
@@ -55,6 +55,7 @@ long_help = """\
     -dpr     f f     add prior constraint on the vp/vs offset between layers, idem, no unit
     -growing         shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0.
     -op              force overwriting {herrmetparamfilelocal} if exists
+    -h, -help        display the help message for this plugin 
     """.format(herrmetparamfilelocal=HERRMETPARAMFILELOCAL,
                default_parameterization_list=default_parameterization_list,
                default_parameterization=default_parameterization)
@@ -85,6 +86,10 @@ HerrMet --send
 
 # ------------------------------
 def param(argv):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
 
     for k in argv.keys():
         if k in ['main', "_keyorder"]:

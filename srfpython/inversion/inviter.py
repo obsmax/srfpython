@@ -74,7 +74,7 @@ def lininvsmooth(xi, di, si, xmodel, modelprior, sigmamodel,
     for _ in range(100):
 
         Gi = FD(modeli)
-        if n < m:
+        if n <= m:
             # over determined problem
             CmGiT = np.dot(Cm, Gi.T)
             Siinv = np.linalg.inv(Cd + np.dot(Gi, CmGiT))

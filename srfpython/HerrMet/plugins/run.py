@@ -16,7 +16,7 @@ default_nchain = 12
 default_nkeep = 100
 default_mode = "skip"
 # ------------------------------ autorized_keys
-authorized_keys = ["-mode", "-nchain", "-nkeep"]
+authorized_keys = ["-mode", "-nchain", "-nkeep", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--run        invert dispersion data using the Markov Chain Monte Carlo method"
@@ -29,7 +29,8 @@ long_help = """\
                      skip     : ignore rootnames with existsing run file(s)               
     -nchain  i       number of chains to use, default {default_nchain}
     -nkeep   i       number of models to keep per chain, default {default_nkeep}
-    [use -w option before --run to control the maximum number of chains to run simultaneously]   
+    -h, -help        display the help message for this plugin
+    [use -w option before --run to control the maximum number of chains to run simultaneously]
     """.format(default_rootnames=default_rootnames,
                default_mode=default_mode,
                default_nchain=default_nchain,
@@ -51,6 +52,10 @@ HerrMet -w 4 \\
 
 # ------------------------------
 def run(argv, verbose, mapkwargs):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
 
     for k in argv.keys():
         if k in ['main', "_keyorder"]:

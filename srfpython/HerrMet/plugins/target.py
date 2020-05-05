@@ -10,7 +10,7 @@ from srfpython.HerrMet.files import ROOTNAME, HERRMETTARGETFILE, \
 # ------------------------------ defaults
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-resamp", "-lunc", "-unc", "-ot"]
+authorized_keys = ["-resamp", "-lunc", "-unc", "-ot", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--target     set the target data, create temporary directories for each location"
@@ -29,6 +29,7 @@ long_help = """\
     -lunc    f       set constant uncertainties in log domain (uncertainty = value x lunc)
     -unc     f       set constant uncertainty in linear domain (uncertainty = unc)
     -ot              force overwriting the targetfiles if exist
+    -h, -help        display the help message for this plugin
     """.format(surf96file="AAAA.surf96",
                rootname=surf96filename_to_rootname("AAAA.surf96"))
 
@@ -58,7 +59,13 @@ HerrMet --display {rootname}
     herrmettargetfile=surf96filename_to_herrmettargetfile("/path/to/my/data/node???.surf96"),
     rootname=ROOTNAME.format(node="node???"))
 
+
 def target(argv, verbose):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
+
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
             continue  # private keys

@@ -9,18 +9,19 @@ from srfpython.HerrMet.files import ROOTNAME, DEFAULTROOTNAMES, HERRMETRUNFILE, 
 default_rootnames = DEFAULTROOTNAMES
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-stats", "-plot", "-delbad", "-delchains", "-inline"]
+authorized_keys = ["-stats", "-plot", "-delbad", "-delchains", "-inline", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--manage     summarize run file content, manage run results"
 
 long_help = """\
 --manage     s [s..] manage run results for given rootnames, default {default_rootnames}
-     -stats          prints detailed stats for each chain of each runfile 
-     -plot   [f]     display the convergence for every chain and every rootname, specify the lower bound
-     -inline         do not pause (jupyter)
-     -delbad f       delete bad models, log likelihood below a given threshold, no default
-     -delchains i [i...] delete one or more chains using their chainid
+    -stats           prints detailed stats for each chain of each runfile 
+    -plot   [f]      display the convergence for every chain and every rootname, specify the lower bound
+    -inline          do not pause (jupyter)
+    -delbad f        delete bad models, log likelihood below a given threshold, no default
+    -delchains i [i...] delete one or more chains using their chainid
+    -h, -help        display the help message for this plugin 
       
 """.format(default_rootnames=default_rootnames)
 
@@ -43,6 +44,11 @@ HerrMet --manage -delbad -25 -delchains 8 11 14
 
 # ------------------------------
 def manage(argv, verbose, mapkwargs):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
+
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
             continue  # private keys

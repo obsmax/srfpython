@@ -13,14 +13,14 @@ if "-png" in sys.argv[1:]: matplotlib.use('agg')
 from srfpython.utils import readargv1
 from srfpython.Herrmann.Herrmann import check_herrmann_codes
 from srfpython.HerrMet.plugins import target, param, send, run, \
-    manage, extract, display, default
+    manage, extract, display, optimize, default
+from srfpython.HerrMet.files import DEFAULTROOTNAMES
 
 check_herrmann_codes()
 
 # -------------------------------------
 version = "6.0"
-default_verbose=1
-from srfpython.HerrMet.files import DEFAULTROOTNAMES
+default_verbose = 1
 default_rootnames = DEFAULTROOTNAMES
 default_nworkers = None
 default_taskset = None
@@ -41,10 +41,13 @@ authorized_keys = \
      "--run",
      "--manage",
      "--extract",
-     "--display"]
+     "--display",
+     "--optimize",
+     "--default",]
 
 # -------------------------------------
 help = '''HerrMet V{version}
+
 # ------- main options (s=string, i=int, f=float)
 -version, -v          version number, quit
 -help, -h   [s...]    help, provide plugin names for details, quit
@@ -53,7 +56,11 @@ help = '''HerrMet V{version}
 -taskset     s        affinity, e.g. "0-3", default {default_taskset}
 -lowprio              run processes with low priority if mentioned
 -verbose     i        reduce verbosity, 0/1, default {default_verbose}
-# ------- plugins, use --help plugin [plugin ...] for details
+
+# ------- plugins, for details
+#         use HerrMet -help plugin [plugin ...]  
+#         or HerrMet --[plugin] -help
+#         or HerrMet -example plugin [plugin ...] 
 {target_help}
 {param_help}
 {send_help}
@@ -61,6 +68,8 @@ help = '''HerrMet V{version}
 {manage_help}
 {extract_help}
 {display_help}
+{optimize_help}
+{default_help}
 '''.format(
     version=version,
     default_nworkers=default_nworkers,
@@ -72,7 +81,9 @@ help = '''HerrMet V{version}
     run_help=run.short_help,
     manage_help=manage.short_help,
     extract_help=extract.short_help,
-    display_help=display.short_help)
+    display_help=display.short_help,
+    optimize_help=optimize.short_help,
+    default_help=default.short_help)
 
 
 # -------------------------------------
@@ -187,3 +198,11 @@ if __name__ == "__main__":
     # ------
     if "--display" in argv.keys():
         display.display(argv['--display'], verbose, mapkwargs)
+
+    # ------
+    if "--optimize" in argv.keys():
+        optimize.optimize(argv['--optimize'], verbose, mapkwargs)
+
+    # ------
+    if "--default" in argv.keys():
+        default.default(argv['--default'], verbose, mapkwargs)

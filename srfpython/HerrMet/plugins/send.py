@@ -6,7 +6,7 @@ import os, glob
 default_rootnames = DEFAULTROOTNAMES
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-op"]
+authorized_keys = ["-op", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--send       send the parameterization to the temporary directories"
@@ -15,6 +15,7 @@ long_help = """\
 --send       s [s..] send the custom parameterization file {herrmetparamfilelocal} to the specified rootnames, 
                      default {default_rootnames}
     -op              force overwriting {herrmetparamfile} if exists
+    -h, -help        display the help message for this plugin
     """.format(
     herrmetparamfilelocal=HERRMETPARAMFILELOCAL,
     herrmetparamfile=HERRMETPARAMFILE.format(rootname='[rootname]'),
@@ -26,6 +27,11 @@ example = ""
 
 # ------------------------------
 def send(argv, verbose):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
+
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
             continue  # private keys
