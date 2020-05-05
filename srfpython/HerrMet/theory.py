@@ -1,7 +1,8 @@
+import warnings
+import numpy as np
 from srfpython.Herrmann.Herrmann import HerrmannCallerFromLists
 from srfpython.HerrMet.parameterizers import Parameterizer
 from srfpython.HerrMet.datacoders import Datacoder
-import numpy as np
 
 """
 Parameterizer : object to convert an array of parameters into smth that can be understood by Herrmann.dispersion
@@ -69,7 +70,9 @@ class Theory(object):
             gm = self.__call__(m)
 
         if np.isnan(gm).any():
-            raise ValueError('g(m) contains nans')
+            # probably because some freq points are above the cut off period
+            warnings.warn('g(m) contains nans')
+            # raise ValueError('g(m) contains nans')
 
         if np.isinf(gm).any():
             raise ValueError('g(m) contains infs')
@@ -85,10 +88,13 @@ class Theory(object):
             mj[j] += deltam[j]
             gmj = self.__call__(mj)
             if np.isnan(gmj).any() or np.isinf(gmj).any():
-                raise ValueError('g(m+dm) contains nans of infs')
+                # probably because some freq points are above the cut off period
+                warnings.warn('g(m+dm) contains nans of infs')
+                # raise ValueError('g(m+dm) contains nans of infs')
 
             fd[:, j] = (gmj - gm) / deltam[j]
 
+        fd[np.isnan(fd)] = 0.
         return fd
 
 

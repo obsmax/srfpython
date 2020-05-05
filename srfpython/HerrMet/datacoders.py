@@ -1,4 +1,4 @@
-from srfpython.depthdisp.dispcurves import surf96reader, surf96reader_from_surf96string
+from srfpython.depthdisp.dispcurves import surf96reader, surf96reader_from_surf96string, mklaws
 import numpy as np
 import os
 
@@ -43,12 +43,23 @@ class Datacoder(object):
 
     def __call__(self, values):
         """converts dispersion values into a data array d"""
-        # assert len(values) == self.npoints
-        return values  # the default behavior is identity, see subclasses for advanced conversions
+        # the default behavior is identity, see subclasses for advanced conversions
+        d = values
+        return d
 
     def inv(self, d):
         """converts a data array d into dispersion values"""
-        return d  # the default behavior is identity, see subclasses for advanced conversions
+        # the default behavior is identity, see subclasses for advanced conversions
+        values = d
+        return values
+
+    def inv_to_laws(self, d):
+        values = self.inv(d)
+        laws = mklaws(
+            waves=self.waves, types=self.types,
+            modes=self.modes, freqs=self.freqs,
+            values=values, dvalues=self.dvalues)
+        return laws
 
 
 class Datacoder_log(Datacoder):
@@ -62,9 +73,8 @@ class Datacoder_log(Datacoder):
 
     def __call__(self, values):
         assert len(values) == len(self.values)
-        return np.asarray(map(log_nofail, values), float)
-        # d = np.log(values)
-        # return d
+        d = np.asarray(map(log_nofail, values), float)
+        return d
 
     def inv(self, d):
         values = np.exp(d)

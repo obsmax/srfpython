@@ -159,6 +159,13 @@ class Parameterizer(object):
         """
         raise NotImplementedError  # the default behavior, each subclass must define this method
 
+    def inv_to_depthmodel(self, m):
+        """same as inv but pack output into a depthmodel object
+        do not subclass"""
+        ztop, vp, vs, rh = self.inv(m)
+        dm = depthmodel_from_arrays(ztop, vp, vs, rh)
+        return dm
+
     def prior(self, ZTOP_apr, VP_apr, VS_apr, RH_apr):
         """
         to be used for linearized inversion (HerrLin)
