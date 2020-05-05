@@ -1,12 +1,19 @@
 import os
 import numpy as np
 from srfpython.HerrMet.files import ROOTNAME, HERRMETPARAMFILE, HERRMETTARGETFILE, HERRMETEXTRACTPDFMODELFILE
-
+from srfpython.standalone.asciifile import AsciiFile_fromstring
 
 """
 a node file is an ascii file with 3 columns and one line header 
 
-# longitude_deg latitude_deg node
+#met rootdir = "."
+#met extract_mode = "best"
+#met extract_limit = 1000
+#met extract_llkmin = 0
+#met extract_step = 1
+#fld longitude latitude node
+#unt deg       deg      -
+#fmt %f        %f       %s
 12.132131 45.355425434 node0001
 22.132131 35.355425434 node0002
 32.132131 25.355425434 node0003
@@ -17,29 +24,35 @@ a node file is an ascii file with 3 columns and one line header
 class NodeFileString(object):
     def __init__(self, string, rootdir="."):
         """
-
         :param string:
         """
-        assert os.path.isdir(rootdir)
-        self.rootdir = rootdir
-        lines = string.split('\n')
+        a = AsciiFile_fromstring(string)
 
-        lons, lats, nodes = [], [], []
-        paramfiles = []
-        targetfiles = []
+        self.lons = np.asarray(a.data['longitude'], float)
+        self.lats = np.asarray(a.data['latitude'], float)
+        self.nodes = np.asarray(a.data['node'], str)
 
-        for line in lines:
-            line = line.strip()
-            if line.startswith("#"):
-                continue
+        # the file rootdir is relative to the file location, stack
+        self.rootdir = os.path.join(rootdir, a.metadata['rootdir'])
+        self.extract_mode = a.metadata['extract_mode']
+        self.extract_limit = a.metadata['extract_limit']
+        self.extract_llkmin = a.metadata['extract_llkmin']
+        self.extract_step = a.metadata['extract_step']
 
-            if not len(line):
-                continue
+        if not os.path.isdir(self.rootdir):
+            raise IOError()
 
-            lon, lat, node = line.split()
-            lons.append(lon)
-            lats.append(lat)
-            nodes.append(node)
+        if not len(self.nodes) == len(np.unique(self.nodes)):
+            raise ValueError('node names are not unique')
+
+        n = len(self.lons)
+        self.paramfiles = np.zeros(n, object)  # object for now
+        self.targetfiles = np.zeros(n, object)  # object for now
+        self.medianfiles = np.zeros(n, object)  # object for now
+        self.p16files = np.zeros(n, object)  # object for now
+        self.p84files = np.zeros(n, object)  # object for now
+
+        for i, (lon, lat, node) in enumerate(zip(self.lons, self.lats, self.nodes)):
 
             rootname = os.path.join(self.rootdir, ROOTNAME.format(node=node))
             paramfile = HERRMETPARAMFILE.format(rootname=rootname)
@@ -51,39 +64,23 @@ class NodeFileString(object):
             if not os.path.isfile(targetfile):
                 raise IOError(paramfile)
 
-            paramfiles.append(paramfile)
-            targetfiles.append(targetfile)
+            print(paramfile, self.paramfiles[i])
+            self.paramfiles[i] = paramfile
+            self.targetfiles[i] = targetfile
+        self.paramfiles = np.asarray(self.paramfiles, str)
+        self.targetfiles = np.asarray(self.targetfiles, str)
 
-        self.lons = np.asarray(lons, float)
-        self.lats = np.asarray(lats, float)
-        self.nodes = np.asarray(nodes, str)
-        self.paramfiles = np.asarray(paramfiles, str)
-        self.targetfiles = np.asarray(targetfiles, str)
-        self.medianfiles = np.zeros(len(lons), object)  # not str otherwise => type is set to |S1
-        self.p16files = np.zeros(len(lons), object)
-        self.p84files = np.zeros(len(lons), object)
-
-        if not len(self.nodes) == len(np.unique(self.nodes)):
-            raise ValueError('node names are not unique')
-
-    def fill_extraction_files(
-            self, extract_mode="best", extract_limit=1000,
-            extract_llkmin=0, extract_step=1):
-        """
-        :param extract_mode:
-        :param extract_limit:
-        :param extract_llkmin:
-        :param extract_step:
-        :return:
-        """
+    def fill_extraction_files(self):
 
         for n, node in enumerate(self.nodes):
             rootname = os.path.join(self.rootdir, ROOTNAME.format(node=node))
             for k, p in enumerate([0.16, 0.5, 0.84]):
                 f = HERRMETEXTRACTPDFMODELFILE.format(
-                    rootname=rootname, extract_mode=extract_mode,
-                    extract_limit=extract_limit, extract_llkmin=extract_llkmin,
-                    extract_step=extract_step, percentile=p)
+                    rootname=rootname,
+                    extract_mode=self.extract_mode,
+                    extract_limit=self.extract_limit,
+                    extract_llkmin=self.extract_llkmin,
+                    extract_step=self.extract_step, percentile=p)
                 if not os.path.isfile(f):
                     raise IOError(f)
 
@@ -128,6 +125,22 @@ class NodeFileString(object):
         return len(self.nodes)
 
     def __str__(self):
+        s = """# Nodefile for HerrMet
+        # directory where inversion is run (relative to this file)
+        #met rootdir = "{rootdir:s}"
+        # extraction parameters needed to locate the temporary files
+        #met extract_mode = "{extract_mode:s}"
+        #met extract_limit = {extract_limit:d}
+        #met extract_llkmin = {extract_llkmin:d}
+        #met extract_step = {extract_step:d}
+        #fld longitude latitude node
+        #unt deg       deg      -
+        #fmt %f        %f       %s""".format(
+            rootdir=self.rootdir,
+            extract_mode=self.extract_mode,
+            extract_limit=self.extract_limit,
+            extract_llkmin=self.extract_llkmin,
+            extract_step=self.extract_step)
         s = "# longitude_deg latitude_deg node\n"
         for lon, lat, node in zip(self.lons, self.lats, self.nodes):
             s += "{:f} {:f} {:s}\n".format(lon, lat, node)
@@ -139,12 +152,12 @@ class NodeFileString(object):
 
 
 class NodeFile(NodeFileString):
-    def __init__(self, filename, rootdir=None):
+    def __init__(self, filename):
         """
         :param filename:
         """
-        if rootdir is None:
-            rootdir = os.path.dirname(filename)
 
         with open(filename, "r") as fid:
-            NodeFileString.__init__(self, string="".join(fid.readlines()), rootdir=rootdir)
+            NodeFileString.__init__(self,
+                                    string="".join(fid.readlines()),
+                                    rootdir=os.path.dirname(filename))
