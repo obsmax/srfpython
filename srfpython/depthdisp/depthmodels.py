@@ -85,18 +85,36 @@ class depthmodel1D(object):
         return vv, zz
 
     # -------------------------------------------------
-    def show(self, ax, marker = "-", **kwargs): #halfspacemarker="-",
+    def fill_between(self, ax, other, **kwargs):
+        assert isinstance(other, depthmodel1D)
+
+        zz1, vv1 = self.stairs()
+        zz2, vv2 = other.stairs()
+        zz1[-1] = np.max([1.5 * self.z[-1], 3.0])  # cannot plot np.inf...
+        zz2[-1] = np.max([1.5 * other.z[-1], 3.0])  # cannot plot np.inf...
+
+        # zz = np.unique(np.concatenate((zz1, zz2)))
+        # vv1 = self.interp(zz)
+        # vv2 = other.interp(zz)
+
+        if not ax.yaxis_inverted():
+            ax.invert_yaxis()
+
+        y = np.hstack((zz1, zz2[::-1]))
+        x = np.hstack((vv1, vv2[::-1]))
+        #return ax.fill_betweenx(y=zz, x1=vv1, x2=vv2, **kwargs)
+        return ax.fill(x, y, **kwargs)
+
+    def show(self, ax, marker="-", **kwargs): #halfspacemarker="-",
 
         zz, vv = self.stairs()
         zz[-1] = np.max([1.5 * self.z[-1], 3.0]) #cannot plot np.inf...
 
-        hdl = ax.plot(vv, zz, marker, **kwargs)[0]
-        #hdl = ax.plot(vv[:-1], zz[:-1], marker, **kwargs)[0]
-        #kwargs["linestyle"] = halfspacemarker
-        #ax.plot(vv[-2:], zz[-2:], marker, **kwargs)
+        hdl, = ax.plot(vv, zz, marker, **kwargs)
 
         if not ax.yaxis_inverted():
             ax.invert_yaxis()
+
         return hdl
 
     # -------------------------------------------------

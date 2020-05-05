@@ -3,7 +3,7 @@
 #met extract_limit = 1000
 #met extract_llkmin = 0
 #met extract_step = 1
-#met ztop = "np.linspace(0., 3.0, 30)"
+#met ztop = "np.linspace(0., 3.0, 50)"
 #fld longitude latitude node
 #unt deg       deg      -
 #fmt %f        %f       %s

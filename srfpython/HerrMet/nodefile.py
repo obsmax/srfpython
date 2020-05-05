@@ -2,7 +2,7 @@ import os
 import numpy as np
 from srfpython.HerrMet.files import ROOTNAME, HERRMETPARAMFILE, HERRMETTARGETFILE, HERRMETEXTRACTPDFMODELFILE
 from srfpython.standalone.asciifile import AsciiFile_fromstring
-from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthspace
 
 
 NODEFILE_HEADER = """# Nodefile for HerrMet

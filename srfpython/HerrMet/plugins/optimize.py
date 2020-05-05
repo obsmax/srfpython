@@ -72,6 +72,7 @@ authorized_keys = ["-option",
                    "-data",
                    "-fd",
                    "-upd",
+                   "-show",
                    "-h", "-help"]
 
 # ------------------------------ help messages
@@ -298,12 +299,6 @@ def save_matrix(filename, matrix, verbose):
     assert os.path.isfile(filename)
 
 
-def get_propblem_size():
-    n = len(np.load(DOBSFILE.format(workingdir=WORKINGDIR)))
-    m = len(np.load(MPRIORFILE.format(workingdir=WORKINGDIR)))
-    return n, m
-
-
 class SuperParameterizer(object):
     def __init__(self, parameterizers):
         self.parameterizers = parameterizers
@@ -344,11 +339,27 @@ class SuperParameterizer(object):
             dms.append(self.parameterizers[nnode].inv_to_depthmodel(model))
         return dms
 
-    def show_models(self, ax, Model, *args, **kwargs):
-        for nnode, dm in enumerate(self.inv_to_depthmodels(Model)):
-            dm.vs.values += nnode  # offset
-            dm.vs.show(ax, *args, **kwargs)
-
+    def show_models(self, ax, Model, Munc=None, offset=3.0, **kwargs):
+        xticks = []
+        xticklabels = []
+        vsticks = np.array([1., 2., 3.])
+        vsticklabels = ['1', '2', '3']
+        if Munc is None:
+            for nnode, dm in enumerate(self.inv_to_depthmodels(Model)):
+                dm.vs.values += offset * nnode  # offset
+                dm.vs.show(ax, **kwargs)
+                xticks = np.concatenate((xticks, vsticks + offset * nnode))
+                xticklabels = np.concatenate((xticklabels, vsticklabels))
+        else:
+            for nnode, (dmlow, dmhigh) in enumerate(zip(self.inv_to_depthmodels(Model-Munc),
+                                                        self.inv_to_depthmodels(Model+Munc))):
+                dmlow.vs.values += offset * nnode  # offset
+                dmhigh.vs.values += offset * nnode  # offset
+                dmlow.vs.fill_between(ax=ax, other=dmhigh.vs, **kwargs)
+                xticks = np.concatenate((xticks, vsticks + offset * nnode))
+                xticklabels = np.concatenate((xticklabels, vsticklabels))
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklabels)
 
 class SuperDatacoder(object):
     def __init__(self, datacoders):
@@ -396,11 +407,32 @@ class SuperDatacoder(object):
             Laws.append(datacoder.inv_to_laws(data))
         return Laws
 
-    def show_datas(self, ax, Data, *args, **kwargs):
+    def show_datas(self, ax, Data, showdvalue=False,
+                   offset=3.,
+                   pticks=[0.5, 1., 2.],
+                   pticklabels=['0.5', '1', '2'],
+                   **kwargs):
+        xticks = []
+        xticklabels = []
+
         for nnode, laws in enumerate(self.inv_to_laws(Data)):
+
+            xticks = np.concatenate((xticks, np.log(pticks) + offset * nnode))
+            xticklabels = np.concatenate((xticklabels, pticklabels))
             for law in laws:
-                law.value += nnode
-                law.show(ax, *args, **kwargs)
+
+                x = np.log(1. / law.freq) + offset * nnode
+                y = law.value
+                if showdvalue:
+                    yinf = law.value * np.exp(-law.dvalue / law.value)
+                    ysup = law.value * np.exp(+law.dvalue / law.value)
+                    ax.fill_between(x, yinf, ysup, **kwargs)
+                else:
+                    ax.plot(x, y, **kwargs)
+        ax.set_xscale('linear')
+        ax.set_yscale('log')
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklabels)
 
 
 class SuperTheory(object):
@@ -477,33 +509,7 @@ class SuperTheory(object):
 
 
 def optimize(argv, verbose, mapkwargs):
-    # import matplotlib.pyplot as plt
-    # import numpy as np
-    #
-    # mprior = np.load('_HerrMet_Mprior.npy')
-    # m000 = np.load('_HerrMet_M000.npy')
-    # m001 = np.load('_HerrMet_M001.npy')
-    # m002 = np.load('_HerrMet_M002.npy')
-    # plt.plot(m000, "k")
-    # plt.plot(m001, "g")
-    # plt.plot(m002, "b")
-    # plt.show()
-    #
-    # dobs = np.load('_HerrMet_Dobs.npy')
-    # plt.plot(dobs, "k")
-    # d000 = np.load('_HerrMet_D000.npy')
-    # plt.plot(d000, "g")
-    # plt.plot(d000 - dobs, "g")
-    # d001 = np.load('_HerrMet_D001.npy')
-    # plt.plot(d001, "b")
-    # plt.plot(d001 -dobs, "b")
-    # d002 = np.load('_HerrMet_D002.npy')
-    # plt.plot(d002, "r")
-    # plt.plot(d002-dobs, "r")
-    # plt.show()
-    #
-    #
-    # sys.exit()
+
     if '-h' in argv.keys() or "-help" in argv.keys():
         print(long_help)
         return
@@ -546,7 +552,16 @@ def optimize(argv, verbose, mapkwargs):
         fig_model = plt.figure()
         ax_model = fig_model.add_subplot(111)
         modelfiles = np.sort(glob.glob(MFILES.format(workingdir=WORKINGDIR)))
-        for modelfile, color in zip([modelfiles[0], modelfiles[-1]], "kr"):
+        mpriorfile = MPRIORFILE.format(workingdir=WORKINGDIR)
+        Mprior = np.load(mpriorfile)
+        CM = load_sparse_npz(CMFILE.format(workingdir=WORKINGDIR))
+        Munc = np.asarray(CM[np.arange(n_parameters), np.arange(n_parameters)]).flat[:] ** 0.5
+        superparameterizer.show_models(ax_model, Mprior - Munc, color="k", alpha=0.3)
+        superparameterizer.show_models(ax_model, Mprior + Munc, color="k", alpha=0.3)
+        superparameterizer.show_models(ax_model, Mprior, color="k", alpha=1.0)
+        superparameterizer.show_models(ax_model, Mprior, Munc=Munc, color="k", alpha=0.3)
+
+        for modelfile, color in zip([modelfiles[0], modelfiles[-1]], "br"):
             Model = np.load(modelfile)
             superparameterizer.show_models(ax_model, Model, color=color)
 
@@ -554,7 +569,8 @@ def optimize(argv, verbose, mapkwargs):
         ax_data = fig_data.add_subplot(111)
         dobsfile = DOBSFILE.format(workingdir=WORKINGDIR)
         Dobs = np.load(dobsfile)
-        superdatacoder.show_datas(ax_data, Dobs, color="k", showdvalue=True)
+        superdatacoder.show_datas(ax_data, Dobs, color="k", showdvalue=True, alpha=0.3)
+        superdatacoder.show_datas(ax_data, Dobs, color="k", showdvalue=False)
 
         datafiles = np.sort(glob.glob(DFILES.format(workingdir=WORKINGDIR)))
         for datafile, color in zip([datafiles[0], datafiles[-1]], 'br'):
@@ -648,9 +664,18 @@ def optimize(argv, verbose, mapkwargs):
             Hi = Siinv * GiTCDinv
 
         Xi = Dobs - Di + Gi * (Mi - M0)
-        Minew = M0 + Hi * Xi
+        mu = 1.0
+        from srfpython.Herrmann.Herrmann import CPiSDomainError
+        while mu > 0.001:
+            try:
+                Minew = M0 + mu * Hi * Xi
+                Dinew = supertheory(Minew)
+                break
+            except CPiSDomainError as e:
+                print(str(e))
+                mu /= 2.0
+                continue
 
-        Dinew = supertheory(Minew)
         Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
 
         mfilename_new = MFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
