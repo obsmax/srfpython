@@ -141,7 +141,6 @@ class NodeFileString(object):
             extract_limit=self.extract_limit,
             extract_llkmin=self.extract_llkmin,
             extract_step=self.extract_step)
-        s = "# longitude_deg latitude_deg node\n"
         for lon, lat, node in zip(self.lons, self.lats, self.nodes):
             s += "{:f} {:f} {:s}\n".format(lon, lat, node)
         return s
