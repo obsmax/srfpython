@@ -6,6 +6,7 @@ from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.depthdisp.depthmodels import depthmodel_from_arrays
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import Theory
+from srfpython.standalone.display import *
 
 
 CM = load_sparse_npz('CM.npz')
@@ -40,7 +41,7 @@ M0 = Mprior
 
 MS = [M0]
 MI = M0
-for _ in range(10):
+for _ in range(2):
     XI = Dobs - g(MI) + G * (MI - Mprior)
     MI = M0 + CMGT * Sinv * XI
     MS.append(MI.copy())
@@ -60,15 +61,13 @@ def MtoDM(M3):
 
 
 dms0 = MtoDM(MS[0])
-# dms1 = MtoDM(MS[1])
-# dms2 = MtoDM(MS[2])
 dmslast = MtoDM(MS[-1])
 
 def showdms(ax, dms, **kwargs):
     vs = []
     for n, dm in enumerate(dms):
         vs.append(dm.vs.values)
-    x = np.arange(len(vs)+1)
+    x = np.arange(len(vs)+1) - 0.5
     y = np.hstack((dm.vs.z, dm.vs.z[-1] + 0.1))
     plt.colorbar(ax.pcolormesh(
         x,
@@ -80,7 +79,7 @@ def showdiff(ax, dms1, dms2, **kwargs):
     vsdiff = []
     for n, (dm1, dm2) in enumerate(zip(dms1, dms2)):
         vsdiff.append(dm1.vs.values - dm2.vs.values)
-    x = np.arange(len(vsdiff)+1)
+    x = np.arange(len(vsdiff)+1) - 0.5
     y = np.hstack((dm1.vs.z, dm1.vs.z[-1] + 0.1))
     plt.colorbar(ax.pcolormesh(
         x,
@@ -88,7 +87,7 @@ def showdiff(ax, dms1, dms2, **kwargs):
         np.array(vsdiff).T,
         **kwargs), ax=ax)
 
-from srfpython.standalone.display import *
+
 ax0 = plt.subplot(311)
 ax3 = plt.subplot(312, sharex=gca(), sharey=gca())
 axdiff = plt.subplot(313, sharex=gca(), sharey=gca())
