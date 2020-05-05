@@ -115,6 +115,7 @@ with open('nodes.txt', 'w') as fid:
     fid.write("#met extract_limit = 1000\n")
     fid.write("#met extract_llkmin = 0\n")
     fid.write("#met extract_step = 1\n")
+    fid.write('#met ztop = "np.linspace(0., 3.0, 30)"\n')
     fid.write("#fld longitude latitude node\n")
     fid.write("#unt deg       deg      -\n")
     fid.write("#fmt %f        %f       %s\n")

@@ -2,22 +2,26 @@ import os
 import numpy as np
 from srfpython.HerrMet.files import ROOTNAME, HERRMETPARAMFILE, HERRMETTARGETFILE, HERRMETEXTRACTPDFMODELFILE
 from srfpython.standalone.asciifile import AsciiFile_fromstring
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
 
-"""
-a node file is an ascii file with 3 columns and one line header 
 
-#met rootdir = "."
-#met extract_mode = "best"
-#met extract_limit = 1000
-#met extract_llkmin = 0
-#met extract_step = 1
+NODEFILE_HEADER = """# Nodefile for HerrMet
+
+# directory where inversion is run (relative to this file)
+#met rootdir = "{rootdir:s}"
+
+# extraction parameters needed to locate the temporary files
+#met extract_mode = "{extract_mode:s}"
+#met extract_limit = {extract_limit:d}
+#met extract_llkmin = {extract_llkmin:d}
+#met extract_step = {extract_step:d}
+
+# ztop array needed to resample the extraction pdf 
+#met ztop = "{ztop:s}"
+
 #fld longitude latitude node
-#unt deg       deg      -
-#fmt %f        %f       %s
-12.132131 45.355425434 node0001
-22.132131 35.355425434 node0002
-32.132131 25.355425434 node0003
-...
+#unt deg    deg    -
+#fmt %12.8f %12.8f %s
 """
 
 
@@ -38,6 +42,10 @@ class NodeFileString(object):
         self.extract_limit = a.metadata['extract_limit']
         self.extract_llkmin = a.metadata['extract_llkmin']
         self.extract_step = a.metadata['extract_step']
+        self.ztop = np.asarray(eval(a.metadata['ztop']), float)
+        self.zmid = self.ztop + np.hstack(
+            (0.5 * (self.ztop[1:] - self.ztop[:-1]),
+             0.5 * np.median(self.ztop[1:] - self.ztop[:-1])))
 
         if not os.path.isdir(self.rootdir):
             raise IOError()
@@ -64,7 +72,7 @@ class NodeFileString(object):
             if not os.path.isfile(targetfile):
                 raise IOError(paramfile)
 
-            print(paramfile, self.paramfiles[i])
+            # print(paramfile, self.paramfiles[i])
             self.paramfiles[i] = paramfile
             self.targetfiles[i] = targetfile
         self.paramfiles = np.asarray(self.paramfiles, str)
@@ -125,24 +133,17 @@ class NodeFileString(object):
         return len(self.nodes)
 
     def __str__(self):
-        s = """# Nodefile for HerrMet
-        # directory where inversion is run (relative to this file)
-        #met rootdir = "{rootdir:s}"
-        # extraction parameters needed to locate the temporary files
-        #met extract_mode = "{extract_mode:s}"
-        #met extract_limit = {extract_limit:d}
-        #met extract_llkmin = {extract_llkmin:d}
-        #met extract_step = {extract_step:d}
-        #fld longitude latitude node
-        #unt deg       deg      -
-        #fmt %f        %f       %s""".format(
+        s = NODEFILE_HEADER.format(
             rootdir=self.rootdir,
             extract_mode=self.extract_mode,
             extract_limit=self.extract_limit,
             extract_llkmin=self.extract_llkmin,
-            extract_step=self.extract_step)
+            extract_step=self.extract_step,
+            ztop=str(list(self.ztop)))
+
+        s = "\n".join([_.lstrip() for _ in s.split('\n')])
         for lon, lat, node in zip(self.lons, self.lats, self.nodes):
-            s += "{:f} {:f} {:s}\n".format(lon, lat, node)
+            s += "{:12.8f} {:12.8f} {:s}\n".format(lon, lat, node)
         return s
 
     def write(self, filename):
