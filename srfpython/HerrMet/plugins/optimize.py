@@ -14,39 +14,36 @@ from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import Theory
 from srfpython.standalone.multipro8 import Job, MapSync
-
+from srfpython.Herrmann.Herrmann import CPiSDomainError
+from srfpython.HerrMet.files import ROOTKEY
 
 WORKINGDIR = "."
-NODEFILELOCAL = os.path.join("{workingdir}", "_HerrMet_.nodes")
-MPRIORFILE = os.path.join("{workingdir}", "_HerrMet_Mprior.npy")
-
-MFILE = os.path.join("{workingdir}", "_HerrMet_M{niter:03d}.npy")
-MFILES = os.path.join("{workingdir}", "_HerrMet_M[0-9][0-9][0-9].npy")
-
-DFILE = os.path.join("{workingdir}", "_HerrMet_D{niter:03d}.npy")
-DFILES = os.path.join("{workingdir}", "_HerrMet_D[0-9][0-9][0-9].npy")
-
-FDFILE = os.path.join("{workingdir}", "_HerrMet_G{niter:03d}.npz")
-FDFILES = os.path.join("{workingdir}", "_HerrMet_G[0-9][0-9][0-9].npz")
-
-DOBSFILE = os.path.join("{workingdir}", "_HerrMet_Dobs.npy")
-CDFILE = os.path.join("{workingdir}", "_HerrMet_CD.npz")
-CDINVFILE = os.path.join("{workingdir}", "_HerrMet_CDinv.npz")
-CMFILE = os.path.join("{workingdir}", "_HerrMet_CM.npz")
-CMINVFILE = os.path.join("{workingdir}", "_HerrMet_CMinv.npz")
+NODEFILELOCAL = os.path.join(WORKINGDIR, ROOTKEY + "nodes.txt")
+MPRIORFILE    = os.path.join(WORKINGDIR, ROOTKEY + "Mprior.npy")
+MFILE         = os.path.join(WORKINGDIR, ROOTKEY + "M{niter:03d}.npy")
+MFILES        = os.path.join(WORKINGDIR, ROOTKEY + "M[0-9][0-9][0-9].npy")
+DFILE         = os.path.join(WORKINGDIR, ROOTKEY + "D{niter:03d}.npy")
+DFILES        = os.path.join(WORKINGDIR, ROOTKEY + "D[0-9][0-9][0-9].npy")
+FDFILE        = os.path.join(WORKINGDIR, ROOTKEY + "G{niter:03d}.npz")
+FDFILES       = os.path.join(WORKINGDIR, ROOTKEY + "G[0-9][0-9][0-9].npz")
+DOBSFILE      = os.path.join(WORKINGDIR, ROOTKEY + "Dobs.npy")
+CDFILE        = os.path.join(WORKINGDIR, ROOTKEY + "CD.npz")
+CDINVFILE     = os.path.join(WORKINGDIR, ROOTKEY + "CDinv.npz")
+CMFILE        = os.path.join(WORKINGDIR, ROOTKEY + "CM.npz")
+CMINVFILE     = os.path.join(WORKINGDIR, ROOTKEY + "CMinv.npz")
 
 
 CLEAR_COMMAND = 'trash ' + " ".join(
-    [NODEFILELOCAL.format(workingdir=WORKINGDIR),
-     MPRIORFILE.format(workingdir=WORKINGDIR),
-     DOBSFILE.format(workingdir=WORKINGDIR),
-     CDFILE.format(workingdir=WORKINGDIR),
-     CDINVFILE.format(workingdir=WORKINGDIR),
-     CMFILE.format(workingdir=WORKINGDIR),
-     CMINVFILE.format(workingdir=WORKINGDIR),
-     MFILES.format(workingdir=WORKINGDIR),
-     DFILES.format(workingdir=WORKINGDIR),
-     FDFILES.format(workingdir=WORKINGDIR)])
+    [NODEFILELOCAL,
+     MPRIORFILE,
+     DOBSFILE,
+     CDFILE,
+     CDINVFILE,
+     CMFILE,
+     CMINVFILE,
+     MFILES,
+     DFILES,
+     FDFILES])
 
 
 def mfile2niter(mfile):
@@ -54,7 +51,7 @@ def mfile2niter(mfile):
 
 
 def lastiter():
-    path = MFILES.format(workingdir=WORKINGDIR)
+    path = MFILES
     mfiles = glob.glob(path)
     if not len(mfiles):
         raise ValueError('no file responding to {}'.format(path))
@@ -88,28 +85,41 @@ long_help = """\
     -data            get the data array and data covariance matrix, 
                      save it to {dobsfile}, {cdfile}
     -fd              compute the frechet derivatives for the first model
-                     save it to {fdfile}                
+                     save it to {fdfile}
+    -upd   i         update the model, compute the frechet derivatives for the next iteration
+                     repeat n times, default 1                                 
     -h, -help        display the help message for this plugin 
 """.format(workingdir=WORKINGDIR,
-           nodefilelocal=NODEFILELOCAL.format(workingdir=WORKINGDIR),
-           mpriorfile=MPRIORFILE.format(workingdir=WORKINGDIR),
-           cmfile=CMFILE.format(workingdir=WORKINGDIR),
-           dobsfile=DOBSFILE.format(workingdir=WORKINGDIR),
-           cdfile=CDFILE.format(workingdir=WORKINGDIR),
-           fdfile=FDFILES.format(workingdir=WORKINGDIR))
+           nodefilelocal=NODEFILELOCAL,
+           mpriorfile=MPRIORFILE,
+           cmfile=CMFILE,
+           dobsfile=DOBSFILE,
+           cdfile=CDFILE,
+           fdfile=FDFILES)
 
 # ------------------------------ example usage
 example = """\
 ## OPTIMIZE
 
+# initialize the optimization (clear temp files)
 HerrMet --optimize \\
-    -init /home/max/prog/git/srfpython/tutorials/02_cube_inversion_example/nodes.txt \\
-    -prior 100. 0.  \\
-    -data \\
-    -fd
-
+    -init /home/max/prog/git/srfpython/tutorials/02_cube_inversion_example/nodes.txt 
+    
+# set the data and prior information    
+HerrMet --optimize \\
+    -prior 80. 0.  \\
+    -data 
+    
+# the prior can be changed afterwards, 
+# it requires to remove the iteration files    
+HerrMet --optimize \\
+    -restart \\ 
+    -prior 100. 0.
+    
+# run 3 iterations
 HerrMet --optimize -upd 3 
 
+# display results
 HerrMet --optimize -show    
 """
 
@@ -561,26 +571,24 @@ def optimize(argv, verbose, mapkwargs):
         if not os.path.isfile(nodefilename_in):
             raise IOError(nodefilename_in)
 
-        nodefilename_out = NODEFILELOCAL.format(workingdir=WORKINGDIR)
-
         nodefile = NodeFile(nodefilename_in)
         nodefile.fill_extraction_files()
-        nodefile.write(nodefilename_out)
-        assert os.path.isfile(nodefilename_out)
+        nodefile.write(NODEFILELOCAL)
+        assert os.path.isfile(NODEFILELOCAL)
 
     if "-restart" in argv.keys():
         # ========= clear temporary files except for the initiation files
         for niter in range(1, lastiter()+1):
-            mfile = MFILE.format(workingdir=WORKINGDIR, niter=niter)
-            dfile = DFILE.format(workingdir=WORKINGDIR, niter=niter)
-            fdfile = FDFILE.format(workingdir=WORKINGDIR, niter=niter)
+            mfile = MFILE.format(niter=niter)
+            dfile = DFILE.format(niter=niter)
+            fdfile = FDFILE.format(niter=niter)
             trashcmd = 'trash {} {} {}'.format(mfile, dfile, fdfile)
             print(trashcmd)
             os.system(trashcmd)
 
     # =================================
     # (re)read the local node file
-    nodefile = NodeFileLocal(NODEFILELOCAL.format(workingdir=WORKINGDIR))
+    nodefile = NodeFileLocal(NODEFILELOCAL)
     nodefile.fill_extraction_files()
 
     # Compute the initialization matrixes
@@ -591,20 +599,142 @@ def optimize(argv, verbose, mapkwargs):
         superdatacoder=superdatacoder)
     n_data_points, n_parameters = supertheory.shape
 
-    if "-show" in argv.keys():
-        mpriorfile = MPRIORFILE.format(workingdir=WORKINGDIR)
-        modelfiles = np.sort(glob.glob(MFILES.format(workingdir=WORKINGDIR)))
-        dobsfile = DOBSFILE.format(workingdir=WORKINGDIR)
-        datafiles = np.sort(glob.glob(DFILES.format(workingdir=WORKINGDIR)))
-        cmfile = CMFILE.format(workingdir=WORKINGDIR)
-        cminvfile = CMINVFILE.format(workingdir=WORKINGDIR)
-        cdinvfile = CDINVFILE.format(workingdir=WORKINGDIR)
+    if "-prior" in argv.keys():
+        hsd, vsd = argv["-prior"]
+        # ========= set the prior model and covariance matrix
+        mpriorfilename = MPRIORFILE
+        os.system('trash {}'.format(CMINVFILE))
+        assert not os.path.isfile(CMINVFILE)
 
-        Dobs = np.load(dobsfile)
+        Mprior = superparameterizer.get_Mprior()
+        CM = nodefile.get_CM(
+            horizontal_smoothing_distance=hsd,
+            vertical_smoothing_distance=vsd)
+        save_matrix(mpriorfilename, Mprior, verbose)
+        save_matrix(CMFILE, CM, verbose)
+
+        if True:
+            # qc
+            CMinv = get_CMinv(CMFILE, CMINVFILE, True)
+            ncut = 3 * len(nodefile.ztop)
+            plt.figure()
+            plt.subplot(121)
+            X = CM[:ncut, :ncut].toarray()
+            X = np.ma.masked_where(X == 0, X)
+            Y = CMinv[:ncut, :ncut].toarray()
+            Y = np.ma.masked_where(Y == 0, Y)
+            X = np.log(X)
+            Y = np.log(np.abs(Y))
+
+            plt.imshow(X)
+            plt.subplot(122, sharex=plt.gca(), sharey=plt.gca())
+            plt.imshow(Y)
+            plt.show()
+
+        M0 = Mprior
+        m0filename = MFILE.format(niter=0)
+        save_matrix(m0filename, M0, verbose)
+
+        d0filename = DFILE.format(niter=0)
+        D0 = supertheory(M0)
+        save_matrix(d0filename, D0, verbose)
+
+    if "-data" in argv.keys():
+        # ========= set the observed data and data covariance matrix
+        Dobs = superdatacoder.get_Dobs()
+        CD, CDinv = superdatacoder.get_CD()
+
+        save_matrix(DOBSFILE, Dobs, verbose)
+        save_matrix(CDFILE, CD, verbose)
+        save_matrix(CDINVFILE, CDinv, verbose)
+
+    if "-fd" in argv.keys():
+        # ========= compute the frechet derivatives for the last model found
+        niter = lastiter()
+        mfilename = MFILE.format(niter=niter)
+        fdfilename = FDFILE.format(niter=niter)
+        if not os.path.isfile(fdfilename):
+            Mi = np.load(mfilename)
+            Gi = supertheory.get_FD(Mi, mapkwargs)
+            save_matrix(fdfilename, Gi, verbose)
+
+        elif verbose:
+            print('{} exists already'.format(fdfilename))
+
+    if "-upd" in argv.keys():
+        nupd = argv["-upd"][0] if len(argv["-upd"]) > 0 else 1
+        for _ in range(nupd):
+
+            niter = lastiter()
+            m0file = MFILE.format(niter=0)
+            mfilename = MFILE.format(niter=niter)
+            dfile = DFILE.format(niter=niter)
+            fdfilename = FDFILE.format(niter=niter)
+
+            M0 = np.load(m0file)
+            Mi = np.load(mfilename)
+            Di = np.load(dfile)  # g(Mi)
+            Gi = load_sparse_npz(fdfilename)
+            Dobs = np.load(DOBSFILE)
+
+            if n_data_points <= n_parameters:
+                # over determined problem
+                CM = load_sparse_npz(CMFILE)
+                CD = load_sparse_npz(CDFILE)
+
+                CMGiT = CM * Gi.T
+                Siinv = sparse_inv(CD + Gi * CMGiT)  # needs a csc format
+                Hi = CMGiT * Siinv
+
+            else:
+                # under determined problem
+                CDinv = load_sparse_npz(CDINVFILE)
+                CMinv = get_CMinv(CMFILE, CMINVFILE, verbose)
+
+                GiTCDinv = Gi.T.tocsc() * CDinv
+                Siinv = sparse_inv(GiTCDinv * Gi + CMinv)  # needs a csc format
+                Hi = Siinv * GiTCDinv
+
+            # nan issues
+            # nan can occur in the predicted data if a data point is above the cut off period
+            # let ignore them
+            Inan = np.isnan(Di) | np.isnan(Dobs)
+            Dobs[Inan] = Di[Inan] = 0.
+
+            Xi = Dobs - Di + Gi * (Mi - M0)
+            HiXi = Hi * Xi
+            mu = 1.0
+
+            while mu > 0.001:
+                try:
+                    Minew = M0 + mu * HiXi
+                    Dinew = supertheory(Minew)
+                    break
+                except CPiSDomainError as e:
+                    print(str(e))
+                    mu /= 2.0
+                    continue
+
+            Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
+
+            mfilename_new = MFILE.format(niter=niter + 1)
+            dfilename_new = DFILE.format(niter=niter + 1)
+            fdfilename_new = FDFILE.format(niter=niter + 1)
+
+            save_matrix(mfilename_new, Minew, verbose)
+            save_matrix(dfilename_new, Dinew, verbose)
+            save_matrix(fdfilename_new, Ginew, verbose)
+
+    if "-show" in argv.keys():
+        mpriorfile = MPRIORFILE
+        modelfiles = np.sort(glob.glob(MFILES))
+        datafiles = np.sort(glob.glob(DFILES))
+
+        Dobs = np.load(DOBSFILE)
         Mprior = np.load(mpriorfile)
-        CM = load_sparse_npz(cmfile)
-        CMinv = get_CMinv(cmfile, cminvfile, verbose)
-        CDinv = load_sparse_npz(cdinvfile)
+        CM = load_sparse_npz(CMFILE)
+        CMinv = get_CMinv(CMFILE, CMINVFILE, verbose)
+        CDinv = load_sparse_npz(CDINVFILE)
         Mpriorunc = np.asarray(CM[np.arange(n_parameters), np.arange(n_parameters)]).flat[:] ** 0.5
 
         # =================== display the data fit
@@ -616,8 +746,8 @@ def optimize(argv, verbose, mapkwargs):
         data_costs = []
         model_costs = []
         for niter in range(lastiter()+1):
-            modelfile = MFILE.format(workingdir=WORKINGDIR, niter=niter)
-            datafile = DFILE.format(workingdir=WORKINGDIR, niter=niter)
+            modelfile = MFILE.format(niter=niter)
+            datafile = DFILE.format(niter=niter)
             Model = np.load(modelfile)
             Data = np.load(datafile)
 
@@ -677,142 +807,4 @@ def optimize(argv, verbose, mapkwargs):
         plt.show()
         input('pause')
         exit()
-
-    if "-prior" in argv.keys():
-        hsd, vsd = argv["-prior"]
-        # ========= set the prior model and covariance matrix
-        mpriorfilename = MPRIORFILE.format(workingdir=WORKINGDIR)
-        cmfile = CMFILE.format(workingdir=WORKINGDIR)
-        cminvfile = CMINVFILE.format(workingdir=WORKINGDIR)
-        os.system('trash {}'.format(cminvfile))
-        assert not os.path.isfile(cminvfile)
-
-        Mprior = superparameterizer.get_Mprior()
-        CM = nodefile.get_CM(
-            horizontal_smoothing_distance=hsd,
-            vertical_smoothing_distance=vsd)
-        save_matrix(mpriorfilename, Mprior, verbose)
-        save_matrix(cmfile, CM, verbose)
-
-        if True:
-            # qc
-            CMinv = get_CMinv(cmfile, CMINVFILE.format(workingdir=WORKINGDIR), True)
-            ncut = 3 * len(nodefile.ztop)
-            plt.figure()
-            plt.subplot(121)
-            X = CM[:ncut, :ncut].toarray()
-            X = np.ma.masked_where(X == 0, X)
-            Y = CMinv[:ncut, :ncut].toarray()
-            Y = np.ma.masked_where(Y == 0, Y)
-            X = np.log(X)
-            Y = np.log(np.abs(Y))
-
-            plt.imshow(X)
-            plt.subplot(122, sharex=plt.gca(), sharey=plt.gca())
-            plt.imshow(Y)
-            plt.show()
-
-        M0 = Mprior
-        m0filename = MFILE.format(workingdir=WORKINGDIR, niter=0)
-        save_matrix(m0filename, M0, verbose)
-
-        d0filename = DFILE.format(workingdir=WORKINGDIR, niter=0)
-        D0 = supertheory(M0)
-        save_matrix(d0filename, D0, verbose)
-
-    if "-data" in argv.keys():
-        # ========= set the observed data and data covariance matrix
-        Dobs = superdatacoder.get_Dobs()
-        CD, CDinv = superdatacoder.get_CD()
-        dobsfilename = DOBSFILE.format(workingdir=WORKINGDIR)
-        cdfilename = CDFILE.format(workingdir=WORKINGDIR)
-        cdinvfilename = CDINVFILE.format(workingdir=WORKINGDIR)
-
-        save_matrix(dobsfilename, Dobs, verbose)
-        save_matrix(cdfilename, CD, verbose)
-        save_matrix(cdinvfilename, CDinv, verbose)
-
-    if "-fd" in argv.keys():
-        # ========= compute the frechet derivatives for the last model found
-        niter = lastiter()
-        mfilename = MFILE.format(workingdir=WORKINGDIR, niter=niter)
-        fdfilename = FDFILE.format(workingdir=WORKINGDIR, niter=niter)
-        if not os.path.isfile(fdfilename):
-            Mi = np.load(mfilename)
-            Gi = supertheory.get_FD(Mi, mapkwargs)
-            save_matrix(fdfilename, Gi, verbose)
-
-        elif verbose:
-            print('{} exists already'.format(fdfilename))
-
-    if "-upd" in argv.keys():
-        nupd = argv["-upd"][0] if len(argv["-upd"]) > 0 else 1
-        for _ in range(nupd):
-
-            niter = lastiter()
-            m0file = MFILE.format(workingdir=WORKINGDIR, niter=0)
-            mfilename = MFILE.format(workingdir=WORKINGDIR, niter=niter)
-            dfile = DFILE.format(workingdir=WORKINGDIR, niter=niter)
-            fdfilename = FDFILE.format(workingdir=WORKINGDIR, niter=niter)
-            cmfile = CMFILE.format(workingdir=WORKINGDIR)
-            cminvfile = CMINVFILE.format(workingdir=WORKINGDIR)
-            cdfile = CDFILE.format(workingdir=WORKINGDIR)
-            cdinvfile = CDINVFILE.format(workingdir=WORKINGDIR)
-            dobsfile = DOBSFILE.format(workingdir=WORKINGDIR)
-
-            M0 = np.load(m0file)
-            Mi = np.load(mfilename)
-            Di = np.load(dfile)  # g(Mi)
-            Gi = load_sparse_npz(fdfilename)
-            Dobs = np.load(dobsfile)
-
-            if n_data_points <= n_parameters:
-                # over determined problem
-                CM = load_sparse_npz(cmfile)
-                CD = load_sparse_npz(cdfile)
-
-                CMGiT = CM * Gi.T
-                Siinv = sparse_inv(CD + Gi * CMGiT)  # needs a csc format
-                Hi = CMGiT * Siinv
-
-            else:
-                # under determined problem
-                CDinv = load_sparse_npz(cdinvfile)
-                CMinv = get_CMinv(cmfile, cminvfile, verbose)
-
-                GiTCDinv = Gi.T.tocsc() * CDinv
-                Siinv = sparse_inv(GiTCDinv * Gi + CMinv)  # needs a csc format
-                Hi = Siinv * GiTCDinv
-
-            # nan issues
-            # nan can occur in the predicted data if a data point is above the cut off period
-            # let ignore them
-            Inan = np.isnan(Di) | np.isnan(Dobs)
-            Dobs[Inan] = Di[Inan] = 0.
-
-            Xi = Dobs - Di + Gi * (Mi - M0)
-            HiXi = Hi * Xi
-            mu = 1.0
-            from srfpython.Herrmann.Herrmann import CPiSDomainError
-            while mu > 0.001:
-                try:
-                    Minew = M0 + mu * HiXi
-                    Dinew = supertheory(Minew)
-                    break
-                except CPiSDomainError as e:
-                    print(str(e))
-                    mu /= 2.0
-                    continue
-
-            Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
-
-            mfilename_new = MFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
-            dfilename_new = DFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
-            fdfilename_new = FDFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
-
-            save_matrix(mfilename_new, Minew, verbose)
-            save_matrix(dfilename_new, Dinew, verbose)
-            save_matrix(fdfilename_new, Ginew, verbose)
-
-
 
