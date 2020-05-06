@@ -104,13 +104,11 @@ example = """\
 
 HerrMet --optimize \\
     -init /home/max/prog/git/srfpython/tutorials/02_cube_inversion_example/nodes.txt \\
-    -prior 1000000. 1000000.  \\
+    -prior 100. 0.  \\
     -data \\
     -fd
 
-HerrMet --optimize -upd
-HerrMet --optimize -upd
-HerrMet --optimize -upd    
+HerrMet --optimize -upd 3 
 
 HerrMet --optimize -show    
 """
@@ -212,10 +210,12 @@ class NodeFileLocal(NodeFile):
     def get_CM(self, horizontal_smoothing_distance, vertical_smoothing_distance):
         ztop = self.ztop
         zmid = self.zmid
+        lock_half_space = True
 
         CM_row_ind = np.array([], int)
         CM_col_ind = np.array([], int)
         CM_data = np.array([], float)
+
         for nnode in range(len(self)):
             # find the posterior unc at each depth on vs from the pointwise inversion
 
@@ -224,49 +224,74 @@ class NodeFileLocal(NodeFile):
             vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
             vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
             vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
-            vs_unc_n[-1] = 1.e-6
+            if lock_half_space:
+                vs_unc_n[-1] = 1.e-3
 
             # determine the vertical correlation coeff in cell n
             if vertical_smoothing_distance > 0:
+                raise Exception('seems incorrect')
                 rhonn = np.exp(-0.5 * ((ztop - ztop[:, np.newaxis]) / vertical_smoothing_distance) ** 2.)
                 covnn = vs_unc_n[:, np.newaxis] * vs_unc_n * rhonn
-
-                row_ind, col_ind = np.meshgrid(range(len(ztop)), range(len(ztop)))
+                col_ind, row_ind = np.meshgrid(range(len(ztop)),
+                                               range(len(ztop)))
                 CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + row_ind.flat[:]))
                 CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + col_ind.flat[:]))
                 CM_data = np.hstack((CM_data, covnn.flat[:]))
+
             else:
                 covnn_diags = vs_unc_n ** 2.0
                 CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
                 CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
                 CM_data = np.hstack((CM_data, covnn_diags.flat[:]))
 
-            for mnode in range(nnode + 1, len(self)):
-                lonn = self.lons[nnode]
-                latn = self.lats[nnode]
-                lonm = self.lons[mnode]
-                latm = self.lats[mnode]
+            if horizontal_smoothing_distance > 0:
+                for mnode in range(nnode + 1, len(self)):
+                    lonn = self.lons[nnode]
+                    latn = self.lats[nnode]
+                    lonm = self.lons[mnode]
+                    latm = self.lats[mnode]
 
-                vs84_m = depthmodel_from_mod96(self.p84files[mnode]).vs
-                vs16_m = depthmodel_from_mod96(self.p16files[mnode]).vs
-                vs84_m = depthmodel1D(ztop, vs84_m.interp(zmid))
-                vs16_m = depthmodel1D(ztop, vs16_m.interp(zmid))
-                vs_unc_m = 0.5 * (vs84_m.values - vs16_m.values)
-                vs_unc_m[-1] = 1.e-6
+                    vs84_m = depthmodel_from_mod96(self.p84files[mnode]).vs
+                    vs16_m = depthmodel_from_mod96(self.p16files[mnode]).vs
+                    vs84_m = depthmodel1D(ztop, vs84_m.interp(zmid))
+                    vs16_m = depthmodel1D(ztop, vs16_m.interp(zmid))
+                    vs_unc_m = 0.5 * (vs84_m.values - vs16_m.values)
+                    if lock_half_space:
+                        vs_unc_m[-1] = 1.e-3
 
-                dnm = haversine(lonn, latn, lonm, latm)
-                rhonm_diags = np.exp(-0.5 * (dnm / horizontal_smoothing_distance) ** 2.)
-                covnm_diags = vs_unc_n * vs_unc_m * rhonm_diags
+                    dnm = haversine(loni=lonn, lati=latn, lonj=lonm, latj=latm)
+                    rhonm = np.exp(-0.5 * (dnm / horizontal_smoothing_distance) ** 2.)
+                    if True:
+                        covnm = vs_unc_n * vs_unc_m * rhonm
 
-                CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
-                CM_col_ind = np.hstack((CM_col_ind, mnode * len(ztop) + np.arange(len(ztop))))
-                CM_data = np.hstack((CM_data, covnm_diags.flat[:]))
+                        CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
+                        CM_col_ind = np.hstack((CM_col_ind, mnode * len(ztop) + np.arange(len(ztop))))
+                        CM_data = np.hstack((CM_data, covnm.flat[:]))
 
-                CM_row_ind = np.hstack((CM_row_ind, mnode * len(ztop) + np.arange(len(ztop))))
-                CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
-                CM_data = np.hstack((CM_data, covnm_diags.flat[:]))
+                        CM_row_ind = np.hstack((CM_row_ind, mnode * len(ztop) + np.arange(len(ztop))))
+                        CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
+                        CM_data = np.hstack((CM_data, covnm.flat[:]))
 
-        CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)), shape=(len(self) * len(ztop), len(self) * len(ztop)))
+                    else:
+                        covnm = vs_unc_n[:, np.newaxis] * vs_unc_m * rhonm
+
+                        col_ind, row_ind = np.meshgrid(range(len(ztop)), range(len(ztop)))
+
+                        CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + row_ind.flat[:]))
+                        CM_col_ind = np.hstack((CM_col_ind, mnode * len(ztop) + col_ind.flat[:]))
+                        CM_data = np.hstack((CM_data, covnm.flat[:]))
+
+                        CM_row_ind = np.hstack((CM_row_ind, mnode * len(ztop) + col_ind.flat[:]))
+                        CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + row_ind.flat[:]))
+                        CM_data = np.hstack((CM_data, covnm.flat[:]))
+
+        CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)),
+                        shape=(len(self) * len(ztop), len(self) * len(ztop)))
+
+        check = (CM - CM.T)
+        assert not len(check.data)
+        # print(check.format, check.shape, check.data)
+
         return CM
 
 
@@ -484,10 +509,14 @@ def get_CMinv(cmfile, cminvfile, verbose):
     try:
         CMinv = load_sparse_npz(cminvfile)
     except IOError:
+        if verbose:
+            print('computing CMinv...')
         CM = load_sparse_npz(cmfile)
         CMinv = sparse_inv(CM)
+
         del CM
         save_matrix(cminvfile, CMinv, verbose)
+
     return CMinv
 
 
@@ -539,6 +568,16 @@ def optimize(argv, verbose, mapkwargs):
         nodefile.write(nodefilename_out)
         assert os.path.isfile(nodefilename_out)
 
+    if "-restart" in argv.keys():
+        # ========= clear temporary files except for the initiation files
+        for niter in range(1, lastiter()+1):
+            mfile = MFILE.format(workingdir=WORKINGDIR, niter=niter)
+            dfile = DFILE.format(workingdir=WORKINGDIR, niter=niter)
+            fdfile = FDFILE.format(workingdir=WORKINGDIR, niter=niter)
+            trashcmd = 'trash {} {} {}'.format(mfile, dfile, fdfile)
+            print(trashcmd)
+            os.system(trashcmd)
+
     # =================================
     # (re)read the local node file
     nodefile = NodeFileLocal(NODEFILELOCAL.format(workingdir=WORKINGDIR))
@@ -553,17 +592,61 @@ def optimize(argv, verbose, mapkwargs):
     n_data_points, n_parameters = supertheory.shape
 
     if "-show" in argv.keys():
+        mpriorfile = MPRIORFILE.format(workingdir=WORKINGDIR)
+        modelfiles = np.sort(glob.glob(MFILES.format(workingdir=WORKINGDIR)))
+        dobsfile = DOBSFILE.format(workingdir=WORKINGDIR)
+        datafiles = np.sort(glob.glob(DFILES.format(workingdir=WORKINGDIR)))
+        cmfile = CMFILE.format(workingdir=WORKINGDIR)
+        cminvfile = CMINVFILE.format(workingdir=WORKINGDIR)
+        cdinvfile = CDINVFILE.format(workingdir=WORKINGDIR)
+
+        Dobs = np.load(dobsfile)
+        Mprior = np.load(mpriorfile)
+        CM = load_sparse_npz(cmfile)
+        CMinv = get_CMinv(cmfile, cminvfile, verbose)
+        CDinv = load_sparse_npz(cdinvfile)
+        Mpriorunc = np.asarray(CM[np.arange(n_parameters), np.arange(n_parameters)]).flat[:] ** 0.5
+
+        # =================== display the data fit
+        fig_costs = plt.figure()
+        ax_costs1 = fig_costs.add_subplot(311)
+        ax_costs2 = fig_costs.add_subplot(312, sharex=ax_costs1)
+        ax_costs3 = fig_costs.add_subplot(313, sharex=ax_costs1)
+
+        data_costs = []
+        model_costs = []
+        for niter in range(lastiter()+1):
+            modelfile = MFILE.format(workingdir=WORKINGDIR, niter=niter)
+            datafile = DFILE.format(workingdir=WORKINGDIR, niter=niter)
+            Model = np.load(modelfile)
+            Data = np.load(datafile)
+
+            from scipy.sparse import issparse
+            assert issparse(CDinv)
+            assert issparse(CMinv)
+            assert not issparse(Data - Dobs)
+            assert not issparse(Model - Mprior)
+
+            data_cost = np.dot(((Data - Dobs) * CDinv), (Data - Dobs))  # looks right
+            model_cost = np.dot(((Model - Mprior) * CMinv), (Model - Mprior))
+            print(model_cost)
+
+            # model_cost = np.dot(np.dot((Model - Mprior), CMinv), (Model - Mprior))  # NO
+            data_costs.append(data_cost)
+            model_costs.append(model_cost)
+
+        ax_costs1.plot(data_costs, 'ko')
+        ax_costs2.plot(model_costs, 'bo')
+        ax_costs3.plot(np.array(data_costs) + np.array(model_costs), 'bo')
+
+        # =================== display the models side by side
         fig_model = plt.figure()
         ax_model = fig_model.add_subplot(111)
-        modelfiles = np.sort(glob.glob(MFILES.format(workingdir=WORKINGDIR)))
-        mpriorfile = MPRIORFILE.format(workingdir=WORKINGDIR)
-        Mprior = np.load(mpriorfile)
-        CM = load_sparse_npz(CMFILE.format(workingdir=WORKINGDIR))
-        Munc = np.asarray(CM[np.arange(n_parameters), np.arange(n_parameters)]).flat[:] ** 0.5
-        superparameterizer.show_models(ax_model, Mprior - Munc, color="k", alpha=0.3)
-        superparameterizer.show_models(ax_model, Mprior + Munc, color="k", alpha=0.3)
+
+        superparameterizer.show_models(ax_model, Mprior - Mpriorunc, color="k", alpha=0.3)
+        superparameterizer.show_models(ax_model, Mprior + Mpriorunc, color="k", alpha=0.3)
         superparameterizer.show_models(ax_model, Mprior, color="k", alpha=1.0)
-        superparameterizer.show_models(ax_model, Mprior, Munc=Munc, color="k", alpha=0.3)
+        superparameterizer.show_models(ax_model, Mprior, Munc=Mpriorunc, color="k", alpha=0.3)
 
         for modelfile, color in zip([modelfiles[0], modelfiles[-1]], "br"):
             Model = np.load(modelfile)
@@ -573,14 +656,13 @@ def optimize(argv, verbose, mapkwargs):
             Model = np.load(modelfile)
             superparameterizer.show_models(ax_model, Model, color="k", alpha=0.1)
 
+        # =================== display the datas side by side
         fig_data = plt.figure()
         ax_data = fig_data.add_subplot(111)
-        dobsfile = DOBSFILE.format(workingdir=WORKINGDIR)
-        Dobs = np.load(dobsfile)
+
         superdatacoder.show_datas(ax_data, Dobs, color="k", showdvalue=True, alpha=0.3)
         superdatacoder.show_datas(ax_data, Dobs, color="k", showdvalue=False)
 
-        datafiles = np.sort(glob.glob(DFILES.format(workingdir=WORKINGDIR)))
         for datafile, color in zip([datafiles[0], datafiles[-1]], 'br'):
             Data = np.load(datafile)
             superdatacoder.show_datas(ax_data, Data, color=color, showdvalue=False)
@@ -594,13 +676,35 @@ def optimize(argv, verbose, mapkwargs):
         hsd, vsd = argv["-prior"]
         # ========= set the prior model and covariance matrix
         mpriorfilename = MPRIORFILE.format(workingdir=WORKINGDIR)
-        cmfilename = CMFILE.format(workingdir=WORKINGDIR)
+        cmfile = CMFILE.format(workingdir=WORKINGDIR)
+        cminvfile = CMINVFILE.format(workingdir=WORKINGDIR)
+        os.system('trash {}'.format(cminvfile))
+        assert not os.path.isfile(cminvfile)
+
         Mprior = superparameterizer.get_Mprior()
         CM = nodefile.get_CM(
-                    horizontal_smoothing_distance=hsd,
-                    vertical_smoothing_distance=vsd)
+            horizontal_smoothing_distance=hsd,
+            vertical_smoothing_distance=vsd)
         save_matrix(mpriorfilename, Mprior, verbose)
-        save_matrix(cmfilename, CM, verbose)
+        save_matrix(cmfile, CM, verbose)
+
+        if True:
+            # qc
+            CMinv = get_CMinv(cmfile, CMINVFILE.format(workingdir=WORKINGDIR), True)
+            ncut = 2 * len(nodefile.ztop)
+            plt.figure()
+            plt.subplot(121)
+            X = CM[:ncut, :ncut].toarray()
+            X = np.ma.masked_where(X == 0, X)
+            Y = CMinv[:ncut, :ncut].toarray()
+            Y = np.ma.masked_where(Y == 0, Y)
+            X = np.log(X)
+            Y = np.log(np.abs(Y))
+
+            plt.imshow(X)
+            plt.subplot(122, sharex=plt.gca(), sharey=plt.gca())
+            plt.imshow(Y)
+            plt.show()
 
         M0 = Mprior
         m0filename = MFILE.format(workingdir=WORKINGDIR, niter=0)
@@ -623,7 +727,7 @@ def optimize(argv, verbose, mapkwargs):
         save_matrix(cdinvfilename, CDinv, verbose)
 
     if "-fd" in argv.keys():
-        # ========= compute the frechet derivatives
+        # ========= compute the frechet derivatives for the last model found
         niter = lastiter()
         mfilename = MFILE.format(workingdir=WORKINGDIR, niter=niter)
         fdfilename = FDFILE.format(workingdir=WORKINGDIR, niter=niter)
@@ -636,64 +740,67 @@ def optimize(argv, verbose, mapkwargs):
             print('{} exists already'.format(fdfilename))
 
     if "-upd" in argv.keys():
+        nupd = argv["-upd"][0] if len(argv["-upd"]) > 0 else 0
+        for _ in range(nupd):
 
-        niter = lastiter()
-        m0file = MFILE.format(workingdir=WORKINGDIR, niter=0)
-        mfilename = MFILE.format(workingdir=WORKINGDIR, niter=niter)
-        dfile = DFILE.format(workingdir=WORKINGDIR, niter=niter)
-        fdfilename = FDFILE.format(workingdir=WORKINGDIR, niter=niter)
-        cmfile = CMFILE.format(workingdir=WORKINGDIR)
-        cminvfile = CMINVFILE.format(workingdir=WORKINGDIR)
-        cdfile = CDFILE.format(workingdir=WORKINGDIR)
-        cdinvfile = CDINVFILE.format(workingdir=WORKINGDIR)
-        dobsfile = DOBSFILE.format(workingdir=WORKINGDIR)
+            niter = lastiter()
+            m0file = MFILE.format(workingdir=WORKINGDIR, niter=0)
+            mfilename = MFILE.format(workingdir=WORKINGDIR, niter=niter)
+            dfile = DFILE.format(workingdir=WORKINGDIR, niter=niter)
+            fdfilename = FDFILE.format(workingdir=WORKINGDIR, niter=niter)
+            cmfile = CMFILE.format(workingdir=WORKINGDIR)
+            cminvfile = CMINVFILE.format(workingdir=WORKINGDIR)
+            cdfile = CDFILE.format(workingdir=WORKINGDIR)
+            cdinvfile = CDINVFILE.format(workingdir=WORKINGDIR)
+            dobsfile = DOBSFILE.format(workingdir=WORKINGDIR)
 
-        M0 = np.load(m0file)
-        Mi = np.load(mfilename)
-        Di = np.load(dfile)  # g(Mi)
-        Gi = load_sparse_npz(fdfilename)
-        Dobs = np.load(dobsfile)
+            M0 = np.load(m0file)
+            Mi = np.load(mfilename)
+            Di = np.load(dfile)  # g(Mi)
+            Gi = load_sparse_npz(fdfilename)
+            Dobs = np.load(dobsfile)
 
-        if n_data_points <= n_parameters:
-            # over determined problem
-            CM = load_sparse_npz(cmfile)
-            CD = load_sparse_npz(cdfile)
+            if n_data_points <= n_parameters:
+                # over determined problem
+                CM = load_sparse_npz(cmfile)
+                CD = load_sparse_npz(cdfile)
 
-            CMGiT = CM * Gi.T
-            Siinv = sparse_inv(CD + Gi * CMGiT)
-            Hi = np.dot(CMGiT, Siinv)
+                CMGiT = CM * Gi.T
+                Siinv = sparse_inv(CD + Gi * CMGiT)
+                Hi = CMGiT * Siinv
 
-        else:
-            CDinv = load_sparse_npz(cdinvfile)
-            CMinv = get_CMinv(cmfile, cminvfile, verbose)
+            else:
+                # under determined problem
+                CDinv = load_sparse_npz(cdinvfile)
+                CMinv = get_CMinv(cmfile, cminvfile, verbose)
 
-            GiTCDinv = Gi.T * CDinv
-            Siinv = sparse_inv(GiTCDinv * Gi + CMinv)
-            Hi = Siinv * GiTCDinv
+                GiTCDinv = Gi.T * CDinv
+                Siinv = sparse_inv(GiTCDinv * Gi + CMinv)
+                Hi = Siinv * GiTCDinv
 
-        Xi = Dobs - Di + Gi * (Mi - M0)
-        HiXi = Hi * Xi
-        mu = 0.1
-        from srfpython.Herrmann.Herrmann import CPiSDomainError
-        while mu > 0.001:
-            try:
-                Minew = M0 + mu * HiXi
-                Dinew = supertheory(Minew)
-                break
-            except CPiSDomainError as e:
-                print(str(e))
-                mu /= 2.0
-                continue
+            Xi = Dobs - Di + Gi * (Mi - M0)
+            HiXi = Hi * Xi
+            mu = 1.0
+            from srfpython.Herrmann.Herrmann import CPiSDomainError
+            while mu > 0.001:
+                try:
+                    Minew = M0 + mu * HiXi
+                    Dinew = supertheory(Minew)
+                    break
+                except CPiSDomainError as e:
+                    print(str(e))
+                    mu /= 2.0
+                    continue
 
-        Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
+            Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
 
-        mfilename_new = MFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
-        dfilename_new = DFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
-        fdfilename_new = FDFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
+            mfilename_new = MFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
+            dfilename_new = DFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
+            fdfilename_new = FDFILE.format(workingdir=WORKINGDIR, niter=niter + 1)
 
-        save_matrix(mfilename_new, Minew, verbose)
-        save_matrix(dfilename_new, Dinew, verbose)
-        save_matrix(fdfilename_new, Ginew, verbose)
+            save_matrix(mfilename_new, Minew, verbose)
+            save_matrix(dfilename_new, Dinew, verbose)
+            save_matrix(fdfilename_new, Ginew, verbose)
 
 
 
