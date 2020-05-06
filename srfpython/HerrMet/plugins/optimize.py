@@ -63,13 +63,8 @@ def lastiter():
 default_option = None
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-option",
-                   "-init",
-                   "-prior",
-                   "-data",
-                   "-fd",
-                   "-upd",
-                   "-show",
+authorized_keys = ["-option", "-init", "-restart", "-prior",
+                   "-data", "-fd", "-upd", "-show",
                    "-h", "-help"]
 
 # ------------------------------ help messages
@@ -155,8 +150,8 @@ def check_keys(argv):
         if k not in authorized_keys:
             message = 'option {} is not recognized'.format(k)
 
-            warnings.warn(message)  # disable checks for development, please reactivate exception afterwards
-            #raise Exception(message)
+            # warnings.warn(message)  # disable checks for development, please reactivate exception afterwards
+            raise Exception(message)
 
 
 class NodeFileLocal(NodeFile):
