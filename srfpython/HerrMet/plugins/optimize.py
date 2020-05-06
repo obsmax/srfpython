@@ -104,14 +104,15 @@ example = """\
 
 HerrMet --optimize \\
     -init /home/max/prog/git/srfpython/tutorials/02_cube_inversion_example/nodes.txt \\
-    -prior 50. 2.  \\
+    -prior 1000000. 1000000.  \\
     -data \\
     -fd
 
 HerrMet --optimize -upd
 HerrMet --optimize -upd
 HerrMet --optimize -upd    
-    
+
+HerrMet --optimize -show    
 """
 
 
@@ -150,153 +151,123 @@ def check_keys(argv):
             #raise Exception(message)
 
 
-def get_superparameterizer(nodefile):
-    """
-    construct parameterizers needed to define the theory function in each node
-    :param nodefile:
-    :return:
-    """
-    # write the header of the parameterizer for each node
-    parameter_string_header = """
-    #met NLAYER = {}
-    #met TYPE = 'mZVSVPvsRHvp'
-    #met VPvs = 'lambda VS: 0.9409 + 2.0947 * VS - 0.8206 * VS ** 2.0 + 0.2683 * VS ** 3.0 - 0.0251 * VS ** 4.0'
-    #met RHvp = 'lambda VP: 1.6612 * VP - 0.4721 * VP ** 2.0 + 0.0671 * VP ** 3.0 - 0.0043 * VP ** 4.0 + 0.000106 * VP ** 5.0'
-    #fld KEY     VINF          VSUP
-    #unt []      []            []
-    #fmt %s      %f            %f
-    """.format(len(nodefile.ztop)).replace('    #', '#')
+class NodeFileLocal(NodeFile):
 
-    for i in range(1, len(nodefile.ztop)):
-        # force VINF=VSUP => means lock the depth of the interfaces in the theory operator
-        parameter_string_header += "-Z{} {} {}\n".format(i, -nodefile.ztop[i], -nodefile.ztop[i])  # add locked depth interfaces
+    def get_superparameterizer(self):
+        """
+        construct parameterizers needed to define the theory function in each node
+        :param self:
+        :return:
+        """
+        # write the header of the parameterizer for each node
+        parameter_string_header = """
+        #met NLAYER = {}
+        #met TYPE = 'mZVSVPvsRHvp'
+        #met VPvs = 'lambda VS: 0.9409 + 2.0947 * VS - 0.8206 * VS ** 2.0 + 0.2683 * VS ** 3.0 - 0.0251 * VS ** 4.0'
+        #met RHvp = 'lambda VP: 1.6612 * VP - 0.4721 * VP ** 2.0 + 0.0671 * VP ** 3.0 - 0.0043 * VP ** 4.0 + 0.000106 * VP ** 5.0'
+        #fld KEY     VINF          VSUP
+        #unt []      []            []
+        #fmt %s      %f            %f
+        """.format(len(self.ztop)).replace('    #', '#')
 
-    parameterizer_strings = []
-    for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(nodefile):
-        dm = depthmodel_from_mod96(medianfile)
-        vs = dm.vs.interp(nodefile.zmid)
+        for i in range(1, len(self.ztop)):
+            # force VINF=VSUP => means lock the depth of the interfaces in the theory operator
+            parameter_string_header += "-Z{} {} {}\n".format(i, -self.ztop[i], -self.ztop[i])  # add locked depth interfaces
 
-        parameter_string = parameter_string_header
+        parameterizer_strings = []
+        for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(self):
+            dm = depthmodel_from_mod96(medianfile)
+            vs = dm.vs.interp(self.zmid)
 
-        for i in range(len(nodefile.ztop)):
-            # SET VINF < VS extracted from pointwise inv < VSUP
-            # such as parameterizer.MMEAN corresponds to the extracted vs
-            parameter_string += "VS{} {} {}\n".format(i, vs[i]-0.01, vs[i]+0.01)
-        parameterizer_strings.append(parameter_string)
+            parameter_string = parameter_string_header
 
-    parameterizer_strings = np.asarray(parameterizer_strings, str)
-    parameterizers = [load_paramfile(parameter_string, verbose=False)[0]
-                      for parameter_string in parameterizer_strings]
-    return SuperParameterizer(parameterizers)
+            for i in range(len(self.ztop)):
+                # SET VINF < VS extracted from pointwise inv < VSUP
+                # such as parameterizer.MMEAN corresponds to the extracted vs
+                parameter_string += "VS{} {} {}\n".format(i, vs[i]-0.01, vs[i]+0.01)
+            parameterizer_strings.append(parameter_string)
 
+        parameterizer_strings = np.asarray(parameterizer_strings, str)
+        parameterizers = [load_paramfile(parameter_string, verbose=False)[0]
+                          for parameter_string in parameterizer_strings]
+        return SuperParameterizer(parameterizers)
 
-def get_superdatacoder(nodefile):
-    """
+    def get_superdatacoder(self):
+        """
 
-    :param nodefile:
-    :return:
-    """
-    datacoder_strings = []
-    for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(nodefile):
+        :param self:
+        :return:
+        """
+        datacoder_strings = []
+        for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(self):
 
-        with open(targetfile, 'r') as fid:
-            datacoder_string = "".join(fid.readlines())
-            datacoder_strings.append(datacoder_string)
+            with open(targetfile, 'r') as fid:
+                datacoder_string = "".join(fid.readlines())
+                datacoder_strings.append(datacoder_string)
 
-    datacoder_strings = np.asarray(datacoder_strings, str)
-    datacoders = [makedatacoder(datacoder_string, which=Datacoder_log) for datacoder_string in datacoder_strings]
-    return SuperDatacoder(datacoders)
+        datacoder_strings = np.asarray(datacoder_strings, str)
+        datacoders = [makedatacoder(datacoder_string, which=Datacoder_log) for datacoder_string in datacoder_strings]
+        return SuperDatacoder(datacoders)
 
+    def get_CM(self, horizontal_smoothing_distance, vertical_smoothing_distance):
+        ztop = self.ztop
+        zmid = self.zmid
 
-def get_CM(nodefile, horizontal_smoothing_distance, vertical_smoothing_distance):
-    ztop = nodefile.ztop
-    zmid = nodefile.zmid
+        CM_row_ind = np.array([], int)
+        CM_col_ind = np.array([], int)
+        CM_data = np.array([], float)
+        for nnode in range(len(self)):
+            # find the posterior unc at each depth on vs from the pointwise inversion
 
-    CM_row_ind = np.array([], int)
-    CM_col_ind = np.array([], int)
-    CM_data = np.array([], float)
-    for nnode in range(len(nodefile)):
-        # find the posterior unc at each depth on vs from the pointwise inversion
+            vs84_n = depthmodel_from_mod96(self.p84files[nnode]).vs
+            vs16_n = depthmodel_from_mod96(self.p16files[nnode]).vs
+            vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
+            vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
+            vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
+            vs_unc_n[-1] = 1.e-6
 
-        vs84_n = depthmodel_from_mod96(nodefile.p84files[nnode]).vs
-        vs16_n = depthmodel_from_mod96(nodefile.p16files[nnode]).vs
-        vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
-        vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
-        vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
+            # determine the vertical correlation coeff in cell n
+            if vertical_smoothing_distance > 0:
+                rhonn = np.exp(-0.5 * ((ztop - ztop[:, np.newaxis]) / vertical_smoothing_distance) ** 2.)
+                covnn = vs_unc_n[:, np.newaxis] * vs_unc_n * rhonn
 
-        # determine the vertical correlation coeff in cell n
-        if vertical_smoothing_distance > 0:
-            rhonn = np.exp(-0.5 * ((ztop - ztop[:, np.newaxis]) / vertical_smoothing_distance) ** 2.)
-            covnn = vs_unc_n[:, np.newaxis] * vs_unc_n * rhonn
+                row_ind, col_ind = np.meshgrid(range(len(ztop)), range(len(ztop)))
+                CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + row_ind.flat[:]))
+                CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + col_ind.flat[:]))
+                CM_data = np.hstack((CM_data, covnn.flat[:]))
+            else:
+                covnn_diags = vs_unc_n ** 2.0
+                CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
+                CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
+                CM_data = np.hstack((CM_data, covnn_diags.flat[:]))
 
-            row_ind, col_ind = np.meshgrid(range(len(ztop)), range(len(ztop)))
-            CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + row_ind.flat[:]))
-            CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + col_ind.flat[:]))
-            CM_data = np.hstack((CM_data, covnn.flat[:]))
-        else:
-            covnn_diags = vs_unc_n ** 2.0
-            CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
-            CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
-            CM_data = np.hstack((CM_data, covnn_diags.flat[:]))
+            for mnode in range(nnode + 1, len(self)):
+                lonn = self.lons[nnode]
+                latn = self.lats[nnode]
+                lonm = self.lons[mnode]
+                latm = self.lats[mnode]
 
-        for mnode in range(nnode + 1, len(nodefile)):
-            lonn = nodefile.lons[nnode]
-            latn = nodefile.lats[nnode]
-            lonm = nodefile.lons[mnode]
-            latm = nodefile.lats[mnode]
+                vs84_m = depthmodel_from_mod96(self.p84files[mnode]).vs
+                vs16_m = depthmodel_from_mod96(self.p16files[mnode]).vs
+                vs84_m = depthmodel1D(ztop, vs84_m.interp(zmid))
+                vs16_m = depthmodel1D(ztop, vs16_m.interp(zmid))
+                vs_unc_m = 0.5 * (vs84_m.values - vs16_m.values)
+                vs_unc_m[-1] = 1.e-6
 
-            vs84_m = depthmodel_from_mod96(nodefile.p84files[mnode]).vs
-            vs16_m = depthmodel_from_mod96(nodefile.p16files[mnode]).vs
-            vs84_m = depthmodel1D(ztop, vs84_m.interp(zmid))
-            vs16_m = depthmodel1D(ztop, vs16_m.interp(zmid))
-            vs_unc_m = 0.5 * (vs84_m.values - vs16_m.values)
+                dnm = haversine(lonn, latn, lonm, latm)
+                rhonm_diags = np.exp(-0.5 * (dnm / horizontal_smoothing_distance) ** 2.)
+                covnm_diags = vs_unc_n * vs_unc_m * rhonm_diags
 
-            dnm = haversine(lonn, latn, lonm, latm)
-            rhonm_diags = np.exp(-0.5 * (dnm / horizontal_smoothing_distance) ** 2.)
-            covnm_diags = vs_unc_n * vs_unc_m * rhonm_diags
+                CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
+                CM_col_ind = np.hstack((CM_col_ind, mnode * len(ztop) + np.arange(len(ztop))))
+                CM_data = np.hstack((CM_data, covnm_diags.flat[:]))
 
-            CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
-            CM_col_ind = np.hstack((CM_col_ind, mnode * len(ztop) + np.arange(len(ztop))))
-            CM_data = np.hstack((CM_data, covnm_diags.flat[:]))
+                CM_row_ind = np.hstack((CM_row_ind, mnode * len(ztop) + np.arange(len(ztop))))
+                CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
+                CM_data = np.hstack((CM_data, covnm_diags.flat[:]))
 
-            CM_row_ind = np.hstack((CM_row_ind, mnode * len(ztop) + np.arange(len(ztop))))
-            CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
-            CM_data = np.hstack((CM_data, covnm_diags.flat[:]))
-
-    CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)), shape=(len(nodefile) * len(ztop), len(nodefile) * len(ztop)))
-    return CM
-
-
-def get_CMinv(cmfile, cminvfile, verbose):
-    try:
-        CMinv = load_sparse_npz(cminvfile)
-    except IOError:
-        CM = load_sparse_npz(cmfile)
-        CMinv = sparse_inv(CM)
-        del CM
-        save_matrix(cminvfile, CMinv, verbose)
-    return CMinv
-
-
-def save_matrix(filename, matrix, verbose):
-    if verbose:
-        print('saving {}, type:{}, shape:{}, dtype:{}'.format(
-            filename, matrix.__class__.__name__, matrix.shape, matrix.dtype))
-
-    if isinstance(matrix, np.ndarray):
-        if not filename.endswith('.npy'):
-            raise ValueError('{} does not end with .npy'.format(filename))
-        np.save(filename, matrix, allow_pickle=False)
-
-    elif isinstance(matrix, spmatrix):
-        if not filename.endswith('.npz'):
-            raise ValueError('{} does not end with .npz'.format(filename))
-        save_sparse_npz(filename, matrix)
-
-    else:
-        raise NotImplementedError
-
-    assert os.path.isfile(filename)
+        CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)), shape=(len(self) * len(ztop), len(self) * len(ztop)))
+        return CM
 
 
 class SuperParameterizer(object):
@@ -361,6 +332,7 @@ class SuperParameterizer(object):
         ax.set_xticks(xticks)
         ax.set_xticklabels(xticklabels)
 
+
 class SuperDatacoder(object):
     def __init__(self, datacoders):
         self.datacoders = datacoders
@@ -380,8 +352,8 @@ class SuperDatacoder(object):
 
         CDinv_diag = np.concatenate(CDinv_diag)
 
-        CDinv = diags(CDinv_diag, offsets=0, format="csr", dtype=float)
-        CD = diags(CDinv_diag ** -1.0, offsets=0, format="csr", dtype=float)
+        CDinv = diags(CDinv_diag, offsets=0, format="csc", dtype=float)
+        CD = diags(CDinv_diag ** -1.0, offsets=0, format="csc", dtype=float)
         return CD, CDinv
 
     def split(self, Data):
@@ -504,8 +476,40 @@ class SuperTheory(object):
                 G_col_ind = np.concatenate((G_col_ind, G_cols))
                 G_fd_data = np.concatenate((G_fd_data, G_datas))
 
-        G = csr_matrix((G_fd_data, (G_row_ind, G_col_ind)), shape=G_shape)
+        G = csc_matrix((G_fd_data, (G_row_ind, G_col_ind)), shape=G_shape)
         return G
+
+
+def get_CMinv(cmfile, cminvfile, verbose):
+    try:
+        CMinv = load_sparse_npz(cminvfile)
+    except IOError:
+        CM = load_sparse_npz(cmfile)
+        CMinv = sparse_inv(CM)
+        del CM
+        save_matrix(cminvfile, CMinv, verbose)
+    return CMinv
+
+
+def save_matrix(filename, matrix, verbose):
+    if verbose:
+        print('saving {}, type:{}, shape:{}, dtype:{}'.format(
+            filename, matrix.__class__.__name__, matrix.shape, matrix.dtype))
+
+    if isinstance(matrix, np.ndarray):
+        if not filename.endswith('.npy'):
+            raise ValueError('{} does not end with .npy'.format(filename))
+        np.save(filename, matrix, allow_pickle=False)
+
+    elif isinstance(matrix, spmatrix):
+        if not filename.endswith('.npz'):
+            raise ValueError('{} does not end with .npz'.format(filename))
+        save_sparse_npz(filename, matrix)
+
+    else:
+        raise NotImplementedError
+
+    assert os.path.isfile(filename)
 
 
 def optimize(argv, verbose, mapkwargs):
@@ -537,12 +541,12 @@ def optimize(argv, verbose, mapkwargs):
 
     # =================================
     # (re)read the local node file
-    nodefile = NodeFile(NODEFILELOCAL.format(workingdir=WORKINGDIR))
+    nodefile = NodeFileLocal(NODEFILELOCAL.format(workingdir=WORKINGDIR))
     nodefile.fill_extraction_files()
 
     # Compute the initialization matrixes
-    superparameterizer = get_superparameterizer(nodefile)
-    superdatacoder = get_superdatacoder(nodefile)
+    superparameterizer = nodefile.get_superparameterizer()
+    superdatacoder = nodefile.get_superdatacoder()
     supertheory = SuperTheory(
         superparameterizer=superparameterizer,
         superdatacoder=superdatacoder)
@@ -564,6 +568,10 @@ def optimize(argv, verbose, mapkwargs):
         for modelfile, color in zip([modelfiles[0], modelfiles[-1]], "br"):
             Model = np.load(modelfile)
             superparameterizer.show_models(ax_model, Model, color=color)
+
+        for modelfile in modelfiles[1:-1]:
+            Model = np.load(modelfile)
+            superparameterizer.show_models(ax_model, Model, color="k", alpha=0.1)
 
         fig_data = plt.figure()
         ax_data = fig_data.add_subplot(111)
@@ -588,7 +596,7 @@ def optimize(argv, verbose, mapkwargs):
         mpriorfilename = MPRIORFILE.format(workingdir=WORKINGDIR)
         cmfilename = CMFILE.format(workingdir=WORKINGDIR)
         Mprior = superparameterizer.get_Mprior()
-        CM = get_CM(nodefile,
+        CM = nodefile.get_CM(
                     horizontal_smoothing_distance=hsd,
                     vertical_smoothing_distance=vsd)
         save_matrix(mpriorfilename, Mprior, verbose)
@@ -664,11 +672,12 @@ def optimize(argv, verbose, mapkwargs):
             Hi = Siinv * GiTCDinv
 
         Xi = Dobs - Di + Gi * (Mi - M0)
-        mu = 1.0
+        HiXi = Hi * Xi
+        mu = 0.1
         from srfpython.Herrmann.Herrmann import CPiSDomainError
         while mu > 0.001:
             try:
-                Minew = M0 + mu * Hi * Xi
+                Minew = M0 + mu * HiXi
                 Dinew = supertheory(Minew)
                 break
             except CPiSDomainError as e:
