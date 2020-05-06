@@ -627,6 +627,12 @@ def optimize(argv, verbose, mapkwargs):
             assert not issparse(Data - Dobs)
             assert not issparse(Model - Mprior)
 
+            # nan issues
+            # nan can occur in the predicted data if a data point is above the cut off period
+            # let ignore them
+            Inan = np.isnan(Data) | np.isnan(Dobs)
+            Dobs[Inan] = Data[Inan] = 0.  # so that they do not act on the data misfit
+
             data_cost = np.dot(((Data - Dobs) * CDinv), (Data - Dobs))  # looks right
             model_cost = np.dot(((Model - Mprior) * CMinv), (Model - Mprior))
             print(model_cost)
@@ -648,13 +654,13 @@ def optimize(argv, verbose, mapkwargs):
         superparameterizer.show_models(ax_model, Mprior, color="k", alpha=1.0)
         superparameterizer.show_models(ax_model, Mprior, Munc=Mpriorunc, color="k", alpha=0.3)
 
-        for modelfile, color in zip([modelfiles[0], modelfiles[-1]], "br"):
-            Model = np.load(modelfile)
-            superparameterizer.show_models(ax_model, Model, color=color)
-
         for modelfile in modelfiles[1:-1]:
             Model = np.load(modelfile)
             superparameterizer.show_models(ax_model, Model, color="k", alpha=0.1)
+
+        for modelfile, color in zip([modelfiles[0], modelfiles[-1]], "br"):
+            Model = np.load(modelfile)
+            superparameterizer.show_models(ax_model, Model, color=color, linewidth=2)
 
         # =================== display the datas side by side
         fig_data = plt.figure()
@@ -691,7 +697,7 @@ def optimize(argv, verbose, mapkwargs):
         if True:
             # qc
             CMinv = get_CMinv(cmfile, CMINVFILE.format(workingdir=WORKINGDIR), True)
-            ncut = 2 * len(nodefile.ztop)
+            ncut = 3 * len(nodefile.ztop)
             plt.figure()
             plt.subplot(121)
             X = CM[:ncut, :ncut].toarray()
@@ -740,7 +746,7 @@ def optimize(argv, verbose, mapkwargs):
             print('{} exists already'.format(fdfilename))
 
     if "-upd" in argv.keys():
-        nupd = argv["-upd"][0] if len(argv["-upd"]) > 0 else 0
+        nupd = argv["-upd"][0] if len(argv["-upd"]) > 0 else 1
         for _ in range(nupd):
 
             niter = lastiter()
@@ -766,7 +772,7 @@ def optimize(argv, verbose, mapkwargs):
                 CD = load_sparse_npz(cdfile)
 
                 CMGiT = CM * Gi.T
-                Siinv = sparse_inv(CD + Gi * CMGiT)
+                Siinv = sparse_inv(CD + Gi * CMGiT)  # needs a csc format
                 Hi = CMGiT * Siinv
 
             else:
@@ -774,9 +780,15 @@ def optimize(argv, verbose, mapkwargs):
                 CDinv = load_sparse_npz(cdinvfile)
                 CMinv = get_CMinv(cmfile, cminvfile, verbose)
 
-                GiTCDinv = Gi.T * CDinv
-                Siinv = sparse_inv(GiTCDinv * Gi + CMinv)
+                GiTCDinv = Gi.T.tocsc() * CDinv
+                Siinv = sparse_inv(GiTCDinv * Gi + CMinv)  # needs a csc format
                 Hi = Siinv * GiTCDinv
+
+            # nan issues
+            # nan can occur in the predicted data if a data point is above the cut off period
+            # let ignore them
+            Inan = np.isnan(Di) | np.isnan(Dobs)
+            Dobs[Inan] = Di[Inan] = 0.
 
             Xi = Dobs - Di + Gi * (Mi - M0)
             HiXi = Hi * Xi
