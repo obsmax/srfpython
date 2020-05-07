@@ -599,7 +599,6 @@ def optimize(argv, verbose, mapkwargs):
     if "-prior" in argv.keys():
         hsd, vsd = argv["-prior"]
         # ========= set the prior model and covariance matrix
-        mpriorfilename = MPRIORFILE
         os.system('trash {}'.format(CMINVFILE))
         assert not os.path.isfile(CMINVFILE)
 
@@ -607,7 +606,7 @@ def optimize(argv, verbose, mapkwargs):
         CM = nodefile.get_CM(
             horizontal_smoothing_distance=hsd,
             vertical_smoothing_distance=vsd)
-        save_matrix(mpriorfilename, Mprior, verbose)
+        save_matrix(MPRIORFILE, Mprior, verbose)
         save_matrix(CMFILE, CM, verbose)
 
         if True:
@@ -660,60 +659,58 @@ def optimize(argv, verbose, mapkwargs):
 
     if "-upd" in argv.keys():
         nupd = argv["-upd"][0] if len(argv["-upd"]) > 0 else 1
-        for _ in range(nupd):
+        method = "quasi_newton"
+        method = "steepest_descent"
+        # ================ load data
+        Mprior = np.load(MPRIORFILE)
+        M0 = np.load(MFILE.format(niter=0))
+        Dobs = np.load(DOBSFILE)
 
+        if n_data_points <= n_parameters:
+            if verbose:
+                print('over determined problem, loading CM, CD')
+            CM = load_sparse_npz(CMFILE)
+            CD = load_sparse_npz(CDFILE)
+            CMinv = CDinv = None
+        else:
+            if verbose:
+                print('under determined problem, loading CMinv, CDinv')
+            CDinv = load_sparse_npz(CDINVFILE)
+            CMinv = get_CMinv(CMFILE, CMINVFILE, verbose)
+            CM = CD = None
+
+        for _ in range(nupd):
             niter = lastiter()
-            m0file = MFILE.format(niter=0)
+
+            # ==== save the current model state
             mfilename = MFILE.format(niter=niter)
             dfile = DFILE.format(niter=niter)
             fdfilename = FDFILE.format(niter=niter)
 
-            M0 = np.load(m0file)
             Mi = np.load(mfilename)
             Di = np.load(dfile)  # g(Mi)
             Gi = load_sparse_npz(fdfilename)
-            Dobs = np.load(DOBSFILE)
 
-            if n_data_points <= n_parameters:
-                # over determined problem
-                CM = load_sparse_npz(CMFILE)
-                CD = load_sparse_npz(CDFILE)
+            # ==== update the current model
+            if method == "quasi_newton":
+                Dinew, Minew = quasi_newton(
+                    n_data_points, n_parameters,
+                    Dobs, Di, CD, CDinv,
+                    Mprior, M0, Mi, CM, CMinv,
+                    Gi, supertheory)
 
-                CMGiT = CM * Gi.T
-                Siinv = sparse_inv(CD + Gi * CMGiT)  # needs a csc format
-                Hi = CMGiT * Siinv
+            elif method == "steepest_descent":
+                raise NotImplementedError
+                mu = 0.05  # need proper estimate of mu
+                Minew = Mi + mu * (CM * Gi.T * CDinv * (Dobs - Di) - (Mi - Mprior))
+                Dinew = supertheory(Minew)  # may raise a CPiSDomainError
 
             else:
-                # under determined problem
-                CDinv = load_sparse_npz(CDINVFILE)
-                CMinv = get_CMinv(CMFILE, CMINVFILE, verbose)
-
-                GiTCDinv = Gi.T.tocsc() * CDinv
-                Siinv = sparse_inv(GiTCDinv * Gi + CMinv)  # needs a csc format
-                Hi = Siinv * GiTCDinv
-
-            # nan issues
-            # nan can occur in the predicted data if a data point is above the cut off period
-            # let ignore them
-            Inan = np.isnan(Di) | np.isnan(Dobs)
-            Dobs[Inan] = Di[Inan] = 0.
-
-            Xi = Dobs - Di + Gi * (Mi - M0)
-            HiXi = Hi * Xi
-            mu = 1.0
-
-            while mu > 0.001:
-                try:
-                    Minew = M0 + mu * HiXi
-                    Dinew = supertheory(Minew)
-                    break
-                except CPiSDomainError as e:
-                    print(str(e))
-                    mu /= 2.0
-                    continue
-
+                raise
+            # ==== compute the frechet derivatives for the next iteration
             Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
 
+            # ==== save the new model state
             mfilename_new = MFILE.format(niter=niter + 1)
             dfilename_new = DFILE.format(niter=niter + 1)
             fdfilename_new = FDFILE.format(niter=niter + 1)
@@ -805,3 +802,50 @@ def optimize(argv, verbose, mapkwargs):
         input('pause')
         exit()
 
+
+def quasi_newton(n_data_points, n_parameters,
+                 Dobs, Di, CD, CDinv,
+                 Mprior, M0, Mi, CM, CMinv,
+                 Gi, supertheory):
+
+    if n_data_points <= n_parameters:
+        # over determined problem : see Tarantola Valette 82 eq. 23
+        assert CD is not None and CDinv is None
+        assert CM is not None and CMinv is None
+        CMGiT = CM * Gi.T
+        Siinv = sparse_inv(CD + Gi * CMGiT)  # needs a csc format
+        Ki = CMGiT * Siinv
+
+    else:
+        # under determined problem  : see Tarantola Valette 82 eq. 24
+        assert CDinv is not None and CD is None
+        assert CMinv is not None and CM is None
+        GiTCDinv = Gi.T.tocsc() * CDinv
+        Siinv = sparse_inv(GiTCDinv * Gi + CMinv)  # needs a csc format
+        Ki = Siinv * GiTCDinv
+
+    # nan issues
+    # nan can occur in the predicted data if a data point is above the cut off period
+    # let ignore them
+    Inan = np.isnan(Di) | np.isnan(Dobs)
+    Dobs[Inan] = Di[Inan] = 0.
+    Xi = Dobs - Di + Gi * (Mi - Mprior)
+
+    HiXi = Ki * Xi
+    mu = 1.0
+    Minew = Dinew = None
+    while mu > 0.001:
+        try:
+            Minew = M0 + mu * HiXi
+            Dinew = supertheory(Minew)
+            break
+        except CPiSDomainError as e:
+            print('step was too large and leaded to an error of the forward problem, '
+                  'try reducing the step')
+            mu /= 2.0
+            continue
+
+    if Minew is None:
+        raise Exception('fail')
+
+    return Dinew, Minew
