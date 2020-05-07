@@ -3,11 +3,10 @@ from builtins import input
 import sys, glob, os
 import warnings
 import numpy as np
-from scipy.sparse import spmatrix, diags, csr_matrix, csc_matrix, \
+from scipy.sparse import spmatrix, diags, issparse, csc_matrix, \
     save_npz as save_sparse_npz, load_npz as load_sparse_npz
 from scipy.sparse.linalg import inv as sparse_inv
 import matplotlib.pyplot as plt
-# from srfpython.HerrMet.files import *
 from srfpython.HerrMet.nodefile import NodeFile
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel1D, depthmodel_from_arrays
 from srfpython.HerrMet.paramfile import load_paramfile
@@ -19,18 +18,18 @@ from srfpython.HerrMet.files import ROOTKEY
 
 WORKINGDIR = "."
 NODEFILELOCAL = os.path.join(WORKINGDIR, ROOTKEY + "nodes.txt")
-MPRIORFILE    = os.path.join(WORKINGDIR, ROOTKEY + "Mprior.npy")
-MFILE         = os.path.join(WORKINGDIR, ROOTKEY + "M{niter:03d}.npy")
-MFILES        = os.path.join(WORKINGDIR, ROOTKEY + "M[0-9][0-9][0-9].npy")
-DFILE         = os.path.join(WORKINGDIR, ROOTKEY + "D{niter:03d}.npy")
-DFILES        = os.path.join(WORKINGDIR, ROOTKEY + "D[0-9][0-9][0-9].npy")
-FDFILE        = os.path.join(WORKINGDIR, ROOTKEY + "G{niter:03d}.npz")
-FDFILES       = os.path.join(WORKINGDIR, ROOTKEY + "G[0-9][0-9][0-9].npz")
-DOBSFILE      = os.path.join(WORKINGDIR, ROOTKEY + "Dobs.npy")
-CDFILE        = os.path.join(WORKINGDIR, ROOTKEY + "CD.npz")
-CDINVFILE     = os.path.join(WORKINGDIR, ROOTKEY + "CDinv.npz")
-CMFILE        = os.path.join(WORKINGDIR, ROOTKEY + "CM.npz")
-CMINVFILE     = os.path.join(WORKINGDIR, ROOTKEY + "CMinv.npz")
+MPRIORFILE = os.path.join(WORKINGDIR, ROOTKEY + "Mprior.npy")
+MFILE = os.path.join(WORKINGDIR, ROOTKEY + "M{niter:03d}.npy")
+MFILES = os.path.join(WORKINGDIR, ROOTKEY + "M[0-9][0-9][0-9].npy")
+DFILE = os.path.join(WORKINGDIR, ROOTKEY + "D{niter:03d}.npy")
+DFILES = os.path.join(WORKINGDIR, ROOTKEY + "D[0-9][0-9][0-9].npy")
+FDFILE = os.path.join(WORKINGDIR, ROOTKEY + "G{niter:03d}.npz")
+FDFILES = os.path.join(WORKINGDIR, ROOTKEY + "G[0-9][0-9][0-9].npz")
+DOBSFILE = os.path.join(WORKINGDIR, ROOTKEY + "Dobs.npy")
+CDFILE = os.path.join(WORKINGDIR, ROOTKEY + "CD.npz")
+CDINVFILE = os.path.join(WORKINGDIR, ROOTKEY + "CDinv.npz")
+CMFILE = os.path.join(WORKINGDIR, ROOTKEY + "CM.npz")
+CMINVFILE = os.path.join(WORKINGDIR, ROOTKEY + "CMinv.npz")
 
 
 CLEAR_COMMAND = 'trash ' + " ".join(
@@ -108,8 +107,11 @@ HerrMet --optimize \\
 # the prior can be changed afterwards, 
 # it requires to remove the iteration files    
 HerrMet --optimize \\
-    -restart \\ 
+    -restart \\
     -prior 100. 0.
+
+# set the sensituvuty kernels for first iteration
+HerrMet --optimize -fd 
     
 # run 3 iterations
 HerrMet --optimize -upd 3 
