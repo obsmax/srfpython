@@ -236,7 +236,7 @@ class NodeFileLocal(NodeFile):
 
             # determine the vertical correlation coeff in cell n
             if vertical_smoothing_distance > 0:
-                raise Exception('seems incorrect')
+                raise Exception('seems incorrect (check the sign of (M - Mprior)T * CMinv * (M - Mprior)')
                 rhonn = np.exp(-0.5 * ((ztop - ztop[:, np.newaxis]) / vertical_smoothing_distance) ** 2.)
                 covnn = vs_unc_n[:, np.newaxis] * vs_unc_n * rhonn
                 col_ind, row_ind = np.meshgrid(range(len(ztop)),
@@ -659,25 +659,26 @@ def optimize(argv, verbose, mapkwargs):
 
     if "-upd" in argv.keys():
         nupd = argv["-upd"][0] if len(argv["-upd"]) > 0 else 1
-        method = "quasi_newton"
-        method = "steepest_descent"
+
         # ================ load data
         Mprior = np.load(MPRIORFILE)
         M0 = np.load(MFILE.format(niter=0))
         Dobs = np.load(DOBSFILE)
 
-        if n_data_points <= n_parameters:
-            if verbose:
-                print('over determined problem, loading CM, CD')
-            CM = load_sparse_npz(CMFILE)
-            CD = load_sparse_npz(CDFILE)
-            CMinv = CDinv = None
-        else:
-            if verbose:
-                print('under determined problem, loading CMinv, CDinv')
-            CDinv = load_sparse_npz(CDINVFILE)
-            CMinv = get_CMinv(CMFILE, CMINVFILE, verbose)
-            CM = CD = None
+        CM = load_sparse_npz(CMFILE)
+        CD = load_sparse_npz(CDFILE)
+        # if n_data_points <= n_parameters:
+        #     if verbose:
+        #         print('over determined problem, loading CM, CD')
+        #     CM = load_sparse_npz(CMFILE)
+        #     CD = load_sparse_npz(CDFILE)
+        #     CMinv = CDinv = None
+        # else:
+        #     if verbose:
+        #         print('under determined problem, loading CMinv, CDinv')
+        #     CDinv = load_sparse_npz(CDINVFILE)
+        #     CMinv = get_CMinv(CMFILE, CMINVFILE, verbose)
+        #     CM = CD = None
 
         for _ in range(nupd):
             niter = lastiter()
@@ -692,21 +693,11 @@ def optimize(argv, verbose, mapkwargs):
             Gi = load_sparse_npz(fdfilename)
 
             # ==== update the current model
-            if method == "quasi_newton":
-                Dinew, Minew = quasi_newton(
-                    n_data_points, n_parameters,
-                    Dobs, Di, CD, CDinv,
-                    Mprior, M0, Mi, CM, CMinv,
-                    Gi, supertheory)
+            Dinew, Minew = tv23_1(Dobs, Di, CD,
+                       Mprior, M0, Mi, CM,
+                       Gi, supertheory)
 
-            elif method == "steepest_descent":
-                raise NotImplementedError
-                mu = 0.05  # need proper estimate of mu
-                Minew = Mi + mu * (CM * Gi.T * CDinv * (Dobs - Di) - (Mi - Mprior))
-                Dinew = supertheory(Minew)  # may raise a CPiSDomainError
 
-            else:
-                raise
             # ==== compute the frechet derivatives for the next iteration
             Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
 
@@ -803,26 +794,16 @@ def optimize(argv, verbose, mapkwargs):
         exit()
 
 
-def quasi_newton(n_data_points, n_parameters,
-                 Dobs, Di, CD, CDinv,
-                 Mprior, M0, Mi, CM, CMinv,
-                 Gi, supertheory):
+def tv23_1(Dobs, Di, CD,
+           Mprior, M0, Mi, CM,
+           Gi, supertheory):
 
-    if n_data_points <= n_parameters:
-        # over determined problem : see Tarantola Valette 82 eq. 23
-        assert CD is not None and CDinv is None
-        assert CM is not None and CMinv is None
-        CMGiT = CM * Gi.T
-        Siinv = sparse_inv(CD + Gi * CMGiT)  # needs a csc format
-        Ki = CMGiT * Siinv
 
-    else:
-        # under determined problem  : see Tarantola Valette 82 eq. 24
-        assert CDinv is not None and CD is None
-        assert CMinv is not None and CM is None
-        GiTCDinv = Gi.T.tocsc() * CDinv
-        Siinv = sparse_inv(GiTCDinv * Gi + CMinv)  # needs a csc format
-        Ki = Siinv * GiTCDinv
+
+
+    CMGiT = CM * Gi.T
+    Siinv = sparse_inv(CD + Gi * CMGiT)  # needs a csc format
+    Ki = CMGiT * Siinv
 
     # nan issues
     # nan can occur in the predicted data if a data point is above the cut off period
@@ -831,12 +812,12 @@ def quasi_newton(n_data_points, n_parameters,
     Dobs[Inan] = Di[Inan] = 0.
     Xi = Dobs - Di + Gi * (Mi - Mprior)
 
-    HiXi = Ki * Xi
+    KiXi = Ki * Xi
     mu = 1.0
     Minew = Dinew = None
     while mu > 0.001:
         try:
-            Minew = M0 + mu * HiXi
+            Minew = Mi + mu * (M0 + KiXi - Mi)
             Dinew = supertheory(Minew)
             break
         except CPiSDomainError as e:
