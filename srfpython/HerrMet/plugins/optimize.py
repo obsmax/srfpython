@@ -1,20 +1,22 @@
 from __future__ import print_function
 from builtins import input
-import sys, glob, os
 import warnings
+import glob, os
 import numpy as np
 from scipy.sparse import spmatrix, diags, issparse, csc_matrix, \
     save_npz as save_sparse_npz, load_npz as load_sparse_npz
 from scipy.sparse.linalg import spsolve, splu  #inv as sparse_inv NO!!!
 import matplotlib.pyplot as plt
 from srfpython.HerrMet.nodefile import NodeFile
-from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel1D, depthmodel_from_arrays
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel1D
 from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import Theory
 from srfpython.standalone.multipro8 import Job, MapSync
 from srfpython.Herrmann.Herrmann import CPiSDomainError
 from srfpython.HerrMet.files import ROOTKEY
+from srfpython.coordinates import haversine
+
 # TODO replace shell commands using python
 
 WORKINGDIR = "."
@@ -31,10 +33,10 @@ CDFILE = os.path.join(WORKINGDIR, ROOTKEY + "CD.npz")
 CDINVFILE = os.path.join(WORKINGDIR, ROOTKEY + "CDinv.npz")
 CMFILE = os.path.join(WORKINGDIR, ROOTKEY + "CM.npz")
 
-M96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_{niter:03d}.mod96")
-S96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_{niter:03d}.surf96")
-M96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_[0-9][0-9][0-9].mod96")
-S96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_[0-9][0-9][0-9].surf96")
+M96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_optimized.mod96")
+S96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_optimized.surf96")
+M96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_optimized.mod96")
+S96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_optimized.surf96")
 
 CLEAR_COMMAND = 'trash ' + " ".join(
     [NODEFILELOCAL,
@@ -126,29 +128,6 @@ HerrMet --optimize -show
 """
 
 
-def haversine(loni, lati, lonj, latj, R=6371.):
-    """
-    Calculate the great circle distance between two points
-    on the earth (specified in decimal degrees)
-    source https://stackoverflow.com/questions/15736995/how-can-i-quickly-estimate-the-distance-between-two-latitude-longitude-points
-    lone, late : coordinates of the first point, in degrees
-    lons, lats : coordinates of the second point, in degrees
-    :return distance in km
-
-    consistent with Ll2DGAB
-    """
-    # convert decimal degrees to radians
-    q = np.pi / 180.
-
-    # haversine formula
-    dlon = (loni - lonj)
-    dlat = (lati - latj)
-    a = np.sin(q * dlat / 2.) ** 2. + np.cos(q * latj) * np.cos(q * lati) * np.sin(q * dlon / 2.) ** 2.
-    c = 2. * np.arcsin(np.sqrt(a))
-    km = R * c
-    return km
-
-
 def check_keys(argv):
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
@@ -173,8 +152,8 @@ class NodeFileLocal(NodeFile):
         parameter_string_header = """
         #met NLAYER = {}
         #met TYPE = 'mZVSVPvsRHvp'
-        #met VPvs = 'lambda VS: 0.9409 + 2.0947 * VS - 0.8206 * VS ** 2.0 + 0.2683 * VS ** 3.0 - 0.0251 * VS ** 4.0'
-        #met RHvp = 'lambda VP: 1.6612 * VP - 0.4721 * VP ** 2.0 + 0.0671 * VP ** 3.0 - 0.0043 * VP ** 4.0 + 0.000106 * VP ** 5.0'
+        #met VPvs = 'lambda VS: 0.9409+2.0947*VS-0.8206*VS**2+0.2683*VS**3-0.0251*VS**4'
+        #met RHvp = 'lambda VP: 1.6612*VP-0.4721*VP**2+0.0671*VP**3-0.0043*VP**4+0.000106*VP**5'
         #fld KEY     VINF          VSUP
         #unt []      []            []
         #fmt %s      %f            %f
@@ -223,7 +202,8 @@ class NodeFileLocal(NodeFile):
         ztop = self.ztop
         zmid = self.zmid
         lock_half_space = True
-        lock_half_space_sigma = 0.001
+        lock_half_space_sigma = 0.1
+        scale_uncertainties = 1.
 
         CM_row_ind = np.array([], int)
         CM_col_ind = np.array([], int)
@@ -236,14 +216,14 @@ class NodeFileLocal(NodeFile):
             vs16_n = depthmodel_from_mod96(self.p16files[nnode]).vs
             vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
             vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
-            vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
+            vs_unc_n = scale_uncertainties * 0.5 * (vs84_n.values - vs16_n.values)
             # vs_unc_n = np.ones(len(ztop))  ######################################" TEST
             if lock_half_space:
                 vs_unc_n[-1] = lock_half_space_sigma
 
             # determine the vertical correlation coeff in cell n
             if vertical_smoothing_distance > 0:
-                raise Exception('seems incorrect (check the sign of (M - Mprior)T * CMinv * (M - Mprior)')
+                # raise Exception('seems incorrect (check the sign of (M - Mprior)T * CMinv * (M - Mprior)')
                 rhonn = np.exp(-0.5 * ((ztop - ztop[:, np.newaxis]) / vertical_smoothing_distance) ** 2.)
                 covnn = vs_unc_n[:, np.newaxis] * vs_unc_n * rhonn
                 col_ind, row_ind = np.meshgrid(range(len(ztop)),
@@ -269,7 +249,7 @@ class NodeFileLocal(NodeFile):
                     vs16_m = depthmodel_from_mod96(self.p16files[mnode]).vs
                     vs84_m = depthmodel1D(ztop, vs84_m.interp(zmid))
                     vs16_m = depthmodel1D(ztop, vs16_m.interp(zmid))
-                    vs_unc_m = 0.5 * (vs84_m.values - vs16_m.values)
+                    vs_unc_m = scale_uncertainties * 0.5 * (vs84_m.values - vs16_m.values)
                     # vs_unc_m = np.ones(len(ztop))  ######################################" TEST
 
                     if lock_half_space:
@@ -548,8 +528,12 @@ def sparsedet(M):
 
 def save_matrix(filename, matrix, verbose):
     if verbose:
-        print('saving {}, type:{}, shape:{}, dtype:{}'.format(
-            filename, matrix.__class__.__name__, matrix.shape, matrix.dtype))
+        print('saving {:<30s} {:<6s} {:<10s} {:<10s} {:<10s}'.format(
+            filename,
+            ["dense", "sparse"][int(issparse(matrix))],
+            matrix.__class__.__name__,
+            "x".join(np.asarray(matrix.shape, str)),
+            matrix.dtype))
 
     if isinstance(matrix, np.ndarray):
         if not filename.endswith('.npy'):
@@ -773,10 +757,13 @@ def optimize(argv, verbose, mapkwargs):
         fig_model = plt.figure()
         ax_model = fig_model.add_subplot(111)
 
-        superparameterizer.show_models(ax_model, Mprior - Mpriorunc, color="k", alpha=0.3)
-        superparameterizer.show_models(ax_model, Mprior + Mpriorunc, color="k", alpha=0.3)
+        try:
+            superparameterizer.show_models(ax_model, Mprior - Mpriorunc, color="k", alpha=0.3)
+            superparameterizer.show_models(ax_model, Mprior + Mpriorunc, color="k", alpha=0.3)
+            superparameterizer.show_models(ax_model, Mprior, Munc=Mpriorunc, color="k", alpha=0.3)
+        except ValueError as e:
+            warnings.warn(str(e))
         superparameterizer.show_models(ax_model, Mprior, color="k", alpha=1.0)
-        superparameterizer.show_models(ax_model, Mprior, Munc=Mpriorunc, color="k", alpha=0.3)
 
         for modelfile in modelfiles[1:-1]:
             Model = np.load(modelfile)

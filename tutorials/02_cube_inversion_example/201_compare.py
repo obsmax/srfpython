@@ -14,7 +14,7 @@ optimized_models = []
 for lon, lat, node in zip(lons, lats, nodes):
     expected_model = "./models/{}.mod96".format(node)
     solution_model = "./inversion/_HerrMet_{}/_HerrMet.best_1000_0_1.p0.50.mod96".format(node)
-    optimized_model = "./optimize/_HerrMet_{}_003.mod96".format(node)
+    optimized_model = "./optimize/_HerrMet_{}_optimized.mod96".format(node)
 
     if not os.path.isfile(expected_model) \
             or not os.path.isfile(solution_model) \
