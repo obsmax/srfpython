@@ -205,6 +205,14 @@ class NodeFileLocal(NodeFile):
         lock_half_space_sigma = 0.1
         scale_uncertainties = 1.
 
+        vsd = vertical_smoothing_distance
+        hsd = horizontal_smoothing_distance
+
+        trunc_vertical_smoothing_distance = 1.5 * vsd
+        trunc_horizontal_smoothing_distance = 1.5 * hsd
+        tvsd = trunc_vertical_smoothing_distance
+        thsd = trunc_horizontal_smoothing_distance
+
         # ========= load vs uncertainty at each node
         vs_uncertainties = []
         for nnode in range(len(self)):
@@ -220,61 +228,85 @@ class NodeFileLocal(NodeFile):
                 raise ValueError('uncertainty on vs cannot be 0, otherwise CM is singular')
 
             vs_uncertainties.append(vs_unc_n)
+            # vs_uncertainties.append(np.ones(len(ztop)))  ########################## TEST
 
         # ========== compute CM
         CM_row_ind = np.array([], int)
         CM_col_ind = np.array([], int)
         CM_data = np.array([], float)
 
+        assert vertical_smoothing_distance > 0 and horizontal_smoothing_distance > 0 # for now
         for nnode in range(len(self)):
-            # find the posterior unc at each depth on vs from the pointwise inversion
-
             vs_unc_n = vs_uncertainties[nnode]
 
-            # determine the vertical correlation coeff in cell n
-            if vertical_smoothing_distance > 0:
-                # raise Exception('seems incorrect (check the sign of (M - Mprior)T * CMinv * (M - Mprior)')
-                rhonn = np.exp(-0.5 * ((ztop - ztop[:, np.newaxis]) / vertical_smoothing_distance) ** 2.)
-                covnn = vs_unc_n[:, np.newaxis] * vs_unc_n * rhonn
-                col_ind, row_ind = np.meshgrid(range(len(ztop)),
-                                               range(len(ztop)))
-                CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + row_ind.flat[:]))
-                CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + col_ind.flat[:]))
-                CM_data = np.hstack((CM_data, covnn.flat[:]))
+            for mnode in range(nnode, len(self)):
+                vs_unc_m = vs_uncertainties[mnode]
 
-            else:
-                covnn_diags = vs_unc_n ** 2.0
-                CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
-                CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
-                CM_data = np.hstack((CM_data, covnn_diags.flat[:]))
+                # compute the horizontal distance (scalar)
+                dnm = haversine(
+                    loni=self.lons[nnode],
+                    lati=self.lats[nnode],
+                    lonj=self.lons[mnode],
+                    latj=self.lats[mnode])
+                if dnm > thsd:
+                    continue
 
-            if horizontal_smoothing_distance > 0:
-                for mnode in range(nnode + 1, len(self)):
-                    lonn = self.lons[nnode]
-                    latn = self.lats[nnode]
-                    lonm = self.lons[mnode]
-                    latm = self.lats[mnode]
+                # compute the vertical distance (2d)
+                dz = np.abs(zmid - zmid[:, np.newaxis])
+                Itrunc = dz.flat[:] <= tvsd
 
-                    vs_unc_m = vs_uncertainties[mnode]
+                # square distance
+                d2 = ((dz / vsd) ** 2. + (dnm / hsd) ** 2.)
 
-                    dnm = haversine(loni=lonn, lati=latn, lonj=lonm, latj=latm)
-                    rhonm = np.exp(-0.5 * (dnm / horizontal_smoothing_distance) ** 2.)
-                    covnm = vs_unc_n * vs_unc_m * rhonm
+                # linear correlation coefficient
+                rhonm = np.exp(-0.5 * d2)
 
-                    CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
-                    CM_col_ind = np.hstack((CM_col_ind, mnode * len(ztop) + np.arange(len(ztop))))
-                    CM_data = np.hstack((CM_data, covnm.flat[:]))
+                # covariance matrix
+                covnm = vs_unc_n[:, np.newaxis] * vs_unc_m * rhonm
 
-                    CM_row_ind = np.hstack((CM_row_ind, mnode * len(ztop) + np.arange(len(ztop))))
-                    CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
-                    CM_data = np.hstack((CM_data, covnm.flat[:]))
+                # place the matrix in a large matrix
+                col_ind_small, row_ind_small = np.meshgrid(
+                    range(len(ztop)),
+                    range(len(ztop)))
+
+                row_ind_big = nnode * len(ztop) + row_ind_small.flat[Itrunc]
+                col_ind_big = mnode * len(ztop) + col_ind_small.flat[Itrunc]
+                covnm = covnm.flat[Itrunc]
+
+                # fill the upper triangle
+                CM_row_ind = np.hstack((CM_row_ind, row_ind_big))
+                CM_col_ind = np.hstack((CM_col_ind, col_ind_big))
+                CM_data = np.hstack((CM_data, covnm))
+
+                if mnode > nnode:
+                    # fill the lower triangle
+                    CM_row_ind = np.hstack((CM_row_ind, col_ind_big))
+                    CM_col_ind = np.hstack((CM_col_ind, row_ind_big))
+                    CM_data = np.hstack((CM_data, covnm))
 
         CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)),
-                        shape=(len(self) * len(ztop), len(self) * len(ztop)))
-
+                shape=(len(self) * len(ztop), len(self) * len(ztop)))
+        # CM += diags(np.ones(CM.shape[0]))
+        # ============== quality control
+        # verifies symmetry
         check = (CM - CM.T)
         assert not len(check.data)
-        # print(check.format, check.shape, check.data)
+
+        if True:
+            # visualize the matrix
+            CM_ = CM.toarray()
+            CM_ = np.ma.masked_where(CM_ == 0, CM_)
+            plt.figure()
+            plt.colorbar(plt.imshow(np.log(CM_)))
+            plt.show()
+
+        if sparsedet(CM) == 0.:
+            # for huge matrices, the determinant in null because of underflow
+            warnings.warn('do not try to invert CM, the inverse will be unstable')
+
+        print(type(CM))
+        if np.dot(np.ones(CM.shape[0]), Ainv_dot_b(CM, np.ones(CM.shape[0]))) < 0.:
+            raise Exception('the problem is unstable')
 
         return CM
 
