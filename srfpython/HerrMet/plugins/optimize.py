@@ -15,6 +15,7 @@ from srfpython.HerrMet.theory import Theory
 from srfpython.standalone.multipro8 import Job, MapSync
 from srfpython.Herrmann.Herrmann import CPiSDomainError
 from srfpython.HerrMet.files import ROOTKEY
+# TODO replace shell commands using python
 
 WORKINGDIR = "."
 NODEFILELOCAL = os.path.join(WORKINGDIR, ROOTKEY + "nodes.txt")
@@ -29,8 +30,11 @@ DOBSFILE = os.path.join(WORKINGDIR, ROOTKEY + "Dobs.npy")
 CDFILE = os.path.join(WORKINGDIR, ROOTKEY + "CD.npz")
 CDINVFILE = os.path.join(WORKINGDIR, ROOTKEY + "CDinv.npz")
 CMFILE = os.path.join(WORKINGDIR, ROOTKEY + "CM.npz")
-CMINVFILE = os.path.join(WORKINGDIR, ROOTKEY + "CMinv.npz")
 
+M96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_{niter:03d}.mod96")
+S96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_{niter:03d}.surf96")
+M96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_[0-9][0-9][0-9].mod96")
+S96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_[0-9][0-9][0-9].surf96")
 
 CLEAR_COMMAND = 'trash ' + " ".join(
     [NODEFILELOCAL,
@@ -41,7 +45,9 @@ CLEAR_COMMAND = 'trash ' + " ".join(
      CMFILE,
      MFILES,
      DFILES,
-     FDFILES])
+     FDFILES,
+     M96FILEOUTS,
+     S96FILEOUTS])
 
 
 def mfile2niter(mfile):
@@ -62,7 +68,7 @@ default_option = None
 
 # ------------------------------ autorized_keys
 authorized_keys = ["-option", "-init", "-restart", "-prior",
-                   "-data", "-fd", "-upd", "-show",
+                   "-data", "-fd", "-upd", "-show", "-save",
                    "-h", "-help"]
 
 # ------------------------------ help messages
@@ -345,6 +351,12 @@ class SuperParameterizer(object):
             dms.append(self.parameterizers[nnode].inv_to_depthmodel(model))
         return dms
 
+    def inv_to_mod96strings(self, Model):
+        m96strings = []
+        for nnode, model in enumerate(self.split(Model)):
+            m96strings.append(self.parameterizers[nnode].inv_to_mod96string(model))
+        return m96strings
+
     def show_models(self, ax, Model, Munc=None, offset=3.0, **kwargs):
         xticks = []
         xticklabels = []
@@ -404,15 +416,23 @@ class SuperDatacoder(object):
         return datas
 
     def inv(self, Data):
-        datas = []
+        Values = []
         for nnode, (datacoder, data) in enumerate(zip(self.datacoders, self.split(Data))):
-            datas.append(datacoder.inv(data))
+            Values.append(datacoder.inv(data))
+        return Values
 
     def inv_to_laws(self, Data):
         Laws = []
         for nnode, (datacoder, data) in enumerate(zip(self.datacoders, self.split(Data))):
             Laws.append(datacoder.inv_to_laws(data))
         return Laws
+
+    def inv_to_surf96strings(self, Data):
+        surf96strings = []
+        for nnode, (datacoder, data) in enumerate(zip(self.datacoders, self.split(Data))):
+            s96 = datacoder.inv_to_surf96string(data)
+            surf96strings.append(s96)
+        return surf96strings
 
     def show_datas(self, ax, Data, showdvalue=False,
                    offset=3.,
@@ -597,7 +617,9 @@ def optimize(argv, verbose, mapkwargs):
             mfile = MFILE.format(niter=niter)
             dfile = DFILE.format(niter=niter)
             fdfile = FDFILE.format(niter=niter)
-            trashcmd = 'trash {} {} {}'.format(mfile, dfile, fdfile)
+            m96fileout = M96FILEOUT.format(node="*", niter=niter)
+            s96fileout = S96FILEOUT.format(node="*", niter=niter)
+            trashcmd = 'trash {} {} {} {} {}'.format(mfile, dfile, fdfile, m96fileout, s96fileout)
             print(trashcmd)
             os.system(trashcmd)
 
@@ -779,6 +801,28 @@ def optimize(argv, verbose, mapkwargs):
         plt.show()
         input('pause')
         exit()
+
+    if "-save" in argv.keys():
+        niter = lastiter()
+        Model = np.load(MFILE.format(niter=niter))
+        Data = np.load(DFILE.format(niter=niter))
+        m96strings = superparameterizer.inv_to_mod96strings(Model)
+        s96strings = superdatacoder.inv_to_surf96strings(Data)
+        for nnode, (m96string, s96string) in enumerate(zip(m96strings, s96strings)):
+            node_name = nodefile.nodes[nnode]
+
+            m96fileout = M96FILEOUT.format(node=node_name, niter=niter)
+            s96fileout = S96FILEOUT.format(node=node_name, niter=niter)
+
+            if verbose:
+                print('writing {}'.format(m96fileout))
+                print('writing {}'.format(s96fileout))
+
+            with open(m96fileout, 'w') as fid:
+                fid.write(m96string)
+
+            with open(s96fileout, 'w') as fid:
+                fid.write(s96string)
 
 
 def tv23_1(Dobs, Di, CD,
