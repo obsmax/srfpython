@@ -166,6 +166,11 @@ class Parameterizer(object):
         dm = depthmodel_from_arrays(ztop, vp, vs, rh)
         return dm
 
+    def inv_to_mod96string(self, m):
+        """same as inv but pack output into a depthmodel object
+        do not subclass"""
+        return str(self.inv_to_depthmodel(m))
+
     def prior(self, ZTOP_apr, VP_apr, VS_apr, RH_apr):
         """
         to be used for linearized inversion (HerrLin)

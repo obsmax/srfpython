@@ -1,6 +1,8 @@
 from srfpython.depthdisp.dispcurves import surf96reader, surf96reader_from_surf96string, mklaws
 import numpy as np
 import os
+from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
+
 
 """
 see theory.py
@@ -52,6 +54,15 @@ class Datacoder(object):
         # the default behavior is identity, see subclasses for advanced conversions
         values = d
         return values
+
+    def inv_to_surf96reader(self, d):
+        values = self.inv(d)
+        return surf96reader_from_arrays(
+            waves=self.waves, types=self.types, modes=self.modes,
+            freqs=self.freqs, values=values, dvalues=self.dvalues)
+
+    def inv_to_surf96string(self, d):
+        return str(self.inv_to_surf96reader(d))
 
     def inv_to_laws(self, d):
         values = self.inv(d)
