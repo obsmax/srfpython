@@ -16,6 +16,7 @@ def stairs(x, y):
     y_ = np.repeat(y, 2)
     return x_, y_
 
+
 def lininvsmooth(xi, di, si, xmodel, modelprior, sigmamodel,
               correlation_length=0.1):
 
@@ -69,8 +70,10 @@ def lininvsmooth(xi, di, si, xmodel, modelprior, sigmamodel,
     modeli = modelprior
     models = [modeli.copy()]
 
-    Cdinv = np.linalg.inv(Cd)  # np.diag(si ** -2.0)
-    Cminv = np.linalg.inv(Cm)
+    if n > m:
+        Cdinv = np.linalg.inv(Cd)  # np.diag(si ** -2.0)
+        Cminv = np.linalg.inv(Cm)
+
     for _ in range(100):
 
         Gi = FD(modeli)
