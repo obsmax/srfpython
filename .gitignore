@@ -13,7 +13,6 @@
 .DS_Store
 srfpython/Herrmann/bin/max_srfdis96
 srfpython/Herrmann/bin/max_srfpre96
-/tutorials/02_cube_inversion_example/inversion/
 /srfpython/HerrMet/CM.npz
 /srfpython/HerrMet/CDinv.npz
 /srfpython/HerrMet/_HerrMet.param
@@ -23,3 +22,7 @@ srfpython/Herrmann/bin/max_srfpre96
 /srfpython/HerrMet/G.npz
 /srfpython/HerrMet/Mprior.npy
 /srfpython/HerrMet/paramterizer_strings.npy
+/tutorials/02_cube_inversion_example/inversion/
+/tutorials/02_cube_inversion_example/optimize/
+/tutorials/02_cube_inversion_example/models/
+/tutorials/02_cube_inversion_example/data/
