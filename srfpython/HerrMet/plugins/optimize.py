@@ -205,6 +205,23 @@ class NodeFileLocal(NodeFile):
         lock_half_space_sigma = 0.1
         scale_uncertainties = 1.
 
+        # ========= load vs uncertainty at each node
+        vs_uncertainties = []
+        for nnode in range(len(self)):
+            vs84_n = depthmodel_from_mod96(self.p84files[nnode]).vs
+            vs16_n = depthmodel_from_mod96(self.p16files[nnode]).vs
+            vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
+            vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
+            vs_unc_n = scale_uncertainties * 0.5 * (vs84_n.values - vs16_n.values)
+            if lock_half_space:
+                vs_unc_n[-1] = lock_half_space_sigma
+
+            if (vs_unc_n <= 0.).any():
+                raise ValueError('uncertainty on vs cannot be 0, otherwise CM is singular')
+
+            vs_uncertainties.append(vs_unc_n)
+
+        # ========== compute CM
         CM_row_ind = np.array([], int)
         CM_col_ind = np.array([], int)
         CM_data = np.array([], float)
@@ -212,14 +229,7 @@ class NodeFileLocal(NodeFile):
         for nnode in range(len(self)):
             # find the posterior unc at each depth on vs from the pointwise inversion
 
-            vs84_n = depthmodel_from_mod96(self.p84files[nnode]).vs
-            vs16_n = depthmodel_from_mod96(self.p16files[nnode]).vs
-            vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
-            vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
-            vs_unc_n = scale_uncertainties * 0.5 * (vs84_n.values - vs16_n.values)
-            # vs_unc_n = np.ones(len(ztop))  ######################################" TEST
-            if lock_half_space:
-                vs_unc_n[-1] = lock_half_space_sigma
+            vs_unc_n = vs_uncertainties[nnode]
 
             # determine the vertical correlation coeff in cell n
             if vertical_smoothing_distance > 0:
@@ -245,41 +255,19 @@ class NodeFileLocal(NodeFile):
                     lonm = self.lons[mnode]
                     latm = self.lats[mnode]
 
-                    vs84_m = depthmodel_from_mod96(self.p84files[mnode]).vs
-                    vs16_m = depthmodel_from_mod96(self.p16files[mnode]).vs
-                    vs84_m = depthmodel1D(ztop, vs84_m.interp(zmid))
-                    vs16_m = depthmodel1D(ztop, vs16_m.interp(zmid))
-                    vs_unc_m = scale_uncertainties * 0.5 * (vs84_m.values - vs16_m.values)
-                    # vs_unc_m = np.ones(len(ztop))  ######################################" TEST
-
-                    if lock_half_space:
-                        vs_unc_m[-1] = lock_half_space_sigma
+                    vs_unc_m = vs_uncertainties[mnode]
 
                     dnm = haversine(loni=lonn, lati=latn, lonj=lonm, latj=latm)
                     rhonm = np.exp(-0.5 * (dnm / horizontal_smoothing_distance) ** 2.)
-                    if True:
-                        covnm = vs_unc_n * vs_unc_m * rhonm
+                    covnm = vs_unc_n * vs_unc_m * rhonm
 
-                        CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
-                        CM_col_ind = np.hstack((CM_col_ind, mnode * len(ztop) + np.arange(len(ztop))))
-                        CM_data = np.hstack((CM_data, covnm.flat[:]))
+                    CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + np.arange(len(ztop))))
+                    CM_col_ind = np.hstack((CM_col_ind, mnode * len(ztop) + np.arange(len(ztop))))
+                    CM_data = np.hstack((CM_data, covnm.flat[:]))
 
-                        CM_row_ind = np.hstack((CM_row_ind, mnode * len(ztop) + np.arange(len(ztop))))
-                        CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
-                        CM_data = np.hstack((CM_data, covnm.flat[:]))
-
-                    else:
-                        covnm = vs_unc_n[:, np.newaxis] * vs_unc_m * rhonm
-
-                        col_ind, row_ind = np.meshgrid(range(len(ztop)), range(len(ztop)))
-
-                        CM_row_ind = np.hstack((CM_row_ind, nnode * len(ztop) + row_ind.flat[:]))
-                        CM_col_ind = np.hstack((CM_col_ind, mnode * len(ztop) + col_ind.flat[:]))
-                        CM_data = np.hstack((CM_data, covnm.flat[:]))
-
-                        CM_row_ind = np.hstack((CM_row_ind, mnode * len(ztop) + col_ind.flat[:]))
-                        CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + row_ind.flat[:]))
-                        CM_data = np.hstack((CM_data, covnm.flat[:]))
+                    CM_row_ind = np.hstack((CM_row_ind, mnode * len(ztop) + np.arange(len(ztop))))
+                    CM_col_ind = np.hstack((CM_col_ind, nnode * len(ztop) + np.arange(len(ztop))))
+                    CM_data = np.hstack((CM_data, covnm.flat[:]))
 
         CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)),
                         shape=(len(self) * len(ztop), len(self) * len(ztop)))
