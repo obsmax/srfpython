@@ -820,7 +820,7 @@ def tv23_1(Dobs, Di, CD,
     # nan can occur in the predicted data if a data point is above the cut off period
     # let ignore them
     Inan = np.isnan(Di) | np.isnan(Dobs)
-    Dobs[Inan] = Di[Inan] = 0.  # TODO make sure this has not affected Dobs outside this function
+    Dobs[Inan] = Di[Inan] = 0.
     Xi = Dobs - Di + Gi * (Mi - Mprior)
 
     CMGiT = CM * Gi.T
