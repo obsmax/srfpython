@@ -28,7 +28,8 @@ sigmaT = sigma[:, np.newaxis]
 zT = z[:, np.newaxis]
 
 if l > 0:
-    rho = np.exp(-0.5 * ((z - zT) / l) ** 2.0)
+    #rho = np.exp(-0.5 * ((z - zT) / l) ** 2.0)
+    rho = np.exp(-np.abs(z - zT) / l)
 elif l == 0:
     rho = np.diag(np.ones(n))
 else:
@@ -36,9 +37,9 @@ else:
 
 C = sigma * sigmaT * rho
 
-
+det = np.linalg.det(C)
 # ========== compute the determinant
-print(np.linalg.det(C))  # => 0
+print(det, det == 0)  # => 0, True
 Cinv = np.linalg.inv(C)  # => inaccurate
 m = np.ones(n)
 print (np.dot(m, np.dot(Cinv, m)))  # => negative ???

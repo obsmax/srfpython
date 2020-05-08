@@ -18,6 +18,8 @@ from srfpython.HerrMet.files import ROOTKEY
 from srfpython.coordinates import haversine
 
 # TODO replace shell commands using python
+# TODO compute frechet derivatives at the beginning of the current iteration (not after)
+# TODO add convergence interruption
 
 WORKINGDIR = "."
 NODEFILELOCAL = os.path.join(WORKINGDIR, ROOTKEY + "nodes.txt")
@@ -198,21 +200,40 @@ class NodeFileLocal(NodeFile):
         datacoders = [makedatacoder(datacoder_string, which=Datacoder_log) for datacoder_string in datacoder_strings]
         return SuperDatacoder(datacoders)
 
-    def get_CM(self, horizontal_smoothing_distance, vertical_smoothing_distance):
+    def get_CM(self, horizontal_smoothing_distance, vertical_smoothing_distance,
+        trunc_horizontal_smoothing_distance=None,
+        trunc_vertical_smoothing_distance=None,
+        lock_half_space=True,
+        lock_half_space_sigma=0.01,
+        scale_uncertainties=1.,
+        add_uncertainty=0.,
+        norm="L1",
+        visual_qc=False):
+
         ztop = self.ztop
         zmid = self.zmid
-        lock_half_space = True
-        lock_half_space_sigma = 0.1
-        scale_uncertainties = 1.
+        n_parameters = len(self) * len(ztop)
+
+        if trunc_vertical_smoothing_distance is None:
+            trunc_vertical_smoothing_distance = 10.0 * vertical_smoothing_distance
+
+        if trunc_horizontal_smoothing_distance is None:
+            trunc_horizontal_smoothing_distance = 10. * horizontal_smoothing_distance
 
         vsd = vertical_smoothing_distance
         hsd = horizontal_smoothing_distance
-
-        trunc_vertical_smoothing_distance = 1.5 * vsd
-        trunc_horizontal_smoothing_distance = 1.5 * hsd
         tvsd = trunc_vertical_smoothing_distance
         thsd = trunc_horizontal_smoothing_distance
 
+        if vsd == 0.:
+            # trick (not optimal) to avoid vertical smoothing I set the truncation distance to 0
+            vsd, tvsd = 1.0, 0.
+
+        if hsd == 0.:
+            # trick (not optimal) to avoid horizontal smoothing I set the truncation distance to 0
+            hsd, thsd = 1.0, 0.
+
+        assert hsd > 0 and vsd > 0
         # ========= load vs uncertainty at each node
         vs_uncertainties = []
         for nnode in range(len(self)):
@@ -220,22 +241,21 @@ class NodeFileLocal(NodeFile):
             vs16_n = depthmodel_from_mod96(self.p16files[nnode]).vs
             vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
             vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
-            vs_unc_n = scale_uncertainties * 0.5 * (vs84_n.values - vs16_n.values)
+            vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
+            vs_unc_n = scale_uncertainties * vs_unc_n + add_uncertainty
+
             if lock_half_space:
                 vs_unc_n[-1] = lock_half_space_sigma
 
-            if (vs_unc_n <= 0.).any():
-                raise ValueError('uncertainty on vs cannot be 0, otherwise CM is singular')
-
+            # make sure all uncertainties are positive
+            vs_unc_n = np.clip(vs_unc_n, lock_half_space_sigma, np.inf)
             vs_uncertainties.append(vs_unc_n)
-            # vs_uncertainties.append(np.ones(len(ztop)))  ########################## TEST
 
         # ========== compute CM
         CM_row_ind = np.array([], int)
         CM_col_ind = np.array([], int)
         CM_data = np.array([], float)
 
-        assert vertical_smoothing_distance > 0 and horizontal_smoothing_distance > 0 # for now
         for nnode in range(len(self)):
             vs_unc_n = vs_uncertainties[nnode]
 
@@ -243,31 +263,44 @@ class NodeFileLocal(NodeFile):
                 vs_unc_m = vs_uncertainties[mnode]
 
                 # compute the horizontal distance (scalar)
-                dnm = haversine(
+                horizontal_distance_nm = haversine(
                     loni=self.lons[nnode],
                     lati=self.lats[nnode],
                     lonj=self.lons[mnode],
                     latj=self.lats[mnode])
-                if dnm > thsd:
+
+                if horizontal_distance_nm > thsd:
+                    # the two cells are farther than trunc_horizontal_smoothing_distance
+                    # leave covariance = 0
                     continue
 
                 # compute the vertical distance (2d)
                 dz = np.abs(zmid - zmid[:, np.newaxis])
                 Itrunc = dz.flat[:] <= tvsd
 
-                # square distance
-                d2 = ((dz / vsd) ** 2. + (dnm / hsd) ** 2.)
+                if norm == "L2":
+                    # square distance
+                    d2 = (dz / vsd) ** 2. + (horizontal_distance_nm / hsd) ** 2.
 
-                # linear correlation coefficient
-                rhonm = np.exp(-0.5 * d2)
+                    # linear correlation coefficient
+                    rhonm = np.exp(-0.5 * d2)
+
+                elif norm == "L1":
+                    # distance
+                    d1 = np.abs(dz / vsd) + np.abs(horizontal_distance_nm / hsd)
+
+                    # linear correlation coefficient
+                    rhonm = np.exp(-d1)
+
+                else:
+                    raise
 
                 # covariance matrix
                 covnm = vs_unc_n[:, np.newaxis] * vs_unc_m * rhonm
 
                 # place the matrix in a large matrix
                 col_ind_small, row_ind_small = np.meshgrid(
-                    range(len(ztop)),
-                    range(len(ztop)))
+                    range(len(ztop)), range(len(ztop)))
 
                 row_ind_big = nnode * len(ztop) + row_ind_small.flat[Itrunc]
                 col_ind_big = mnode * len(ztop) + col_ind_small.flat[Itrunc]
@@ -286,13 +319,14 @@ class NodeFileLocal(NodeFile):
 
         CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)),
                 shape=(len(self) * len(ztop), len(self) * len(ztop)))
-        # CM += diags(np.ones(CM.shape[0]))
+
         # ============== quality control
         # verifies symmetry
         check = (CM - CM.T)
         assert not len(check.data)
 
-        if True:
+        if visual_qc:
+            # warning memory error
             # visualize the matrix
             CM_ = CM.toarray()
             CM_ = np.ma.masked_where(CM_ == 0, CM_)
@@ -300,13 +334,25 @@ class NodeFileLocal(NodeFile):
             plt.colorbar(plt.imshow(np.log(CM_)))
             plt.show()
 
-        if sparsedet(CM) == 0.:
-            # for huge matrices, the determinant in null because of underflow
-            warnings.warn('do not try to invert CM, the inverse will be unstable')
+        CMdet = sparsedet(CM)
+        M = np.ones(CM.shape[0])
+        MTCMinvM = np.dot(M, Ainv_dot_b(CM, M))
 
-        print(type(CM))
-        if np.dot(np.ones(CM.shape[0]), Ainv_dot_b(CM, np.ones(CM.shape[0]))) < 0.:
-            raise Exception('the problem is unstable')
+        if MTCMinvM < 0.:
+            raise Exception('the problem is unstable because '
+                            'Mt.CM^-1.M is negative '
+                            'this is probably due to under/overflows '
+                            '(try using an exponential covariance instead)')
+
+        elif CMdet == 0.:
+            # for huge matrices, the determinant may be null because of underflow
+            warnings.warn(
+                '\n***************'
+                '\nUnderflow, the determinant of CM is 0, '
+                'do not try to use CM^-1. '
+                '\nNevertheless, I consider that this is '
+                'only a warning because Mt.CM^-1.M is positive'
+                )
 
         return CM
 
