@@ -2,7 +2,8 @@ import os
 import numpy as np
 from srfpython.HerrMet.files import ROOTNAME, HERRMETPARAMFILE, HERRMETTARGETFILE, HERRMETEXTRACTPDFMODELFILE
 from srfpython.standalone.asciifile import AsciiFile_fromstring
-from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthspace
+# from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthspace
+from srfpython.coordinates import haversine
 
 
 NODEFILE_HEADER = """# Nodefile for HerrMet
@@ -149,6 +150,18 @@ class NodeFileString(object):
     def write(self, filename):
         with open(filename, 'w') as fid:
             fid.write(str(self))
+
+    def distances(self):
+        dist = np.zeros((len(self), len(self)), float)
+        for nnode in range(len(self)-1):
+            for mnode in range(nnode + 1, len(self)):
+                dnm = haversine(
+                    loni=self.lons[nnode],
+                    lati=self.lats[nnode],
+                    lonj=self.lons[mnode],
+                    latj=self.lats[mnode])
+                dist[nnode, mnode] = dist[mnode, nnode] = dnm
+        return dist
 
 
 class NodeFile(NodeFileString):
