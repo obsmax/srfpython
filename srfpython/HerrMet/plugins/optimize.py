@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 from scipy.sparse import spmatrix, diags, issparse, csc_matrix, \
     save_npz as save_sparse_npz, load_npz as load_sparse_npz
-from scipy.sparse.linalg import inv as sparse_inv
+from scipy.sparse.linalg import spsolve, splu  #inv as sparse_inv NO!!!
 import matplotlib.pyplot as plt
 from srfpython.HerrMet.nodefile import NodeFile
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel1D, depthmodel_from_arrays
@@ -39,7 +39,6 @@ CLEAR_COMMAND = 'trash ' + " ".join(
      CDFILE,
      CDINVFILE,
      CMFILE,
-     CMINVFILE,
      MFILES,
      DFILES,
      FDFILES])
@@ -218,6 +217,7 @@ class NodeFileLocal(NodeFile):
         ztop = self.ztop
         zmid = self.zmid
         lock_half_space = True
+        lock_half_space_sigma = 0.001
 
         CM_row_ind = np.array([], int)
         CM_col_ind = np.array([], int)
@@ -231,8 +231,9 @@ class NodeFileLocal(NodeFile):
             vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
             vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
             vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
+            # vs_unc_n = np.ones(len(ztop))  ######################################" TEST
             if lock_half_space:
-                vs_unc_n[-1] = 1.e-3
+                vs_unc_n[-1] = lock_half_space_sigma
 
             # determine the vertical correlation coeff in cell n
             if vertical_smoothing_distance > 0:
@@ -263,8 +264,10 @@ class NodeFileLocal(NodeFile):
                     vs84_m = depthmodel1D(ztop, vs84_m.interp(zmid))
                     vs16_m = depthmodel1D(ztop, vs16_m.interp(zmid))
                     vs_unc_m = 0.5 * (vs84_m.values - vs16_m.values)
+                    # vs_unc_m = np.ones(len(ztop))  ######################################" TEST
+
                     if lock_half_space:
-                        vs_unc_m[-1] = 1.e-3
+                        vs_unc_m[-1] = lock_half_space_sigma
 
                     dnm = haversine(loni=lonn, lati=latn, lonj=lonm, latj=latm)
                     rhonm = np.exp(-0.5 * (dnm / horizontal_smoothing_distance) ** 2.)
@@ -512,19 +515,15 @@ class SuperTheory(object):
         return G
 
 
-def get_CMinv(cmfile, cminvfile, verbose):
-    try:
-        CMinv = load_sparse_npz(cminvfile)
-    except IOError:
-        if verbose:
-            print('computing CMinv...')
-        CM = load_sparse_npz(cmfile)
-        CMinv = sparse_inv(CM)
-
-        del CM
-        save_matrix(cminvfile, CMinv, verbose)
-
-    return CMinv
+def sparsedet(M):
+    lu = splu(M)
+    diagL = lu.L.diagonal()
+    diagU = lu.U.diagonal()
+    diagL = diagL.astype(np.complex128)
+    diagU = diagU.astype(np.complex128)
+    logdet = np.log(diagL).sum() + np.log(diagU).sum()
+    det = np.exp(logdet)  # usually underflows/overflows for large matrices
+    return det.real
 
 
 def save_matrix(filename, matrix, verbose):
@@ -546,6 +545,25 @@ def save_matrix(filename, matrix, verbose):
         raise NotImplementedError
 
     assert os.path.isfile(filename)
+
+
+def Ainv_dot_b(A, b):
+    """
+    computes A^-1 * b without inverting A
+    for numerical stability
+    see Tarantola 2005, section 3.4.5 p80
+    :param A:
+    :param b:
+    :return:
+    """
+    if issparse(A):
+        return spsolve(A=A, b=b)
+
+    elif isinstance(A, np.ndarray) or isinstance(A, np.matrix):
+        return np.linalg.solve(a=A, b=b)
+
+    else:
+        raise TypeError
 
 
 def optimize(argv, verbose, mapkwargs):
@@ -599,8 +617,6 @@ def optimize(argv, verbose, mapkwargs):
     if "-prior" in argv.keys():
         hsd, vsd = argv["-prior"]
         # ========= set the prior model and covariance matrix
-        os.system('trash {}'.format(CMINVFILE))
-        assert not os.path.isfile(CMINVFILE)
 
         Mprior = superparameterizer.get_Mprior()
         CM = nodefile.get_CM(
@@ -608,24 +624,6 @@ def optimize(argv, verbose, mapkwargs):
             vertical_smoothing_distance=vsd)
         save_matrix(MPRIORFILE, Mprior, verbose)
         save_matrix(CMFILE, CM, verbose)
-
-        if True:
-            # qc
-            CMinv = get_CMinv(CMFILE, CMINVFILE, True)
-            ncut = 3 * len(nodefile.ztop)
-            plt.figure()
-            plt.subplot(121)
-            X = CM[:ncut, :ncut].toarray()
-            X = np.ma.masked_where(X == 0, X)
-            Y = CMinv[:ncut, :ncut].toarray()
-            Y = np.ma.masked_where(Y == 0, Y)
-            X = np.log(X)
-            Y = np.log(np.abs(Y))
-
-            plt.imshow(X)
-            plt.subplot(122, sharex=plt.gca(), sharey=plt.gca())
-            plt.imshow(Y)
-            plt.show()
 
         M0 = Mprior
         m0filename = MFILE.format(niter=0)
@@ -667,18 +665,6 @@ def optimize(argv, verbose, mapkwargs):
 
         CM = load_sparse_npz(CMFILE)
         CD = load_sparse_npz(CDFILE)
-        # if n_data_points <= n_parameters:
-        #     if verbose:
-        #         print('over determined problem, loading CM, CD')
-        #     CM = load_sparse_npz(CMFILE)
-        #     CD = load_sparse_npz(CDFILE)
-        #     CMinv = CDinv = None
-        # else:
-        #     if verbose:
-        #         print('under determined problem, loading CMinv, CDinv')
-        #     CDinv = load_sparse_npz(CDINVFILE)
-        #     CMinv = get_CMinv(CMFILE, CMINVFILE, verbose)
-        #     CM = CD = None
 
         for _ in range(nupd):
             niter = lastiter()
@@ -693,10 +679,12 @@ def optimize(argv, verbose, mapkwargs):
             Gi = load_sparse_npz(fdfilename)
 
             # ==== update the current model
+            has_nan = np.isnan(Dobs).any()
             Dinew, Minew = tv23_1(Dobs, Di, CD,
                        Mprior, M0, Mi, CM,
                        Gi, supertheory)
-
+            if has_nan:
+                assert np.isnan(Dobs).any()
 
             # ==== compute the frechet derivatives for the next iteration
             Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
@@ -718,7 +706,6 @@ def optimize(argv, verbose, mapkwargs):
         Dobs = np.load(DOBSFILE)
         Mprior = np.load(mpriorfile)
         CM = load_sparse_npz(CMFILE)
-        CMinv = get_CMinv(CMFILE, CMINVFILE, verbose)
         CDinv = load_sparse_npz(CDINVFILE)
         Mpriorunc = np.asarray(CM[np.arange(n_parameters), np.arange(n_parameters)]).flat[:] ** 0.5
 
@@ -736,9 +723,8 @@ def optimize(argv, verbose, mapkwargs):
             Model = np.load(modelfile)
             Data = np.load(datafile)
 
-            from scipy.sparse import issparse
             assert issparse(CDinv)
-            assert issparse(CMinv)
+            assert issparse(CM)
             assert not issparse(Data - Dobs)
             assert not issparse(Model - Mprior)
 
@@ -748,10 +734,11 @@ def optimize(argv, verbose, mapkwargs):
             Inan = np.isnan(Data) | np.isnan(Dobs)
             Dobs[Inan] = Data[Inan] = 0.  # so that they do not act on the data misfit
 
-            data_cost = np.dot(((Data - Dobs) * CDinv), (Data - Dobs))  # looks right
-            model_cost = np.dot(((Model - Mprior) * CMinv), (Model - Mprior))
-            print(model_cost)
-
+            data_cost = np.dot((Data - Dobs), CDinv * (Data - Dobs))  # only because CDinv is known exactly
+            model_cost = np.dot(Model - Mprior, Ainv_dot_b(A=CM, b=Model - Mprior))
+            if verbose:
+                print('iter {:03d}: chi2_data={:<16f} chi2_model={:<16f} chi2={:<16f}'.format(
+                    niter, data_cost, model_cost, data_cost + model_cost))
             # model_cost = np.dot(np.dot((Model - Mprior), CMinv), (Model - Mprior))  # NO
             data_costs.append(data_cost)
             model_costs.append(model_cost)
@@ -798,21 +785,16 @@ def tv23_1(Dobs, Di, CD,
            Mprior, M0, Mi, CM,
            Gi, supertheory):
 
-
-
-
-    CMGiT = CM * Gi.T
-    Siinv = sparse_inv(CD + Gi * CMGiT)  # needs a csc format
-    Ki = CMGiT * Siinv
-
     # nan issues
     # nan can occur in the predicted data if a data point is above the cut off period
     # let ignore them
     Inan = np.isnan(Di) | np.isnan(Dobs)
-    Dobs[Inan] = Di[Inan] = 0.
+    Dobs[Inan] = Di[Inan] = 0.  # TODO make sure this has not affected Dobs outside this function
     Xi = Dobs - Di + Gi * (Mi - Mprior)
 
-    KiXi = Ki * Xi
+    CMGiT = CM * Gi.T
+    KiXi = CMGiT * Ainv_dot_b(A=CD + Gi * CMGiT, b=Xi)
+
     mu = 1.0
     Minew = Dinew = None
     while mu > 0.001:
