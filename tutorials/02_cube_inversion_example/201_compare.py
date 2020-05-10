@@ -117,7 +117,7 @@ for n, z0 in enumerate([.5, 1.5, 2.5]):
 
 
     cx.tripcolor(
-        lons, lats, vs_solution,
+        lons, lats, vs_optimized,
         vmin=vs_expected.min(),
         vmax=vs_expected.max(),
         cmap=plt.get_cmap('jet_r'))

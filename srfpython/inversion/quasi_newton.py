@@ -103,7 +103,7 @@ def Ainv_dot_b(A, b):
 
 
 if __name__ == '__main__':
-    if 0:
+    if 1:
         # over determined problem
         # plus je met de la covariance plus l'egalite A20 de TV est fausse
         xobs = np.array([0., 1., 2., 3.])
@@ -130,7 +130,7 @@ if __name__ == '__main__':
     if correlation_length == 0.:
         # no smoothing
         CM = np.diag(sigmamodel ** 2.0)
-    elif False:
+    elif True:
         # use a exponential smoothing
         CM = sigmamodel[:, np.newaxis] * sigmamodel * np.exp(
             -np.abs((xmodel[:, np.newaxis] - xmodel) / correlation_length))
@@ -184,7 +184,7 @@ if __name__ == '__main__':
              CD=CD,
              # CDinv=CDinv,
              Gn=Gn,
-             mun=0.1)
+             mun=0.6)
         dn = g(mn)
         Gn = FD(mn)
         models.append(mn)

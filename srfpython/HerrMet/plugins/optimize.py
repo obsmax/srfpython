@@ -82,9 +82,16 @@ long_help = """\
 --optimize   
     -init  s         clear temporary files from previous run, 
                      copy the input nodefile to {nodefilelocal} 
-    -prior f f       get the prior model and model covariance matrix, 
+    -prior fx6       get the prior model and model covariance matrix, 
                      save it to {mpriorfile}, {cmfile}
-                     need the horizontal smoothing distance and vertical smoothing distance in km
+                     needs 6 arguments
+                        - horizontal_smoothing_distance in km 
+                        - vertical_smoothing_distance in km 
+                        - trunc_horizontal_smoothing_distance in km 
+                        - trunc_vertical_smoothing_distance in km 
+                        - lock_half_space 1 or 0 
+                        - scale_uncertainties (give a factor > 0) 
+                        - add_uncertainty in km/s
     -data            get the data array and data covariance matrix, 
                      save it to {dobsfile}, {cdfile}
     -fd              compute the frechet derivatives for the first model
@@ -110,7 +117,7 @@ HerrMet --optimize \\
     
 # set the data and prior information    
 HerrMet --optimize \\
-    -prior 80. 0.  \\
+    -prior 100. 2. 1000. 20. 1 1.0 0.5   \\
     -data 
     
 # the prior can be changed afterwards, 
@@ -200,24 +207,26 @@ class NodeFileLocal(NodeFile):
         datacoders = [makedatacoder(datacoder_string, which=Datacoder_log) for datacoder_string in datacoder_strings]
         return SuperDatacoder(datacoders)
 
-    def get_CM(self, horizontal_smoothing_distance, vertical_smoothing_distance,
-        trunc_horizontal_smoothing_distance=None,
-        trunc_vertical_smoothing_distance=None,
-        lock_half_space=True,
-        lock_half_space_sigma=0.01,
-        scale_uncertainties=1.,
-        add_uncertainty=0.,
-        norm="L1",
-        visual_qc=False):
+    def get_CM(
+            self, horizontal_smoothing_distance, vertical_smoothing_distance,
+            trunc_horizontal_smoothing_distance=0.,
+            trunc_vertical_smoothing_distance=0.,
+            lock_half_space=True,
+            lock_half_space_sigma=0.01,
+            scale_uncertainties=1.,
+            add_uncertainty=0.,
+            norm="L1",
+            visual_qc=False):
 
         ztop = self.ztop
         zmid = self.zmid
-        n_parameters = len(self) * len(ztop)
 
-        if trunc_vertical_smoothing_distance is None:
+        if trunc_vertical_smoothing_distance is None or trunc_vertical_smoothing_distance <= 0.:
+            # truncate the covariance beyond 10 times the smoothing distance
             trunc_vertical_smoothing_distance = 10.0 * vertical_smoothing_distance
 
-        if trunc_horizontal_smoothing_distance is None:
+        if trunc_horizontal_smoothing_distance is None or trunc_horizontal_smoothing_distance <= 0.:
+            # truncate the covariance beyond 10 times the smoothing distance
             trunc_horizontal_smoothing_distance = 10. * horizontal_smoothing_distance
 
         vsd = vertical_smoothing_distance
@@ -334,26 +343,15 @@ class NodeFileLocal(NodeFile):
             plt.colorbar(plt.imshow(np.log(CM_)))
             plt.show()
 
-        CMdet = sparsedet(CM)
         M = np.ones(CM.shape[0])
         MTCMinvM = np.dot(M, Ainv_dot_b(CM, M))
 
         if MTCMinvM < 0.:
-            raise Exception('the problem is unstable because '
-                            'Mt.CM^-1.M is negative '
-                            'this is probably due to under/overflows '
-                            '(try using an exponential covariance instead)')
-
-        elif CMdet == 0.:
-            # for huge matrices, the determinant may be null because of underflow
-            warnings.warn(
-                '\n***************'
-                '\nUnderflow, the determinant of CM is 0, '
-                'do not try to use CM^-1. '
-                '\nNevertheless, I consider that this is '
-                'only a warning because Mt.CM^-1.M is positive'
-                )
-
+            message = 'the problem might be unstable because '\
+                      'Mt.CM^-1.M is negative '\
+                      'this is probably due to under/overflows '
+            # raise Exception(message)
+            warnings.warn(message)
         return CM
 
 
@@ -687,13 +685,27 @@ def optimize(argv, verbose, mapkwargs):
     n_data_points, n_parameters = supertheory.shape
 
     if "-prior" in argv.keys():
-        hsd, vsd = argv["-prior"]
-        # ========= set the prior model and covariance matrix
+        horizontal_smoothing_distance = argv["-prior"][0]
+        vertical_smoothing_distance = argv["-prior"][1]
+        trunc_horizontal_smoothing_distance = argv["-prior"][2]
+        trunc_vertical_smoothing_distance = argv["-prior"][3]
+        lock_half_space = bool(int(argv["-prior"][4]))
+        scale_uncertainties = argv["-prior"][5]
+        add_uncertainty = argv["-prior"][6]
 
+        # ========= set the prior model and covariance matrix
         Mprior = superparameterizer.get_Mprior()
         CM = nodefile.get_CM(
-            horizontal_smoothing_distance=hsd,
-            vertical_smoothing_distance=vsd)
+            horizontal_smoothing_distance=horizontal_smoothing_distance,
+            vertical_smoothing_distance=vertical_smoothing_distance,
+            trunc_horizontal_smoothing_distance=trunc_horizontal_smoothing_distance,
+            trunc_vertical_smoothing_distance=trunc_vertical_smoothing_distance,
+            lock_half_space=lock_half_space,
+            scale_uncertainties=scale_uncertainties,
+            add_uncertainty=add_uncertainty,
+            norm="L1",
+            visual_qc=False)
+
         save_matrix(MPRIORFILE, Mprior, verbose)
         save_matrix(CMFILE, CM, verbose)
 
@@ -890,7 +902,16 @@ def tv23_1(Dobs, Di, CD,
     Xi = Dobs - Di + Gi * (Mi - Mprior)
 
     CMGiT = CM * Gi.T
-    KiXi = CMGiT * Ainv_dot_b(A=CD + Gi * CMGiT, b=Xi)
+
+    Ai = CD + Gi * CMGiT
+
+    lu = splu(Ai)
+    Aiinv_dot_Xi = lu.solve(Xi)
+
+    error = np.abs(Xi - Ai * Aiinv_dot_Xi).sum()
+    print('error: {}'.format(error))
+
+    KiXi = CMGiT * Aiinv_dot_Xi
 
     mu = 1.0
     Minew = Dinew = None
