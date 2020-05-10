@@ -580,14 +580,35 @@ def sparsedet(M):
     return det.real
 
 
+def sizeformat(size):
+    n = 0
+    bkmg = []
+    while size and n < 4:
+        bkmg.append(int(size % 1024))
+        size = size // 1024
+        n += 1
+    return str(bkmg[-1]) + " KMG"[len(bkmg) - 1]
+
+
 def save_matrix(filename, matrix, verbose):
+    if not issparse(matrix):
+        sparsity = 0.
+        size = matrix.size * matrix.itemsize
+
+    else:
+        n = matrix.count_nonzero()
+        s = np.prod(matrix.shape)
+        sparsity = 100. * (1. - n / float(s))
+        size = s * matrix.data.itemsize
+
     if verbose:
-        print('saving {:<30s} {:<6s} {:<10s} {:<10s} {:<10s}'.format(
+        print('saving {:<30s} {:<10s} {:<14s} {:<10s} {:<10s} {:<10s}'.format(
             filename,
-            ["dense", "sparse"][int(issparse(matrix))],
             matrix.__class__.__name__,
+            "sparse[{:5.1f}%]".format(sparsity) if sparsity else "dense",
             "x".join(np.asarray(matrix.shape, str)),
-            matrix.dtype))
+            matrix.dtype,
+            sizeformat(size)))
 
     if isinstance(matrix, np.ndarray):
         if not filename.endswith('.npy'):
