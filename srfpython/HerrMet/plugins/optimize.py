@@ -18,7 +18,6 @@ from srfpython.HerrMet.files import ROOTKEY
 from srfpython.coordinates import haversine
 
 # TODO replace shell commands using python
-# TODO compute frechet derivatives at the beginning of the current iteration (not after)
 # TODO add convergence interruption
 
 WORKINGDIR = "."
@@ -343,15 +342,15 @@ class NodeFileLocal(NodeFile):
             plt.colorbar(plt.imshow(np.log(CM_)))
             plt.show()
 
-        M = np.ones(CM.shape[0])
-        MTCMinvM = np.dot(M, Ainv_dot_b(CM, M))
-
-        if MTCMinvM < 0.:
-            message = 'the problem might be unstable because '\
-                      'Mt.CM^-1.M is negative '\
-                      'this is probably due to under/overflows '
-            # raise Exception(message)
-            warnings.warn(message)
+        # M = np.ones(CM.shape[0])
+        # MTCMinvM = np.dot(M, Ainv_dot_b(CM, M))
+        #
+        # if MTCMinvM < 0.:
+        #     message = 'the problem might be unstable because '\
+        #               'Mt.CM^-1.M is negative '\
+        #               'this is probably due to under/overflows '
+        #     # raise Exception(message)
+        #     warnings.warn(message)
         return CM
 
 
@@ -634,6 +633,67 @@ def Ainv_dot_b(A, b):
         raise TypeError
 
 
+def chi2_data(niter=None, Data=None, Dobs=None, CDinv=None):
+    if Data is None:
+        Data = np.load(DFILE.format(niter=niter))
+    if Dobs is None:
+        Dobs = np.load(DOBSFILE)
+    if CDinv is None:
+        CDinv = load_sparse_npz(CDINVFILE.format(niter))
+    assert issparse(CDinv)
+    assert not issparse(Data - Dobs)
+
+    Inan = np.isnan(Data) | np.isnan(Dobs)
+    Dobs[Inan] = Data[Inan] = 0.  # so that they do not act on the data misfit
+
+    return np.dot((Data - Dobs), CDinv * (Data - Dobs))  # only because CDinv is known exactly
+
+
+def chi2_model(niter=None, Model=None, Mprior=None, CM=None):
+
+    assert issparse(CM)
+    assert not issparse(Model - Mprior)
+
+    if Model is None:
+        Model = np.load(MFILE.format(niter=niter))
+    if Mprior is None:
+        Mprior = np.load(MPRIORFILE)
+    if CM is None:
+        CM = load_sparse_npz(CMFILE.format(niter))
+
+    return np.dot(Model - Mprior, Ainv_dot_b(A=CM, b=Model - Mprior))
+
+
+def print_costs(niter, data_cost=None, model_cost=None):
+    if data_cost is None:
+        data_cost = chi2_data(niter=niter)
+    if model_cost is None:
+        model_cost = chi2_model(niter=niter)
+
+    print('iter {:03d}: chi2_data={:<16f} chi2_model={:<16f} chi2={:<16f}'.format(
+        niter, data_cost, model_cost, data_cost + model_cost))
+
+
+def update_frechet_derivatives(supertheory, verbose, mapkwargs):
+    # ========= compute the frechet derivatives for the last model found
+    niter = lastiter()
+    mfilename = MFILE.format(niter=niter)
+    fdfilename = FDFILE.format(niter=niter)
+    if not os.path.isfile(fdfilename):
+        if verbose:
+            print('computing frechet derivatives for iteration {}...'.format(niter))
+        Mi = np.load(mfilename)
+        Gi = supertheory.get_FD(Mi, mapkwargs)
+        save_matrix(fdfilename, Gi, verbose)
+        return Gi
+
+    else:
+        if verbose:
+            print('{} exists already'.format(fdfilename))
+        Gi = load_sparse_npz(fdfilename)
+        return Gi
+
+
 def optimize(argv, verbose, mapkwargs):
 
     if '-h' in argv.keys() or "-help" in argv.keys():
@@ -727,17 +787,7 @@ def optimize(argv, verbose, mapkwargs):
         save_matrix(CDINVFILE, CDinv, verbose)
 
     if "-fd" in argv.keys():
-        # ========= compute the frechet derivatives for the last model found
-        niter = lastiter()
-        mfilename = MFILE.format(niter=niter)
-        fdfilename = FDFILE.format(niter=niter)
-        if not os.path.isfile(fdfilename):
-            Mi = np.load(mfilename)
-            Gi = supertheory.get_FD(Mi, mapkwargs)
-            save_matrix(fdfilename, Gi, verbose)
-
-        elif verbose:
-            print('{} exists already'.format(fdfilename))
+        update_frechet_derivatives(supertheory, verbose, mapkwargs)
 
     if "-upd" in argv.keys():
         nupd = argv["-upd"][0] if len(argv["-upd"]) > 0 else 1
@@ -749,18 +799,22 @@ def optimize(argv, verbose, mapkwargs):
 
         CM = load_sparse_npz(CMFILE)
         CD = load_sparse_npz(CDFILE)
+        CDinv = load_sparse_npz(CDINVFILE)
 
         for _ in range(nupd):
             niter = lastiter()
 
+            # compute frechet derivatives for this iteration (if not already computed)
+            Gi = update_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
+
             # ==== save the current model state
             mfilename = MFILE.format(niter=niter)
             dfile = DFILE.format(niter=niter)
-            fdfilename = FDFILE.format(niter=niter)
+            # fdfilename = FDFILE.format(niter=niter)
 
             Mi = np.load(mfilename)
             Di = np.load(dfile)  # g(Mi)
-            Gi = load_sparse_npz(fdfilename)
+            # Gi = load_sparse_npz(fdfilename)
 
             # ==== update the current model
             has_nan = np.isnan(Dobs).any()
@@ -770,19 +824,26 @@ def optimize(argv, verbose, mapkwargs):
             if has_nan:
                 assert np.isnan(Dobs).any()
 
-            # ==== compute the frechet derivatives for the next iteration
-            Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
+            if False:
+                # ==== compute the frechet derivatives for the next iteration
+                Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
 
             # ==== save the new model state
             mfilename_new = MFILE.format(niter=niter + 1)
             dfilename_new = DFILE.format(niter=niter + 1)
-            fdfilename_new = FDFILE.format(niter=niter + 1)
+            # fdfilename_new = FDFILE.format(niter=niter + 1)
 
             save_matrix(mfilename_new, Minew, verbose)
             save_matrix(dfilename_new, Dinew, verbose)
-            save_matrix(fdfilename_new, Ginew, verbose)
+            # save_matrix(fdfilename_new, Ginew, verbose)
+
+            if verbose:
+                data_cost = chi2_data(niter=None, Data=Dinew, Dobs=Dobs, CDinv=CDinv)
+                model_cost = chi2_model(niter=None, Model=Minew, Mprior=Mprior, CM=CM)
+                print_costs(niter+1, data_cost=data_cost, model_cost=model_cost)
 
     if "-show" in argv.keys():
+
         mpriorfile = MPRIORFILE
         modelfiles = np.sort(glob.glob(MFILES))
         datafiles = np.sort(glob.glob(DFILES))
@@ -807,22 +868,12 @@ def optimize(argv, verbose, mapkwargs):
             Model = np.load(modelfile)
             Data = np.load(datafile)
 
-            assert issparse(CDinv)
-            assert issparse(CM)
-            assert not issparse(Data - Dobs)
-            assert not issparse(Model - Mprior)
+            data_cost = chi2_data(None, Data=Data, Dobs=Dobs, CDinv=CDinv)
+            model_cost = chi2_model(None, Model=Model, Mprior=Mprior, CM=CM)
 
-            # nan issues
-            # nan can occur in the predicted data if a data point is above the cut off period
-            # let ignore them
-            Inan = np.isnan(Data) | np.isnan(Dobs)
-            Dobs[Inan] = Data[Inan] = 0.  # so that they do not act on the data misfit
-
-            data_cost = np.dot((Data - Dobs), CDinv * (Data - Dobs))  # only because CDinv is known exactly
-            model_cost = np.dot(Model - Mprior, Ainv_dot_b(A=CM, b=Model - Mprior))
             if verbose:
-                print('iter {:03d}: chi2_data={:<16f} chi2_model={:<16f} chi2={:<16f}'.format(
-                    niter, data_cost, model_cost, data_cost + model_cost))
+                print_costs(niter, data_cost=data_cost, model_cost=model_cost)
+
             # model_cost = np.dot(np.dot((Model - Mprior), CMinv), (Model - Mprior))  # NO
             data_costs.append(data_cost)
             model_costs.append(model_cost)
