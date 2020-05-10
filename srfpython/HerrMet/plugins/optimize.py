@@ -342,15 +342,6 @@ class NodeFileLocal(NodeFile):
             plt.colorbar(plt.imshow(np.log(CM_)))
             plt.show()
 
-        # M = np.ones(CM.shape[0])
-        # MTCMinvM = np.dot(M, Ainv_dot_b(CM, M))
-        #
-        # if MTCMinvM < 0.:
-        #     message = 'the problem might be unstable because '\
-        #               'Mt.CM^-1.M is negative '\
-        #               'this is probably due to under/overflows '
-        #     # raise Exception(message)
-        #     warnings.warn(message)
         return CM
 
 
@@ -824,10 +815,6 @@ def optimize(argv, verbose, mapkwargs):
             if has_nan:
                 assert np.isnan(Dobs).any()
 
-            if False:
-                # ==== compute the frechet derivatives for the next iteration
-                Ginew = supertheory.get_FD(Model=Minew, mapkwargs=mapkwargs)
-
             # ==== save the new model state
             mfilename_new = MFILE.format(niter=niter + 1)
             dfilename_new = DFILE.format(niter=niter + 1)
@@ -956,11 +943,14 @@ def tv23_1(Dobs, Di, CD,
 
     Ai = CD + Gi * CMGiT
 
-    lu = splu(Ai)
-    Aiinv_dot_Xi = lu.solve(Xi)
+    if False:
+        Aiinv_dot_Xi = spsolve(A=Ai, b=Xi)
+    else:
+        lu = splu(Ai)
+        Aiinv_dot_Xi = lu.solve(Xi)
 
     error = np.abs(Xi - Ai * Aiinv_dot_Xi).sum()
-    print('error: {}'.format(error))
+    print('error on A.x=b : {}'.format(error))
 
     KiXi = CMGiT * Aiinv_dot_Xi
 
@@ -972,8 +962,8 @@ def tv23_1(Dobs, Di, CD,
             Dinew = supertheory(Minew)
             break
         except CPiSDomainError as e:
-            print('step was too large and leaded to an error of the forward problem, '
-                  'try reducing the step')
+            print('the step was too large and leaded to an error in the forward problem \n({}), '
+                  'try reducing the step length'.format(str(e)))
             mu /= 2.0
             continue
 
