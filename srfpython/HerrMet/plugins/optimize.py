@@ -272,6 +272,7 @@ class NodeFileLocal(NodeFile):
         else:
             superparameterizer = self.get_superparameterizer(verbose, mapkwargs)
             with open(SUPERPARAMETERIZERFILE, 'wb') as fid:
+                print('saving ', SUPERPARAMETERIZERFILE)
                 fid.write(pickle.dumps(superparameterizer))
 
         if os.path.isfile(SUPERDATACODERFILE):
@@ -283,6 +284,7 @@ class NodeFileLocal(NodeFile):
         else:
             superdatacoder = self.get_superdatacoder(verbose)
             with open(SUPERDATACODERFILE, 'wb') as fid:
+                print('saving ', SUPERDATACODERFILE)
                 fid.write(pickle.dumps(superdatacoder))
 
         if os.path.isfile(SUPERTHOERYFILE):
@@ -298,6 +300,7 @@ class NodeFileLocal(NodeFile):
                 verbose=verbose,
                 mapkwargs=mapkwargs)
             with open(SUPERTHOERYFILE, 'wb') as fid:
+                print('saving ', SUPERTHOERYFILE)
                 fid.write(pickle.dumps(supertheory))
 
         n_data_points, n_parameters = supertheory.shape
@@ -434,6 +437,7 @@ class NodeFileLocal(NodeFile):
                     CM_row_ind = np.hstack((CM_row_ind, col_ind_big))
                     CM_col_ind = np.hstack((CM_col_ind, row_ind_big))
                     CM_data = np.hstack((CM_data, covnm))
+
             if verbose:
                 wb.refresh(nnode / float(len(self)))
 
