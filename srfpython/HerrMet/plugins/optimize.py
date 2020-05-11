@@ -292,6 +292,7 @@ class NodeFileLocal(NodeFile):
                 print('loading ', SUPERTHOERYFILE)
             with open(SUPERTHOERYFILE, 'rb') as fid:
                 supertheory = pickle.load(fid)
+            supertheory.mapkwargs = mapkwargs  # set the new mapkwargs to supertheory
 
         else:
             supertheory = SuperTheory(
@@ -352,6 +353,10 @@ class NodeFileLocal(NodeFile):
         # compute the vertical distance (2d)
         Itrunc = dz.flat[:] <= tvsd
 
+        # place the matrix in a large matrix
+        col_ind_small, row_ind_small = np.meshgrid(
+            range(len(ztop)), range(len(ztop)))
+
         # ========= load vs uncertainty at each node
         vs_uncertainties = []
         for nnode in range(len(self)):
@@ -370,9 +375,9 @@ class NodeFileLocal(NodeFile):
             vs_uncertainties.append(vs_unc_n)
 
         # ========== compute CM
-        CM_row_ind = np.array([], int)
-        CM_col_ind = np.array([], int)
-        CM_data = np.array([], float)
+        CM_row_ind = []
+        CM_col_ind = []
+        CM_data = []
 
         if verbose:
             wb = waitbarpipe('building CM')
@@ -418,31 +423,30 @@ class NodeFileLocal(NodeFile):
 
                 # covariance matrix
                 covnm = vs_unc_n[:, np.newaxis] * vs_unc_m * rhonm
-
-                # place the matrix in a large matrix
-                col_ind_small, row_ind_small = np.meshgrid(
-                    range(len(ztop)), range(len(ztop)))
-
                 row_ind_big = nnode * len(ztop) + row_ind_small.flat[Itrunc]
                 col_ind_big = mnode * len(ztop) + col_ind_small.flat[Itrunc]
                 covnm = covnm.flat[Itrunc]
 
                 # fill the upper triangle
-                CM_row_ind = np.hstack((CM_row_ind, row_ind_big))
-                CM_col_ind = np.hstack((CM_col_ind, col_ind_big))
-                CM_data = np.hstack((CM_data, covnm))
+                CM_row_ind.append(row_ind_big)
+                CM_col_ind.append(col_ind_big)
+                CM_data.append(covnm)
 
                 if mnode > nnode:
                     # fill the lower triangle
-                    CM_row_ind = np.hstack((CM_row_ind, col_ind_big))
-                    CM_col_ind = np.hstack((CM_col_ind, row_ind_big))
-                    CM_data = np.hstack((CM_data, covnm))
+                    CM_row_ind.append(col_ind_big)
+                    CM_col_ind.append(row_ind_big)
+                    CM_data.append(covnm)
 
             if verbose:
                 wb.refresh(nnode / float(len(self)))
 
         if verbose:
             wb.close()
+            
+        CM_row_ind = np.hstack(CM_row_ind)
+        CM_col_ind = np.hstack(CM_col_ind)
+        CM_data = np.hstack(CM_data)
 
         CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)),
                 shape=(len(self) * len(ztop), len(self) * len(ztop)))
@@ -632,6 +636,7 @@ class SuperTheory(object):
         assert isinstance(superdatacoder, SuperDatacoder)
         assert isinstance(superparameterizer, SuperParameterizer)
         assert len(superparameterizer) == len(superdatacoder)
+        self.mapkwargs = mapkwargs
 
         self.superparameterizer = superparameterizer
         self.superdatacoder = superdatacoder
@@ -674,10 +679,20 @@ class SuperTheory(object):
 
     def __call__(self, Model):
         models = self.superparameterizer.split(Model)
-        Data = []
-        for theory, model in zip(self.theorys, models):
+
+        def job_generator():
+            for theory, model in zip(self.theorys, models):
+                yield Job(theory, model)
+
+        def job_handler(theory, model):
             data = theory(model)
-            Data.append(data)
+            return data
+
+        Data = []
+        with MapSync(job_handler, job_generator(), **self.mapkwargs) as ma:
+            for jobid, data, _, _ in ma:
+                Data.append(data)
+
         return np.concatenate(Data)
 
     def get_FD(self, Model, mapkwargs):
