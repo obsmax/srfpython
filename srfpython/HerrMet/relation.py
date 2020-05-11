@@ -14,8 +14,8 @@ class Relation(object):
             self.fun = eval(self.string)
 
         elif self.string.strip().startswith('def {}('.format(name)):
-            assert "return" in self.string
-            self.fun = eval(compile(self.string, '<string>', 'exec'))
+            eval(compile(self.string, '<string>', 'exec'))
+            self.fun = eval(name)
 
         else:
             raise ValueError("could not compile {} ".format(string))
