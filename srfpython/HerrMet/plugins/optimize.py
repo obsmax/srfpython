@@ -546,7 +546,7 @@ class SuperDatacoder(object):
 
 
 class SuperTheory(object):
-    def __init__(self, superparameterizer, superdatacoder, verbose=True):
+    def __init__(self, superparameterizer, superdatacoder, verbose, mapkwargs):
         assert isinstance(superdatacoder, SuperDatacoder)
         assert isinstance(superparameterizer, SuperParameterizer)
         assert len(superparameterizer) == len(superdatacoder)
@@ -554,17 +554,25 @@ class SuperTheory(object):
         self.superparameterizer = superparameterizer
         self.superdatacoder = superdatacoder
 
-        self.theorys = []
+        def job_generator():
+            for nnode, (parameterizer, datacoder) in enumerate(zip(
+                    superparameterizer.parameterizers, superdatacoder.datacoders)):
+                yield Job(nnode, parameterizer, datacoder)
+
+        def job_handler(nnode, parameterizer, datacoder):
+            theory = Theory(parameterizer=parameterizer, datacoder=datacoder)
+            return nnode, theory
+
         if verbose:
             wb = waitbarpipe('forward operators')
 
-        for nnode, (parameterizer, datacoder) in enumerate(zip(
-                superparameterizer.parameterizers, superdatacoder.datacoders)):
+        self.theorys = []
+        with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
+            for jobid, (nnode, theory), _, _ in ma:
+                self.theorys.append(theory)
 
-            theory = Theory(parameterizer=parameterizer, datacoder=datacoder)
-            self.theorys.append(theory)
-            if verbose:
-                wb.refresh(nnode/float(len(self)))
+                if verbose:
+                    wb.refresh(jobid / float(len(self.superdatacoder)))
 
         if verbose:
             wb.close()
@@ -935,7 +943,8 @@ def optimize(argv, verbose, mapkwargs):
     supertheory = SuperTheory(
         superparameterizer=superparameterizer,
         superdatacoder=superdatacoder,
-        verbose=verbose)
+        verbose=verbose,
+        mapkwargs=mapkwargs)
     n_data_points, n_parameters = supertheory.shape
     print('done')
 
