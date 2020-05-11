@@ -5,6 +5,7 @@ HerrMet : code for depth inversion of multimodal/multitypes surface waves
 This is the main program to be called from command lines with arguments,
 this program will call plugins with corresponding arguments
 """
+from __future__ import print_function
 
 import os, sys, matplotlib
 if "-png" in sys.argv[1:]: matplotlib.use('agg')
@@ -12,13 +13,15 @@ if "-png" in sys.argv[1:]: matplotlib.use('agg')
 from srfpython.utils import readargv1
 from srfpython.Herrmann.Herrmann import check_herrmann_codes
 from srfpython.HerrMet.plugins import target, param, send, run, \
-    manage, neldermead, extract, display, default
+    manage, extract, display, optimize, default
+from srfpython.HerrMet.files import DEFAULTROOTNAMES
+
 check_herrmann_codes()
 
 # -------------------------------------
-version = "6.0"
-default_verbose=1
-default_rootnames = "_HerrMet_*"
+version = "7.0"
+default_verbose = 1
+default_rootnames = DEFAULTROOTNAMES
 default_nworkers = None
 default_taskset = None
 
@@ -37,12 +40,14 @@ authorized_keys = \
      "--send",
      "--run",
      "--manage",
-     "--neldermead",
      "--extract",
-     "--display"]
+     "--display",
+     "--optimize",
+     "--default"]
 
 # -------------------------------------
 help = '''HerrMet V{version}
+
 # ------- main options (s=string, i=int, f=float)
 -version, -v          version number, quit
 -help, -h   [s...]    help, provide plugin names for details, quit
@@ -51,15 +56,20 @@ help = '''HerrMet V{version}
 -taskset     s        affinity, e.g. "0-3", default {default_taskset}
 -lowprio              run processes with low priority if mentioned
 -verbose     i        reduce verbosity, 0/1, default {default_verbose}
-# ------- plugins, use --help plugin [plugin ...] for details
+
+# ------- plugins, for details
+#         use HerrMet -help plugin [plugin ...]  
+#         or HerrMet --[plugin] -help
+#         or HerrMet -example plugin [plugin ...] 
 {target_help}
 {param_help}
 {send_help}
 {run_help}
 {manage_help}
-{neldermead_help}
 {extract_help}
 {display_help}
+{optimize_help}
+{default_help}
 '''.format(
     version=version,
     default_nworkers=default_nworkers,
@@ -70,9 +80,10 @@ help = '''HerrMet V{version}
     send_help=send.short_help,
     run_help=run.short_help,
     manage_help=manage.short_help,
-    neldermead_help=neldermead.short_help,
     extract_help=extract.short_help,
-    display_help=display.short_help)
+    display_help=display.short_help,
+    optimize_help=optimize.short_help,
+    default_help=default.short_help)
 
 
 # -------------------------------------
@@ -82,7 +93,7 @@ if __name__ == "__main__":
     # ------------------------------------- NO ARGUMENT, NAIVE CALL
     if argv == {}:
         # no arguments
-        print help
+        print(help)
         sys.exit()
 
     # ------------------------------------- READ ARGUMENTS, CHECK
@@ -98,7 +109,7 @@ if __name__ == "__main__":
 
     # ------------------------------------- VERSION
     if "-v" in argv.keys() or "-version" in argv.keys():
-        print "version : %s" % version
+        print("version : %s" % version)
         sys.exit()
 
     # ------------------------------------- HELP
@@ -106,18 +117,15 @@ if __name__ == "__main__":
         key = "-h" if "-h" in argv.keys() else "-help"
         if argv[key] == []:
             #print full synthteized help
-            print help
+            print (help)
         else:
             #print specific help for some plugins
             for plugin_name in argv[key]:
                 try:
-                    print eval('%s.long_help' % plugin_name)
+                    print(eval('%s.long_help' % plugin_name))
                 except NameError:
-                    print "%s is not a valid plugin (long_help not found)"
+                    print("%s is not a valid plugin (long_help not found)")
                     continue
-                except:
-                    raise
-
         sys.exit()
 
     # ------------------------------------- EXAMPLES USAGE
@@ -129,9 +137,9 @@ if __name__ == "__main__":
             #print specific help for some plugins
             for plugin_name in argv[key]:
                 try:
-                    print eval('%s.example' % plugin_name)
+                    print(eval('%s.example' % plugin_name))
                 except NameError:
-                    print "%s is not a valid plugin (example not found)"
+                    print("%s is not a valid plugin (example not found)")
                     continue
                 except:
                     raise
@@ -180,8 +188,8 @@ if __name__ == "__main__":
         manage.manage(argv['--manage'], verbose, mapkwargs)
 
     # ------
-    if "--neldermead" in argv.keys():
-        neldermead.neldermead(argv['--neldermead'], verbose, mapkwargs)
+    # if "--neldermead" in argv.keys():
+    #     neldermead.neldermead(argv['--neldermead'], verbose, mapkwargs)
 
     # ------
     if "--extract" in argv.keys():
@@ -190,3 +198,11 @@ if __name__ == "__main__":
     # ------
     if "--display" in argv.keys():
         display.display(argv['--display'], verbose, mapkwargs)
+
+    # ------
+    if "--optimize" in argv.keys():
+        optimize.optimize(argv['--optimize'], verbose, mapkwargs)
+
+    # ------
+    if "--default" in argv.keys():
+        default.default(argv['--default'], verbose, mapkwargs)

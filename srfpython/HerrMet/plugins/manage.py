@@ -1,24 +1,27 @@
 import os, glob
+import warnings
 import numpy as np
-from srfpython.depthdisp.depthdispdisplay import plt, showme, gcf, gca
-from srfpython.HerrMet.files import RunFile
+from srfpython.depthdisp.depthdispdisplay import plt, showme
+from srfpython.HerrMet.runfile import RunFile
+from srfpython.HerrMet.files import ROOTNAME, DEFAULTROOTNAMES, HERRMETRUNFILE, HERRMETSTATSFILE, rootname_to_nodename
 
 # ------------------------------ defaults
-default_rootnames = "_HerrMet_*"
+default_rootnames = DEFAULTROOTNAMES
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-stats", "-plot", "-delbad", "-delchains", "-inline"]
+authorized_keys = ["-stats", "-plot", "-delbad", "-delchains", "-inline", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--manage     summarize run file content, manage run results"
 
 long_help = """\
 --manage     s [s..] manage run results for given rootnames, default {default_rootnames}
-     -stats          prints detailed stats for each chain of each runfile 
-     -plot   [f]     display the convergence for every chain and every rootname, specify the lower bound
-     -inline         do not pause (jupyter)
-     -delbad f       delete bad models, log likelihood below a given threshold, no default
-     -delchains i [i...] delete one or more chains using their chainid
+    -stats           prints detailed stats for each chain of each runfile 
+    -plot   [f]      display the convergence for every chain and every rootname, specify the lower bound
+    -inline          do not pause (jupyter)
+    -delbad f        delete bad models, log likelihood below a given threshold, no default
+    -delchains i [i...] delete one or more chains using their chainid
+    -h, -help        display the help message for this plugin 
       
 """.format(default_rootnames=default_rootnames)
 
@@ -29,25 +32,29 @@ example = """\
 HerrMet --manage
 
 # print detailed stats and display the convergence 
-# of all chains in rootname _HerrMet_001
-HerrMet --manage _HerrMet_001 -stats -top
+# of all chains in rootname {rootname}
+HerrMet --manage {rootname} -stats 
 
 # remove all models whose log likelihood is below -25
 # remove chains 8 11 and 14
 HerrMet --manage -delbad -25 -delchains 8 11 14
  
-"""
+""".format(rootname=ROOTNAME.format(node="001"))
 
 
 # ------------------------------
 def manage(argv, verbose, mapkwargs):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
 
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
             continue  # private keys
 
         if k not in authorized_keys:
-            raise Exception('option %s is not recognized' % k)
+            raise Exception('option {} is not recognized'.format(k))
 
     rootnames0 = argv['main']
     if rootnames0 == []:
@@ -58,15 +65,14 @@ def manage(argv, verbose, mapkwargs):
     rootnames = []
     runfiles = []
     for rootname in rootnames0:
-        runfile = "%s/_HerrMet.run" % rootname
+        runfile = HERRMETRUNFILE.format(rootname=rootname)
         if os.path.exists(runfile):
             rootnames.append(rootname)
             runfiles.append(runfile)
         else:
-            pass #print "%s : %s does not exist" % (rootname, runfile)
+            pass  # print "%s : %s does not exist" % (rootname, runfile)
     del rootnames0
     assert len(rootnames) and len(rootnames) == len(runfiles)
-
 
     # summarize all files
     for rootname, runfile in zip(rootnames, runfiles):
@@ -79,6 +85,7 @@ def manage(argv, verbose, mapkwargs):
 
     # more options
     if np.any([opt in argv.keys() for opt in ["-stats", "-delbad", "-delchains", "-plot"]]):
+        fig = None
         if "-plot" in argv.keys():
             fig = plt.figure(figsize=(8, 4))
 
@@ -103,6 +110,11 @@ def manage(argv, verbose, mapkwargs):
                     select CHAINID, group_concat(NITER), group_concat(LLK) from MODELS
                         group by CHAINID 
                         ''')
+                    if s is None:
+                        warnings.warn('no chains found, if the inversion is running, '
+                                      'please wait for the next commit')
+                        continue
+
                     fig.clf()
                     ax0 = fig.add_subplot(121)
                     ax1 = fig.add_subplot(122, sharey=ax0)
@@ -121,10 +133,13 @@ def manage(argv, verbose, mapkwargs):
                     ax0.set_ylabel('log likelihood')
                     ax1.set_xlabel('# rank')
                     ax0.grid(True, linestyle=":")
-                    ax1.grid(True, linestyle = ":")
-                    fig.suptitle(rootname.split('_HerrMet_')[-1])
+                    ax1.grid(True, linestyle=":")
+                    fig.suptitle(rootname_to_nodename(rootname))
                     showfun()
-                    fig.savefig("%s/_HerrMet.stats.png" % rootname)
+                    statsfile = HERRMETSTATSFILE.format(rootname=rootname)
+                    if verbose:
+                        print('saving ' + statsfile)
+                    fig.savefig(statsfile)
 
         if "-plot" in argv.keys():
             plt.close(fig)

@@ -1,11 +1,16 @@
+from __future__ import print_function
+
 import os
 import numpy as np
 from srfpython.depthdisp.dispcurves import Claw, surf96reader, freqspace
+from srfpython.HerrMet.files import ROOTNAME, HERRMETTARGETFILE, \
+    surf96filename_to_rootname, surf96filename_to_herrmettargetfile, \
+    surf96filename_to_nodename
 
 # ------------------------------ defaults
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-resamp", "-lunc", "-unc", "-ot"]
+authorized_keys = ["-resamp", "-lunc", "-unc", "-ot", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--target     set the target data, create temporary directories for each location"
@@ -16,15 +21,17 @@ long_help = """\
                      For each surf96 file, I create a directory in . for temporary files
                      the target file in this directory is a copy of the input surf96 file. 
                      It can be edited before inversion to remove unwanted points or resample dispersion curves... 
-                     it the target file is AAAA.surf96, the temporary directory will be named 
-                     _HerrMet_AAAA, this name is referred to as the "rootname" in the other plugins
+                     it the target file is {surf96file}, the temporary directory will be named 
+                     {rootname}, this name is referred to as the "rootname" in the other plugins
     -resamp  f f i s resample the dispersion curve in the target file, 
                      requires fmin(Hz), fmax(Hz), nfreq, fscale 
                      (flin=linear in freq domain, plin=linear in period or log=logarithmic scaling)
     -lunc    f       set constant uncertainties in log domain (uncertainty = value x lunc)
     -unc     f       set constant uncertainty in linear domain (uncertainty = unc)
-    -ot              force overwriting _HerrMet.target if exists
-    """
+    -ot              force overwriting the targetfiles if exist
+    -h, -help        display the help message for this plugin
+    """.format(surf96file="AAAA.surf96",
+               rootname=surf96filename_to_rootname("AAAA.surf96"))
 
 # ------------------------------ example usage
 example = """\
@@ -32,26 +39,32 @@ example = """\
 # get the target dispersion curves, resample it between 0.2-1.5 Hz 
 # with 15 samples spaced logarithmically in period domain
 # adjust uncertainties to 0.1 in logaritmic domain, 
-# overwrite target if exists (_HerrMet.target) 
+# overwrite target files if exist ({herrmettargetfile}) 
 # and display it
 
-HerrMet --target /path/to/my/data/file.surf96 \\
+HerrMet --target {surf96filename} \\
             -resamp 0.2 1.5 15 plog \\
             -lunc 0.1 \\
             -ot \\
             --display
             
-# >> you may edit one or more target files (e.g. _HerrMet_t???/_HerrMet.target) 
+# >> you may edit one or more target files (among {herrmettargetfile}) 
 #    and remove points that 
 #    do not need to be inverted, check with  
 
-HerrMet --display _HerrMet_t???
+HerrMet --display {rootname}
             
-"""
+""".format(
+    surf96filename="/path/to/my/data/node???.surf96",
+    herrmettargetfile=surf96filename_to_herrmettargetfile("/path/to/my/data/node???.surf96"),
+    rootname=ROOTNAME.format(node="node???"))
 
 
-# ------------------------------
 def target(argv, verbose):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
 
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
@@ -63,26 +76,35 @@ def target(argv, verbose):
     # determine root names from target filess
     rootnames = []
     for s96 in argv['main']:
-        rootname = "_HerrMet_" + s96.split('/')[-1].split('.s96')[0].split('.surf96')[0]
+        rootname = ROOTNAME.format(node=surf96filename_to_nodename(s96))
         rootnames.append(rootname)
     assert len(np.unique(rootnames)) == len(rootnames)  # make sure all rootnames are distinct
 
     # handle already existing files
     if "-ot" not in argv.keys():
         for rootname in rootnames:
-            if os.path.exists('%s/_HerrMet.target' % rootname):
-                raise Exception('file %s/_HerrMet.target exists already, use -ot to overwrite' % rootname)
+            target_file = HERRMETTARGETFILE.format(rootname=rootname)
+            if os.path.exists(target_file):
+                raise Exception('file {} exists already, use -ot to overwrite' % target_file)
 
     # loop over targets
     for rootname, s96 in zip(rootnames, argv['main']):
+        target_file = HERRMETTARGETFILE.format(rootname=rootname)
+        target_dir = os.path.dirname(target_file)
 
         # create directory
-        if not os.path.isdir(rootname):
-            os.mkdir(rootname)
-            os.system('cp %s %s/%s.copy' % (s96, rootname, s96.split('/')[-1]))
+        if not os.path.isdir(target_dir):
+            if verbose:
+                print("creating " + target_dir)
+            os.makedirs(target_dir)
+            s96copy = os.path.join(target_dir, os.path.basename(s96)) + ".copy"
+            cpcmd = 'cp {} {}'.format(s96, s96copy)
+            if verbose:
+                print(cpcmd)
+            os.system(cpcmd)
 
         s = surf96reader(s96)
-        # -------------------
+
         if "-resamp" in argv.keys():
             news = s.copy()
             news.clear()  # clear all entries
@@ -110,20 +132,21 @@ def target(argv, verbose):
 
             s = news
             # print news
-        # -------------------
+
         if "-lunc" in argv.keys():
             # set uncertainties to constant in log domain
             lunc = float(argv["-lunc"][0])
             s.data['DVALUE'] = s.data['VALUE'] * lunc
+
         elif "-unc" in argv.keys():
             # set uncertainties to constant in lin domain
             unc = float(argv["-unc"][0])
             s.data['DVALUE'] = np.ones(len(s.data['VALUE'])) * unc
-        # -------------------
+
         if verbose:
-            print "writing %s/_HerrMet.target" % rootname
-        s.write96('%s/_HerrMet.target' % rootname)
+            print("writing " + target_file)
+        s.write96(target_file)
 
     # -------------------
-    print "please keep only datapoints to invert in */_HerrMet.target"
-    print "use option --display to see the target data"
+    print("please keep only datapoints to invert in " + HERRMETTARGETFILE.format(rootname="*"))
+    print("use option --display to see the target data")

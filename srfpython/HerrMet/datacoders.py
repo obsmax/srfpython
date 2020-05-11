@@ -1,33 +1,23 @@
-from srfpython.depthdisp.dispcurves import surf96reader, surf96reader_from_surf96string
+from srfpython.depthdisp.dispcurves import surf96reader, surf96reader_from_surf96string, mklaws
 import numpy as np
 import os
+from srfpython.depthdisp.dispcurves import surf96reader_from_arrays
+
 
 """
-Parameterizer : object to convert an array of parameters into smth that can be understood by Herrmann.dispersion
-Theory        : object to convert a model array into a data array
-Datacoder     : object to convert output from Herrmann.dispersion to an array of data
-
-                          a model array (m)                        
-  |                          ^    |
-  |                          |    |
-  |      mod96file ----->  parameterizer   --------> m_apr, CM
-  |      (apriori)           |    |
-  |                          |    v
-  |                        depth model 
-  |                     (ztop, vp, vs, rh)
-  |                            |
- theory                 Herrmann.dispersion
- (forward problem)             |
-  |                            v
-  |                       dispersion data 
-  |                      (waves, types, modes, freqs, values, (dvalues))
-  |                          ^    |
-  |                          |    |
-  |     surf96file ----->   datacoder      --------> d_obs, CD
-  |      (target)            |    |
-  v                          |    v
-                          a data array (d)
+see theory.py
 """
+
+
+def log_nofail(x):
+    if np.isnan(x):
+        return x
+    elif x < 0.:
+        return np.nan
+    elif x == 0.:
+        return -np.inf
+    else:
+        return np.log(x)
 
 
 class Datacoder(object):
@@ -55,54 +45,69 @@ class Datacoder(object):
 
     def __call__(self, values):
         """converts dispersion values into a data array d"""
-        # assert len(values) == self.npoints
-        return values  # the default behavior is identity, see subclasses for advanced conversions
+        # the default behavior is identity, see subclasses for advanced conversions
+        d = values
+        return d
 
     def inv(self, d):
         """converts a data array d into dispersion values"""
-        return d  # the default behavior is identity, see subclasses for advanced conversions
+        # the default behavior is identity, see subclasses for advanced conversions
+        values = d
+        return values
 
+    def inv_to_surf96reader(self, d):
+        values = self.inv(d)
+        return surf96reader_from_arrays(
+            waves=self.waves, types=self.types, modes=self.modes,
+            freqs=self.freqs, values=values, dvalues=self.dvalues)
 
-def log_nofail(x):
-    if np.isnan(x):
-        return x
-    elif x < 0.:
-        return np.nan
-    elif x == 0.:
-        return -np.inf
-    else:
-        return np.log(x)
+    def inv_to_surf96string(self, d):
+        return str(self.inv_to_surf96reader(d))
+
+    def inv_to_laws(self, d):
+        values = self.inv(d)
+        laws = mklaws(
+            waves=self.waves, types=self.types,
+            modes=self.modes, freqs=self.freqs,
+            values=values, dvalues=self.dvalues)
+        return laws
 
 
 class Datacoder_log(Datacoder):
     def __init__(self, waves, types, modes, freqs, values, dvalues):
         Datacoder.__init__(self, waves, types, modes, freqs, values, dvalues)
 
-    # ------------------
     def target(self):
-        dobs   = np.log(self.values)
-        CDinv  = (self.dvalues / self.values) ** -2.
+        dobs = np.log(self.values)
+        CDinv = (self.dvalues / self.values) ** -2.
         return dobs, CDinv
 
-    # ------------------
     def __call__(self, values):
         assert len(values) == len(self.values)
-        return map(log_nofail, values)
-        # d = np.log(values)
-        # return d
+        d = np.asarray(map(log_nofail, values), float)
+        return d
 
-    # ------------------
     def inv(self, d):
         values = np.exp(d)
         return values
 
 
-# ------------------
-def makedatacoder(s96, which=Datacoder_log):
-    if os.path.exists(s96):
-        s = surf96reader(s96)
+def makedatacoder(surf96filename, which=Datacoder_log):
+    """
+    :param surf96filename:
+    :type surf96filename: str
+    :param which: which datacoder to use
+    :type which: type
+    :return datacoder: a datacoder object initialized from the data found in surf96filename
+    :rtype datacoder: DataCoder
+    """
+    if not isinstance(which, type):
+        raise TypeError("which must be the class of the datacoder to use")
+
+    if os.path.exists(surf96filename):
+        s = surf96reader(surf96filename)
     else:
-        s = surf96reader_from_surf96string(s96)
+        s = surf96reader_from_surf96string(surf96filename)
 
     waves, types, modes, freqs, values, dvalues = s.wtmfvd()
     return which(waves, types, modes, freqs, values, dvalues)

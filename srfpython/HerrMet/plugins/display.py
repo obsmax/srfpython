@@ -12,15 +12,19 @@ from srfpython.depthdisp.dispcurves import freqspace
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.disppdfs import dispstats
 from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, DepthDispDisplayCompact, plt, showme
-from srfpython.HerrMet.files import load_paramfile, RunFile
+from srfpython.HerrMet.runfile import RunFile
+from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
-from srfpython.HerrMet.theory import overdisp
+from srfpython.HerrMet.overdisp import overdisp
 from srfpython.HerrMet.parameterizers import Parameterizer_mZVSPRRH, Parameterizer_mZVSVPRH, \
     Parameterizer_mZVSPRzRHz, Parameterizer_mZVSPRzRHvp, Parameterizer_mZVSVPvsRHvp
-
+from srfpython.HerrMet.files import \
+    DEFAULTROOTNAMES, HERRMETTARGETFILE, HERRMETRUNFILE, HERRMETPARAMFILE, \
+    HERRMETPARAMFILELOCAL, HERRMETDISPLAYFILE, rootname_to_nodename
 
 # ------------------------------ defaults
-default_rootnames = "_HerrMet_*"
+default_rootnames = DEFAULTROOTNAMES
+
 default_plot_mode = "last"
 default_plot_limit = 100
 default_plot_llkmin = 0.
@@ -35,14 +39,14 @@ default_dpi = 100
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-compact", "-ftsz", "-inline", "-ritt"]
+authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-compact", "-ftsz", "-inline", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
 
 long_help = """\
 --display   s [s...] display param, target, and run outputs for the required rootnames, default {default_rootnames}
-                     (use "." to see the parameterzation template ./_HerrMet.param from option --param)
+                     (use "." to see the parameterzation template {herrmetparamfilelocal} from option --param)
     -plot  [s i f i] show the best models on the figure, arguments are :  
                      first argument = selection mode, last or best
                      second argument = highest model number to include (>=0, 0 means all)  
@@ -59,7 +63,10 @@ long_help = """\
     -compact         display only vs and the dispersion curves, default False
     -ftsz  i         set font size, default {default_fontsize}
     -inline          do not pause (use in jupyter notebooks)
-    """.format(default_rootnames=default_rootnames,
+    -h, -help        display the help message for this plugin     
+    """.format(
+               herrmetparamfilelocal=HERRMETPARAMFILELOCAL,
+               default_rootnames=default_rootnames,
                default_plot_mode=default_plot_mode,
                default_plot_limit=default_plot_limit,
                default_plot_llkmin=default_plot_llkmin,
@@ -91,11 +98,10 @@ HerrMet --display \\
 # -------------------------------------
 def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=False):
     """private"""
-    targetfile = "%s/_HerrMet.target" % rootname
-    paramfile = "%s/_HerrMet.param" % rootname
-    runfile = '%s/_HerrMet.run' % rootname
-    pngfile = '%s/_HerrMet.png' % rootname
-    #HerrLininitfile = '%s/_HerrLin.init' % rootname
+    targetfile = HERRMETTARGETFILE.format(rootname=rootname)
+    paramfile = HERRMETPARAMFILE.format(rootname=rootname)
+    runfile = HERRMETRUNFILE.format(rootname=rootname)
+    displayfile = HERRMETDISPLAYFILE.format(rootname=rootname)
 
     # ------ Initiate the displayer using the target data if exists
     if "-compact" in argv.keys():  # compact mode
@@ -360,9 +366,6 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
             except Exception as e:
                 print('could not read or display %s (reason : %s)' % (m96, str(e)))
 
-    # if "-ritt" in argv.keys():
-    #     a = AsciiFile('/mnt/labex2/home/max/data/boreholes/GRT1/GRT1.logsonic')
-    #
     #     for what, where in zip([a.data['VS'], a.data['VP'], a.data['VP']/a.data['VS']], [rd.axdepth['VS'], rd.axdepth['VP'], rd.axdepth['PR']]):
     #         if where is not None:
     #             where.plot(what, a.data['TVD']/1000., "m", alpha=0.5)
@@ -384,7 +387,7 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
             rd.set_plim((0.8 / d.freqs.max(), 1.2 / d.freqs.min()))
     rd.tick()
     rd.grid()
-    rd.fig.suptitle(rootname.split('_HerrMet_')[-1])
+    rd.fig.suptitle(rootname_to_nodename(rootname))
     if "-ftsz" in argv.keys():
         chftsz(rd.fig, argv["-ftsz"][0])
     else:
@@ -392,8 +395,8 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
     if "-png" in argv.keys():
         dpi = argv['-png'][0] if len(argv['-png']) else default_dpi
         if verbose:
-            print("writing %s" % pngfile)
-        rd.fig.savefig(pngfile, dpi=dpi)
+            print("writing %s" % displayfile)
+        rd.fig.savefig(displayfile, dpi=dpi)
     elif "-inline" in argv.keys():
         plt.show()
     else:
@@ -407,6 +410,10 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
 
 # ------------------------------
 def display(argv, verbose, mapkwargs):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
 
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
@@ -432,7 +439,7 @@ def display(argv, verbose, mapkwargs):
         except:
             raise Exception('could not find colormap %s neither in matplotlib neither in srfpython.standalone.utils.cmaps' % argv['-cmap'][0])
 
-    # ----------- special case, just show the parameterization file from --param : ./_HerrMet.param
+    # ----------- special case, just show the parameterization file from --param
     if len(rootnames) == 1 and rootnames[0] == '.':
         _display_function(".", argv=argv, verbose=verbose, mapkwargs=mapkwargs)
 
@@ -440,9 +447,7 @@ def display(argv, verbose, mapkwargs):
     else:
         for rootname in rootnames:
             if not os.path.isdir(rootname):
-                raise Exception('%s does not exist' % rootname)
-            elif not rootname.startswith('_HerrMet_'):
-                raise Exception('%s does not starts with _HerrMet_' % rootname)
+                raise IOError('{} does not exist'.format(rootname))
 
         if "-png" not in argv.keys():
             # display mode, cannot parallelize

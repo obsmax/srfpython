@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from __future__ import print_function
+from builtins import input
 
 import numpy as np
 from srfpython.Herrmann.Herrmann import Timer, groupbywtm, igroupbywtm, CPiSDomainError
@@ -17,7 +19,7 @@ use __main__ for demo
 see also Herrmann.dispersion.dispersion
 """
 
-# _____________________________________
+
 def lognofail(x):
 
     def ilognofail(x):
@@ -32,7 +34,6 @@ def lognofail(x):
         return ilognofail(x)
 
 
-# _____________________________________
 def sker17(ztop, vp, vs, rh,
     waves, types, modes, freqs,
     dz=0.001, dlogvs=0.01, dlogpr=0.01, dlogrh=0.01, norm=True,
@@ -72,7 +73,7 @@ def sker17(ztop, vp, vs, rh,
         dispersion
     """
 
-    waves, types, modes, freqs = [np.asarray(_) for _ in waves, types, modes, freqs]
+    waves, types, modes, freqs = [np.asarray(_) for _ in [waves, types, modes, freqs]]
 
     herrmanncaller = HerrmannCallerFromLists(waves, types, modes, freqs, h=h, ddc=ddc)
 
@@ -126,7 +127,7 @@ def sker17(ztop, vp, vs, rh,
         return i, DVAVPi
 
     def gen():
-        for i in xrange(1, 4 * len(ztop)):
+        for i in range(1, 4 * len(ztop)):
             modeli = model0.copy()
             modeli[i] += dmodel[i]
             yield Job(i, modeli)
@@ -184,7 +185,7 @@ if __name__ == "__main__":
                   ...
     '''
     if len(sys.argv) == 1:
-        print help
+        print(help)
         sys.exit()
 
     from srfpython.standalone.display import plt
@@ -301,13 +302,13 @@ if __name__ == "__main__":
             if "png" in argv.keys():
                 k = "%s%s%d" % (w, t, m)
                 fout = 'sker17_%s_%s_%s_%s_%s_%s%s.png' % (k, argv[k][0], argv[k][1], argv[k][2], argv[k][3], q, "_norm" if norm else "")
-                print fout
+                print(fout)
                 fig1.savefig(fout, dpi=300)
             else:
-                raw_input('pause : press enter to plot the next wave type and mode')
+                input('pause : press enter to plot the next wave type and mode')
             cax.cla()
             ax3.cla()
     # --------------------
     if "png" not in argv.keys():
-        raw_input('bye')
+        input('bye')
 

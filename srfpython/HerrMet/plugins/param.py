@@ -1,14 +1,17 @@
+from __future__ import print_function
+
 import os
 import numpy as np
 from srfpython.utils import minmax
-from srfpython.HerrMet.files import write_default_paramfile
+from srfpython.HerrMet.paramfile import write_default_paramfile
+from srfpython.HerrMet.files import ROOTNAME, HERRMETPARAMFILE, HERRMETPARAMFILELOCAL
 
 # ------------------------------ defaults
 default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRzRHz', 'mZVSVPvsRHvp']
 default_parameterization = default_parameterization_list[0]
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-basedon", "-t", "-dvp", "-dvs", "-drh", "-dpr", "-growing", "-op"]
+authorized_keys = ["-basedon", "-t", "-dvp", "-dvs", "-drh", "-dpr", "-growing", "-op", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--param      create a template parameterization file"
@@ -51,9 +54,11 @@ long_help = """\
     -drh     f f     add prior constraint on the density offset between layers, idem, g/cm3
     -dpr     f f     add prior constraint on the vp/vs offset between layers, idem, no unit
     -growing         shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0.
-    -op              force overwriting ./_HerrMet.param if exists
-    """.format(default_parameterization_list=default_parameterization_list,
-           default_parameterization=default_parameterization)
+    -op              force overwriting {herrmetparamfilelocal} if exists
+    -h, -help        display the help message for this plugin 
+    """.format(herrmetparamfilelocal=HERRMETPARAMFILELOCAL,
+               default_parameterization_list=default_parameterization_list,
+               default_parameterization=default_parameterization)
 
 # ------------------------------ example usage
 example = """\
@@ -61,7 +66,7 @@ example = """\
 # build parameter file from existing depthmodel,
 # use 4 layers, use parametrization mZVSPRRH, 
 # require vp, vs and density to be growing
-# overwrite paramfile if exists (_HerrMet_*/_HerrMet.param) and display
+# overwrite paramfile if exists ({paramfiles}) and display
 
 HerrMet --param 4 3. \\
             -basedon /path/to/my/depthmodel.mod96 \\
@@ -70,16 +75,21 @@ HerrMet --param 4 3. \\
             -op \\
             --display .
 
-# >> now edit _HerrMet.param and customize it, check with 
+# >> now edit {herrmetparamfilelocal} and customize it, check with 
 HerrMet --display . 
 
 # when ok, send the parameterization file to the rootnames
 HerrMet --send
-"""
+""".format(herrmetparamfilelocal=HERRMETPARAMFILELOCAL,
+           paramfiles=HERRMETPARAMFILE.format(rootname=ROOTNAME.format(node="*")))
 
 
 # ------------------------------
 def param(argv):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
 
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
@@ -89,7 +99,8 @@ def param(argv):
             raise Exception('option %s is not recognized' % k)
 
     if "-op" not in argv.keys():
-        assert not os.path.exists('_HerrMet.param')
+        if os.path.exists(HERRMETPARAMFILELOCAL):
+            raise IOError(HERRMETPARAMFILELOCAL + ' exists already, use -op to overwrite')
 
     nlayer = int(argv["main"][0])
     zbot = float(argv["main"][1])
@@ -112,7 +123,11 @@ def param(argv):
 
     if not type in default_parameterization_list:
         raise Exception('please pick one type in %s' % str(default_parameterization_list))
-    write_default_paramfile(nlayer, zbot, which_parameterizer=type, basedon=basedon, dvp=dvp, dvs=dvs, drh=drh, dpr=dpr)
-    print "please customize _HerrMet.param, do not change line orders and metadata"
-    print "use option --display to see the depth boundaries"
-    # sys.exit()
+
+    write_default_paramfile(
+        nlayer, zbot, which_parameterizer=type, basedon=basedon, dvp=dvp, dvs=dvs, drh=drh, dpr=dpr)
+
+    print("you can edit {} to adjust parameters boundaries, "
+          "do not change line orders".format(HERRMETPARAMFILELOCAL))
+    print("use option --display to see the depth boundaries of your parameter file")
+    print("use option --send to copy the parameter file to each temporary directory")

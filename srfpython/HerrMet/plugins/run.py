@@ -1,20 +1,22 @@
 from __future__ import print_function
-
 import os, glob
 import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
 from srfpython.inversion.metropolis2 import LogGaussND, metropolis
-from srfpython.HerrMet.files import load_paramfile, RunFile
+from srfpython.HerrMet.runfile import RunFile
+from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import Theory
+from srfpython.HerrMet.files import DEFAULTROOTNAMES, \
+    HERRMETTARGETFILE, HERRMETRUNFILE, HERRMETPARAMFILE, rootname_to_nodename
 
 # ------------------------------ defaults
-default_rootnames = "_HerrMet_*"
+default_rootnames = DEFAULTROOTNAMES
 default_nchain = 12
 default_nkeep = 100
 default_mode = "skip"
 # ------------------------------ autorized_keys
-authorized_keys = ["-mode", "-nchain", "-nkeep"]
+authorized_keys = ["-mode", "-nchain", "-nkeep", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--run        invert dispersion data using the Markov Chain Monte Carlo method"
@@ -27,11 +29,12 @@ long_help = """\
                      skip     : ignore rootnames with existsing run file(s)               
     -nchain  i       number of chains to use, default {default_nchain}
     -nkeep   i       number of models to keep per chain, default {default_nkeep}
-    [use -w option before --run to control the maximum number of chains to run simultaneously]   
+    -h, -help        display the help message for this plugin
+    [use -w option before --run to control the maximum number of chains to run simultaneously]
     """.format(default_rootnames=default_rootnames,
-           default_mode=default_mode,
-           default_nchain=default_nchain,
-           default_nkeep=default_nkeep)
+               default_mode=default_mode,
+               default_nchain=default_nchain,
+               default_nkeep=default_nkeep)
 
 # ------------------------------ example usage
 example = """\
@@ -49,6 +52,10 @@ HerrMet -w 4 \\
 
 # ------------------------------
 def run(argv, verbose, mapkwargs):
+
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
 
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
@@ -71,9 +78,9 @@ def run(argv, verbose, mapkwargs):
     def gen(rootnames, runmode):
 
         for rootname in rootnames:
-            targetfile = "%s/_HerrMet.target" % rootname
-            paramfile = "%s/_HerrMet.param" % rootname
-            runfile = "%s/_HerrMet.run" % rootname
+            targetfile = HERRMETTARGETFILE.format(rootname=rootname)
+            paramfile = HERRMETPARAMFILE.format(rootname=rootname)
+            runfile = HERRMETRUNFILE.format(rootname=rootname)
 
             if runmode == "append" and not os.path.exists(runfile):
                 runmode = "restart"
@@ -103,7 +110,7 @@ def run(argv, verbose, mapkwargs):
             elif runmode == "append":
                 pass
             else:
-                raise Exception('unexpected runmode %s' % runmode)
+                raise Exception('unexpected runmode {}'.format(runmode))
 
             # ---------------------------------
             for chainid in range(Nchain):
@@ -127,27 +134,27 @@ def run(argv, verbose, mapkwargs):
             chainid, M0, MSTD, G, ND, logRHOD, logRHOM, p, d,
             nkeep, verbose):
 
-        models, datas, weights, llks = metropolis(M0, MSTD, G, ND, logRHOD, logRHOM,
-                                                  nkeep=nkeep,
-                                                  normallaw=worker.randn,
-                                                  unilaw=worker.rand,
-                                                  chainid=chainid,
-                                                  HL=10,
-                                                  IK0=0.25,
-                                                  MPMIN=1.e-6,
-                                                  MPMAX=1e6,
-                                                  adjustspeed=0.3,
-                                                  nofail=True,
-                                                  debug=False,
-                                                  verbose=verbose,
-                                                  head="%10s " % rootname.split('_HerrMet_')[-1])
+        models, datas, weights, llks = metropolis(
+            M0, MSTD, G, ND, logRHOD, logRHOM,
+            nkeep=nkeep,
+            normallaw=worker.randn,
+            unilaw=worker.rand,
+            chainid=chainid,
+            HL=10,
+            IK0=0.25,
+            MPMIN=1.e-6,
+            MPMAX=1e6,
+            adjustspeed=0.3,
+            nofail=True,
+            debug=False,
+            verbose=verbose,
+            head="{:10s} ".format(rootname_to_nodename(rootname)))
 
         I = np.any(~np.isnan(datas), axis=1)
         models, datas, weights, llks = models[I, :], datas[I, :], weights[I], llks[I]
 
         return runfile, models, datas, weights, llks, p, d
 
-    # ---------------------------------
     with MapAsync(fun, gen(rootnames, runmode), **mapkwargs) as ma:
         for jobid, answer, _, _ in ma:
             runfile, models, datas, weights, llks, p, d = answer

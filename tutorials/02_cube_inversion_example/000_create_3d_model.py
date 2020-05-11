@@ -109,10 +109,30 @@ for nmodel, dm in enumerate(depthmodels):
     dm.write96(f)
 
 with open('nodes.txt', 'w') as fid:
-    fid.write('#longitude latitude node\n')
+
+    fid.write('#met rootdir = "./inversion"\n')
+    fid.write('#met extract_mode = "best"\n')
+    fid.write("#met extract_limit = 1000\n")
+    fid.write("#met extract_llkmin = 0\n")
+    fid.write("#met extract_step = 1\n")
+    fid.write('#met ztop = "np.linspace(0., 3.0, 30)"\n')
+    fid.write("#fld longitude latitude node\n")
+    fid.write("#unt deg       deg      -\n")
+    fid.write("#fmt %f        %f       %s\n")
     for n, (lon, lat) in enumerate(zip(longitudes, latitudes)):
         fid.write('{} {} node{:03d}\n'.format(lon, lat, n))
+
+# check the inter-node distances
+from srfpython.HerrMet.nodefile import NodeFile
+nf = NodeFile('nodes.txt')
+d = nf.distances()
+print('distance min, max : {} {}km'.format(d[d > 0].min(), d.max()))
 
 fig1.savefig('depth_models.png')
 fig2.savefig('vs_slices.png')
 fig3.savefig('profile.png')
+
+
+
+
+

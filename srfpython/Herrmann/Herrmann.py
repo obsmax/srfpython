@@ -106,20 +106,35 @@ def argcrossfind(X, Y):
 
 
 def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
+    """
+    :param srfdis96stdout:
+    :param waves:
+    :param types:
+    :param modes:
+    :param freqs:
+    :return:
+    """
     """converts output from max_srfdis96"""
-    periods = 1./freqs
+    periods = 1. / freqs
 
-    srfdis96stdout = srfdis96stdout.replace('**************', ' 0            ') #??? what the fuck
+    # ==== transform the input string
+    # remove artifacts whose origin is not known...
+    srfdis96stdout = srfdis96stdout.replace(
+        '**************', ' 0            ')  # ??? what the fuck
+
+    # strip
     srfdis96stdout = srfdis96stdout.strip().rstrip('\n').split('\n')
-    srfdis96stdout = [_[:2] + " " + _[2:] for _ in srfdis96stdout] # add one more space for mode numbers higher than 10
 
-    A = (" ".join(srfdis96stdout)).split()
-    W   = np.asarray(A[::6],  int)-1  # wave type 0 = Love, 1 = Rayleigh
-    M   = np.asarray(A[1::6], int)    # (iq-1) mode number, 0 = fundamental
-    T1A = np.asarray(A[2::6], float)  # t1 if phase only else lower period = t1/(1+h), in s
-    T1B = np.asarray(A[3::6], float)  # 0. if phase only else upper period = t1/(1-h), in s;
-    CC0 = np.asarray(A[4::6], float)  # phase velocity at t1 if phase only else at t1a, in km/s;
-    CC1 = np.asarray(A[5::6], float)  # phase velocity at t1 if phase only else at t1b, in km/s;
+    # concatenate rows
+    srfdis96stdout = (" ".join(srfdis96stdout)).split()
+
+    # ==== load data
+    W   = np.asarray(srfdis96stdout[::6],  int)-1  # wave type 0 = Love, 1 = Rayleigh
+    M   = np.asarray(srfdis96stdout[1::6], int)    # (iq-1) mode number, 0 = fundamental
+    T1A = np.asarray(srfdis96stdout[2::6], float)  # = t1 if phase only else lower period = t1/(1+h), in s
+    T1B = np.asarray(srfdis96stdout[3::6], float)  # = 0. if phase only else upper period = t1/(1-h), in s;
+    CC0 = np.asarray(srfdis96stdout[4::6], float)  # = phase velocity at t1 if phase only else at t1a, in km/s;
+    CC1 = np.asarray(srfdis96stdout[5::6], float)  # = phase velocity at t1 if phase only else at t1b, in km/s;
 
     n = len(W)
     I = T1B == 0.  # True means phase only
@@ -129,15 +144,23 @@ def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
     nI = ~I
     T, C, U = np.zeros(n, float), np.zeros(n, float), np.zeros(n, float) * np.nan
     if I.any():
+        # Phase velocity only
         T[I] = T1A[I]
         C[I] = CC0[I]
 
     if nI.any():
+        # Group only or Group and Phase
         T[nI] = 2. * T1A[nI] * T1B[nI] / (T1A[nI] + T1B[nI])
         # see srfpre96 T1A = T1/(1+h), T1B = T1/(1-h) => T1=2 T1A T1B / (T1A + T1B)
         C[nI] = np.sqrt(CC0[nI] * CC1[nI])   # Jeffreys average #A[nI,4:6].mean(axis = 1)
         LnI = (log(CC1[nI]) - log(CC0[nI])) / (log(T1A[nI]) - log(T1B[nI]))
         U[nI] = C[nI] / (1. - LnI)
+
+        # for overtones near the cut-off period
+        # one can get same values for CC0 and CC1 => which leads to U=C
+        # it seems innacurate
+        J = nI & (CC0 == CC1) & (M > 0)
+        U[J] = np.nan
 
     # arange available data
     umodes = np.arange(max(modes) + 1)
@@ -146,8 +169,8 @@ def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
         I = (M == m)
         IR = R & I
         IL = L & I
-        D["L"].append({"T" : T[IL], "C" : C[IL], "U" : U[IL]})
-        D["R"].append({"T" : T[IR], "C" : C[IR], "U" : U[IR]})
+        D["L"].append({"T": T[IL], "C": C[IL], "U": U[IL]})
+        D["R"].append({"T": T[IR], "C": C[IR], "U": U[IR]})
 
     values = np.zeros(len(waves), float) * np.nan
     indexs  = np.arange(len(waves))

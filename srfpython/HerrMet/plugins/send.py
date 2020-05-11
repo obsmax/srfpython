@@ -1,19 +1,25 @@
+from __future__ import print_function
+from srfpython.HerrMet.files import HERRMETPARAMFILELOCAL, HERRMETPARAMFILE, DEFAULTROOTNAMES
 import os, glob
 
 # ------------------------------ defaults
-default_rootnames = "_HerrMet_*"
+default_rootnames = DEFAULTROOTNAMES
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-op"]
+authorized_keys = ["-op", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--send       send the parameterization to the temporary directories"
 
 long_help = """\
---send       s [s..] send the custom parameterization file ./_HerrMet.param to the specified rootnames, 
+--send       s [s..] send the custom parameterization file {herrmetparamfilelocal} to the specified rootnames, 
                      default {default_rootnames}
-    -op              force overwriting ./rootname/_HerrMet.param if exists
-    """.format(default_rootnames=default_rootnames)
+    -op              force overwriting {herrmetparamfile} if exists
+    -h, -help        display the help message for this plugin
+    """.format(
+    herrmetparamfilelocal=HERRMETPARAMFILELOCAL,
+    herrmetparamfile=HERRMETPARAMFILE.format(rootname='[rootname]'),
+    default_rootnames=default_rootnames)
 
 # ------------------------------ example usage
 example = ""
@@ -22,31 +28,40 @@ example = ""
 # ------------------------------
 def send(argv, verbose):
 
+    if '-h' in argv.keys() or "-help" in argv.keys():
+        print(long_help)
+        return
+
     for k in argv.keys():
         if k in ['main', "_keyorder"]:
             continue  # private keys
 
         if k not in authorized_keys:
-            raise Exception('option %s is not recognized' % k)
+            raise Exception('option {} is not recognized'.format(k))
 
-    if not os.path.exists('_HerrMet.param'):
+    if not os.path.exists(HERRMETPARAMFILELOCAL):
         raise Exception('please use option --param first')
 
     rootnames = argv['main']
     if rootnames == []:
         rootnames = glob.glob(default_rootnames)
     assert len(rootnames)
-    for rootname in rootnames:
-        if not os.path.isdir(rootname):
-            raise Exception('%s does not exist' % rootname)
-        elif not rootname.startswith('_HerrMet_'):
-            raise Exception('%s does not starts with _HerrMet_' % rootname)
-        elif os.path.exists('%s/_HerrMet.param' % rootname) \
-                and not "-op" in argv.keys():
-            raise Exception('%s/_HerrMet.param exists already, use -op' % rootname)
 
     for rootname in rootnames:
-        cmd = 'cp ./_HerrMet.param %s/' % rootname
+        paramfile = HERRMETPARAMFILE.format(rootname=rootname)
+        paramdir = os.path.dirname(paramfile)
+
+        if not os.path.isdir(paramdir):
+            raise IOError(paramdir + ' is not a directory')
+
+        elif os.path.isfile(paramfile):
+            if not "-op" in argv.keys():
+                raise Exception('{} exists already, use -op'.format(paramfile))
+
+    for rootname in rootnames:
+        paramfile = HERRMETPARAMFILE.format(rootname=rootname)
+
+        cmd = 'cp {} {}'.format(HERRMETPARAMFILELOCAL, paramfile)
         if verbose:
-            print cmd
+            print(cmd)
         os.system(cmd)

@@ -6,10 +6,7 @@ import numpy as np
 import copy
 import os
 
-assert scipyversion >= "0.14.0"
 
-
-# ###################################################################################
 def freqspace(freqmin, freqmax, nfreq, scale="flin"):
     if "lin" in scale.lower():
         return np.linspace(freqmin, freqmax, nfreq)
@@ -19,7 +16,6 @@ def freqspace(freqmin, freqmax, nfreq, scale="flin"):
         raise ValueError('%s not understood' % scale)
 
 
-# ###################################################################################
 def C2U(nu, c):
     """convert phase 2 group dispersion curve.
     input :
@@ -43,7 +39,6 @@ def C2U(nu, c):
     return numean, us
 
 
-# ---------------------------------------
 def U2C(nu, u, nuo, co):
     """signaltools.U2C : convert group to phase velocity. Knowledge of the phase dispersion curve is needed at a given frequency nuo.
     nuo must appear into frequency array nu. nuo must be as low as possible.
@@ -74,8 +69,7 @@ def U2C(nu, u, nuo, co):
     return nu_, c
 
 
-# ###################################################################################
-class pickable_interp1d(interp1d):
+class PickableInterp1d(interp1d):
     # I am forced to store the input arguments so that the instance can be pickled and regenerated during depickling
     def __init__(self, x, y, kind='linear', axis=-1, copy=True, bounds_error=True, fill_value=np.nan,
                  assume_sorted=False):
@@ -88,11 +82,9 @@ class pickable_interp1d(interp1d):
         self.assume_sorted = assume_sorted
         self.__setstate__(self.__getstate__())  # trick : __init__ and __setstate__ must keep consistent
 
-    # ---------------------------------------------
     def __getstate__(self):
         return self.x, self.y, self.kind, self.axis, self.copy, self.bounds_error, self.fill_value, self.assume_sorted
 
-    # ---------------------------------------------
     def __setstate__(self, state):
         "By state we denote the tuple of arguments needed to restore the instance dunring depickling"
         x, y, kind, axis, copy, bounds_error, fill_value, assume_sorted = state
@@ -103,8 +95,7 @@ class pickable_interp1d(interp1d):
         self.assume_sorted = assume_sorted
 
 
-####################################################################################
-class freqinterpolator(object):
+class FrequencyInterpolator(object):
     """convention : freqinterpolator(f) = freqinterpolator(-f)"""
     require_positive_values = True
     mode = -1
@@ -113,7 +104,6 @@ class freqinterpolator(object):
     type = "?"
     dvalue = None
 
-    # ---------------------------------------------
     def __init__(self, freq, value, extrapolationmode=1, dvalue=None, **kwargs):
         """
         freq   = numpy.ndarray, frequency values (positive) in Hz
@@ -143,67 +133,73 @@ class freqinterpolator(object):
         self.set_extrapolationmode(extrapolationmode)
         for k, v in kwargs.items(): self.__setattr__(k, v)
 
-    # ---------------------------------------------
     def copy(self):
         return copy.deepcopy(self)
 
-    # ---------------------------------------------
     def set_extrapolationmode(self, extrapolationmode):
         self.extrapolationmode = extrapolationmode  # cannot be changed manually
+
         if extrapolationmode == 0:
-            # this mode is conveniant but dangerous : it extrapolates by repeating values encountered at lowest and highest frequencies,
-            # it cannot be used for dispersion curves overtones, because of the cut-off frequencies (see AKI et Richards, 2nd ed, p253)
+            # warning : extrapolates by repeating values encountered at lowest and highest frequencies,
+            # cannot be used for overtones, because of the cut-off frequencies (see AKI et Richards, 2nd ed, p253)
             freqs = np.concatenate(([-self.freq[0]], self.freq))
             values = np.concatenate(([+self.value[0]], self.value))
-            self.i0 = pickable_interp1d(freqs, values, bounds_error=False, fill_value=values[-1], assume_sorted=True)
+            self.i0 = PickableInterp1d(
+                freqs, values, bounds_error=False, fill_value=values[-1], assume_sorted=True)
             self.i1 = self.i2 = None
+
         elif extrapolationmode == 1:
             # replaces extraplations by np.nan
-            self.i1 = pickable_interp1d(self.freq, self.value, bounds_error=False, fill_value=np.nan,
-                                        assume_sorted=True)
+            self.i1 = PickableInterp1d(
+                self.freq, self.value, bounds_error=False, fill_value=np.nan,
+                assume_sorted=True)
             self.i0 = self.i2 = None
+
         elif extrapolationmode == 2:
             # raises in case of extrapolation
-            self.i2 = pickable_interp1d(self.freq, self.value, bounds_error=True, fill_value=np.nan, assume_sorted=True)
+            self.i2 = PickableInterp1d(
+                self.freq, self.value, bounds_error=True, fill_value=np.nan, assume_sorted=True)
             self.i0 = self.i1 = None
+
         else:
             raise ValueError('')
 
-    # ---------------------------------------------
     def call(self, freq):
         if self.extrapolationmode == 1:
             # return np.masked_where(np.isnan(answer), answer)
             return self.i1(abs(freq))
+
         elif self.extrapolationmode == 2:
             try:
                 answer = self.i2(abs(freq))
             except:
                 raise Exception('could not evaluate freqinterpolator, check interpolation range')
             return answer
+
         elif self.extrapolationmode == 0:
             # print "WARNING : extrapolationmode == 0"
             return self.i0(abs(freq))
+
         else:
             raise Exception('unknown extrapolationmode %d' % self.extrapolationmode)
 
-    # ---------------------------------------------
     def __repr__(self):
         return '%s wave=%s mode=%d type=%s flag=%s extrapmode=%d N=%d' % (
             self.__class__.__name__, self.wave, self.mode, self.type,
             self.flag, self.extrapolationmode, len(self.freq))
 
-    # ---------------------------------------------
     def __call__(self, freq):
         value = self.call(freq)
         if hasattr(freq, "__iter__"): assert len(value) == len(freq)
         return value
 
-    # ---------------------------------------------
     def show(self, ax, marker="-", period=False, showdvalue=True, *args, **kwargs):
         if period:
             hdl = ax.loglog(1. / self.freq, self.value, marker, *args, **kwargs)[0]
+
         else:
             hdl = ax.loglog(self.freq, self.value, marker, *args, **kwargs)[0]
+
         if showdvalue and self.dvalue is not None:
             for f, val, dval in zip(self.freq, self.value, self.dvalue):
                 # velocity is a Jeffreys parameter
@@ -213,16 +209,15 @@ class freqinterpolator(object):
                 if period:
                     ax.plot([1. / f, 1. / f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-",
                             color=hdl.get_color())
+
                 else:
                     ax.plot([f, f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-",
                             color=hdl.get_color())
 
-
         return hdl
 
 
-# -------------------------------------------------
-class Claw(freqinterpolator):
+class Claw(FrequencyInterpolator):
     """monomodal phase dispersion law
     WARNING : do not use extrapolationmode = 0 for n-th modes because of the cut-off frequencies (see Aki & Richards, 2nd ed, p253)
     """
@@ -251,7 +246,6 @@ class Claw(freqinterpolator):
                     mode=self.mode, wave=self.wave, extrapolationmode=self.extrapolationmode)
 
 
-# -------------------------------------------------
 class nanClaw(Claw):
     def __init__(self, **kwargs):
         for k, v in kwargs.items(): self.__setattr__(k, v)
@@ -260,7 +254,6 @@ class nanClaw(Claw):
         return np.nan * np.ones(len(freq))
 
 
-# -------------------------------------------------
 class Ulaw(Claw):
     "monomodal group dispersion law"
     require_positive_values = True
@@ -271,7 +264,6 @@ class Ulaw(Claw):
                     mode=self.mode, wave=self.wave, extrapolationmode=self.extrapolationmode)
 
 
-# -------------------------------------------------
 class nanUlaw(Ulaw):
     def __init__(self, **kwargs):
         for k, v in kwargs.items(): self.__setattr__(k, v)
@@ -279,13 +271,12 @@ class nanUlaw(Ulaw):
     def __call__(self, freq):
         return np.nan * np.ones(len(freq))
 
-#-------------------------------------------------
-class Llaw(freqinterpolator):
+
+class Llaw(FrequencyInterpolator):
     "dlog10(c) / dlog10(f)"
     require_positive_values = False
 
 
-# -------------------------------------------------
 class surf96reader_from_surf96string(object):
     def __init__(self, surf96string):
         self.clear()
@@ -293,7 +284,6 @@ class surf96reader_from_surf96string(object):
             self.data['MODE'], self.data['PERIOD'], \
             self.data['VALUE'], self.data['DVALUE'], _, _, _, _ = unpacksurf96(surf96string)
 
-    # ---------------------------------------------
     def clear(self):
         if hasattr(self, "data"):
             del self.data
@@ -304,17 +294,14 @@ class surf96reader_from_surf96string(object):
             [np.array([], dtype=dtype) for dtype in \
              ['|S1','|S1', '|S1', int, float, float, float]]
 
-    # ---------------------------------------------
     def copy(self):
         return copy.deepcopy(self)
 
-    # ---------------------------------------------
     def get_all(self):
         for WAVE, TYPE, FLAG, MODE in \
                 zip(*munique(self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], self.data['MODE'])):
             yield self.get(mode=MODE, wave=WAVE, type=TYPE, flag=FLAG)
 
-    # ---------------------------------------------
     def get(self, wave="R", type="C", mode=0, flag=None):
         """generate a dispersion law according to the (read) file content"""
         I = (self.data['MODE'] == mode) & (self.data['WAVE'] == wave) & (self.data['TYPE'] == type)
@@ -337,7 +324,6 @@ class surf96reader_from_surf96string(object):
         return W(freq[J], valu[J], extrapolationmode=int(mode != 0), dvalue=dval[J],
                  mode=mode, wave=wave, type=type, flag=flag)
 
-    # ---------------------------------------------
     def get_lower(self, wave="R", type="C", mode=0, flag=None):
         law = self.get(wave=wave, type=type, mode=mode, flag=flag)
         if type == "C":
@@ -349,7 +335,6 @@ class surf96reader_from_surf96string(object):
         return W(law.freq, law.value * np.exp(-law.dvalue / law.value), extrapolationmode=int(mode != 0), dvalue=None,
                  mode=mode, wave=wave, type=type, flag=flag)
 
-    # ---------------------------------------------
     def get_upper(self, wave="R", type="C", mode=0, flag=None):
         law = self.get(wave=wave, type=type, mode=mode, flag=flag)
         if type == "C":
@@ -361,12 +346,10 @@ class surf96reader_from_surf96string(object):
         return W(law.freq, law.value * np.exp(+law.dvalue / law.value), extrapolationmode=int(mode != 0), dvalue=None,
                  mode=mode, wave=wave, type=type, flag=flag)
 
-    # ---------------------------------------------
     def wtm(self):
         for w, t, m in zip(*munique(self.data['WAVE'], self.data['TYPE'], self.data['MODE'])):
             yield w, t, m
 
-    # ---------------------------------------------
     def wtmfvd(self):
         return self.data['WAVE'], \
                self.data['TYPE'], \
@@ -375,7 +358,6 @@ class surf96reader_from_surf96string(object):
                self.data['VALUE'], \
                self.data['DVALUE']
 
-    # ---------------------------------------------
     def wtmfv(self):
         return self.data['WAVE'], \
                self.data['TYPE'], \
@@ -383,7 +365,6 @@ class surf96reader_from_surf96string(object):
                1. / self.data['PERIOD'], \
                self.data['VALUE']
 
-    # ---------------------------------------------
     def __str__(self):
 
         return packsurf96(self.data['WAVE'], self.data['TYPE'],
@@ -391,20 +372,17 @@ class surf96reader_from_surf96string(object):
                           self.data['PERIOD'], self.data['VALUE'],
                           self.data['DVALUE'])
 
-    # -------------------------------------------------
     def write96(self, filename):
         with open(filename, 'w') as fid:
             fid.write(self.__str__())
 
 
-# -------------------------------------------------
 class surf96reader(surf96reader_from_surf96string):
     def __init__(self, filename):
         with open(filename, 'r') as fid:
             surf96reader_from_surf96string.__init__(self, "".join(fid.readlines()))
 
 
-# -------------------------------------------------
 class surf96reader_from_arrays(surf96reader_from_surf96string):
     def __init__(self, waves, types, modes, freqs, values, dvalues=None, flags=None):
         """
@@ -428,7 +406,6 @@ class surf96reader_from_arrays(surf96reader_from_surf96string):
             waves, types, flags, modes, 1. / freqs, values, dvalues
 
 
-# _____________________________________
 def groupbywtm(waves, types, modes, freqs, values, dvalues=None, keepnans=True):
     """group outputs from dispersion by wave, type, modes
 
@@ -473,7 +450,6 @@ def groupbywtm(waves, types, modes, freqs, values, dvalues=None, keepnans=True):
             yield w, t, m, freqs[J][K][L], values[J][K][L], dvalues[J][K][L]
 
 
-# _____________________________________
 def igroupbywtm(Waves, Types, Modes, Freqs):
     """
     make the opposite of groupbywtm, prepare input for dispersion
@@ -501,7 +477,6 @@ def igroupbywtm(Waves, Types, Modes, Freqs):
     return waves, types, modes, freqs
 
 
-# -------------------------------------------------
 def mklaws(waves, types, modes, freqs, values, dvalues=None):
     """convert lists of parameters into interpolable dispersion laws
     input :

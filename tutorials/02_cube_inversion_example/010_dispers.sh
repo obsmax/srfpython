@@ -11,4 +11,3 @@ mkdir --parents data
 rm -f data/node???.surf96
 
 mv ./node???.surf96 data/
-
