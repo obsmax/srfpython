@@ -121,20 +121,25 @@ HerrMet --optimize \\
     
 # set the data and prior information    
 HerrMet --optimize \\
-    -prior 100. 2. 1000. 20. 1 1.0 0.5   \\
-    -data 
+    -prior 80. 1. 160. 2. 1 1.0 0.0   \\
+    -data 1.0 0.0
     
 # the prior can be changed afterwards, 
-# it requires to remove the iteration files    
+# it requires to remove the iteration files using option -restart
 HerrMet --optimize \\
-    -restart \\
-    -prior 100. 0.
+    -prior 100. 2. 200. 4. 1 1.0 0.0    
 
-# set the sensituvuty kernels for first iteration
+# run 1 iterations with fd update
+HerrMet --optimize -upd 1 1
+
+# run 2 iterations without fd update
+HerrMet --optimize -upd 2 0
+
+# update the fd manually
 HerrMet --optimize -fd 
     
-# run 3 iterations
-HerrMet --optimize -upd 3 
+# run 1 more iteration without fd update 
+HerrMet --optimize -upd 1 0   # -upd 1 1 would be equivalent
 
 # display results
 HerrMet --optimize -show    
