@@ -89,14 +89,21 @@ long_help = """\
                         - trunc_horizontal_smoothing_distance in km 
                         - trunc_vertical_smoothing_distance in km 
                         - lock_half_space 1 or 0 
-                        - scale_uncertainties (give a factor > 0) 
-                        - add_uncertainty in km/s
-    -data            get the data array and data covariance matrix, 
+                        - scale_uncertainties (give a factor >= 0) 
+                        - add_uncertainty in km/s (>= 0)
+    -data  fx2       get the data array and data covariance matrix, 
                      save it to {dobsfile}, {cdfile}
-    -fd              compute the frechet derivatives for the first model
+                     needs 2 arguments
+                        - scale_uncertainties (give a factor >= 0) 
+                        - add_uncertainty in km/s (>= 0)
+    -fd              compute the frechet derivatives for last iteration found
                      save it to {fdfile}
-    -upd   i         update the model, compute the frechet derivatives for the next iteration
-                     repeat n times, default 1                                 
+    -upd  [i [i]]    run iterative inversion
+                     two optional arguments
+                        - provide the number of iterations to run (default 1)
+                        - update the frechet derivatives before inversion 1/0 (default 1)
+                          you can also not update the fr. der. for several iterations
+                          and update it manually using -fd                                 
     -h, -help        display the help message for this plugin 
 """.format(workingdir=WORKINGDIR,
            nodefilelocal=NODEFILELOCAL,
@@ -425,10 +432,13 @@ class SuperDatacoder(object):
             Dobs = np.concatenate((Dobs, dobs_current))
         return np.asarray(Dobs, float)
 
-    def get_CD(self):
+    def get_CD(self, scale_uncertainties=1., add_uncertainty=0.):
         CDinv_diag = []
-        for datacoder in self.datacoders:
-            dobs_node, CDinv_diag_node = datacoder.target()
+        for n in range(len(self.datacoders)):
+            self.datacoders[n].dvalues = scale_uncertainties * self.datacoders[n].dvalues + add_uncertainty
+
+            assert np.all(self.datacoders[n].dvalues > 0.)
+            dobs_node, CDinv_diag_node = self.datacoders[n].target()
             CDinv_diag.append(CDinv_diag_node)
 
         CDinv_diag = np.concatenate(CDinv_diag)
@@ -442,7 +452,7 @@ class SuperDatacoder(object):
         datas = []
         for node_number, datacoder in enumerate(self.datacoders):
             ndatapoints = len(datacoder.values)
-            data = Data[i_current : i_current + ndatapoints]
+            data = Data[i_current: i_current + ndatapoints]
             i_current += ndatapoints
             datas.append(data)
 
@@ -686,7 +696,35 @@ def print_costs(niter, data_cost=None, model_cost=None):
         niter, data_cost, model_cost, data_cost + model_cost))
 
 
+def load_last_frechet_derivatives(supertheory, verbose, mapkwargs):
+    niter = lastiter()
+    while niter >= 0:
+        fdfilename = FDFILE.format(niter=niter)
+        if os.path.isfile(fdfilename):
+            if verbose:
+                print('loading {}'.format(fdfilename))
+            Gi = load_sparse_npz(fdfilename)
+            return Gi
+        niter -= 1
+
+    if niter < 0:
+        # no frechet derivatives found even G0,
+        return update_frechet_derivatives(supertheory, verbose, mapkwargs)
+
+
 def update_frechet_derivatives(supertheory, verbose, mapkwargs):
+    """
+
+    :param supertheory:
+    :param verbose:
+    :param mapkwargs:
+    :return:
+    """
+    # if os.path.isfile(FDFILE.format(niter=0)):
+    #     # test do not update the FD
+    #     G0 = load_sparse_npz(FDFILE.format(niter=0))
+    #     return G0
+
     # ========= compute the frechet derivatives for the last model found
     niter = lastiter()
     mfilename = MFILE.format(niter=niter)
@@ -790,19 +828,31 @@ def optimize(argv, verbose, mapkwargs):
         save_matrix(d0filename, D0, verbose)
 
     if "-data" in argv.keys():
+        if len(argv['-data']) == 2:
+            scale_uncertainties, add_uncertainty = argv["-data"]
+        elif len(argv['-data']) == 0:
+            scale_uncertainties, add_uncertainty = 1.0, 0.
+        else:
+            raise ValueError('see help for -data')
+
         # ========= set the observed data and data covariance matrix
         Dobs = superdatacoder.get_Dobs()
-        CD, CDinv = superdatacoder.get_CD()
+
+        CD, CDinv = superdatacoder.get_CD(
+            scale_uncertainties=scale_uncertainties,
+            add_uncertainty=add_uncertainty)
 
         save_matrix(DOBSFILE, Dobs, verbose)
         save_matrix(CDFILE, CD, verbose)
         save_matrix(CDINVFILE, CDinv, verbose)
 
     if "-fd" in argv.keys():
+        # manually update the frechet derivatives
         update_frechet_derivatives(supertheory, verbose, mapkwargs)
 
     if "-upd" in argv.keys():
-        nupd = argv["-upd"][0] if len(argv["-upd"]) > 0 else 1
+        number_of_iterations = argv["-upd"][0] if len(argv["-upd"]) > 0 else 1
+        update_G = bool(argv["-upd"][1]) if len(argv["-upd"]) > 1 else True
 
         # ================ load data
         Mprior = np.load(MPRIORFILE)
@@ -813,11 +863,15 @@ def optimize(argv, verbose, mapkwargs):
         CD = load_sparse_npz(CDFILE)
         CDinv = load_sparse_npz(CDINVFILE)
 
-        for _ in range(nupd):
+        for _ in range(number_of_iterations):
             niter = lastiter()
 
-            # compute frechet derivatives for this iteration (if not already computed)
-            Gi = update_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
+            if update_G:
+                # compute frechet derivatives for this iteration (if not already computed)
+                Gi = update_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
+            else:
+                # find the last version of the frechet derivatives, compute G0 if none is found
+                Gi = load_last_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
 
             # ==== save the current model state
             mfilename = MFILE.format(niter=niter)
