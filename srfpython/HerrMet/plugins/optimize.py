@@ -17,8 +17,11 @@ from srfpython.standalone.stdout import waitbarpipe
 from srfpython.Herrmann.Herrmann import CPiSDomainError
 from srfpython.HerrMet.files import ROOTKEY
 from srfpython.coordinates import haversine
+import pickle
 
 # TODO add convergence interruption warning
+# TODO speed up CM computations
+# TODO add safety gards about the size of CM
 
 WORKINGDIR = "."
 NODEFILELOCAL = os.path.join(WORKINGDIR, ROOTKEY + "nodes.txt")
@@ -33,6 +36,10 @@ DOBSFILE = os.path.join(WORKINGDIR, ROOTKEY + "Dobs.npy")
 CDFILE = os.path.join(WORKINGDIR, ROOTKEY + "CD.npz")
 CDINVFILE = os.path.join(WORKINGDIR, ROOTKEY + "CDinv.npz")
 CMFILE = os.path.join(WORKINGDIR, ROOTKEY + "CM.npz")
+
+SUPERPARAMETERIZERFILE = os.path.join(WORKINGDIR, ROOTKEY + ".SP.pkl")
+SUPERDATACODERFILE = os.path.join(WORKINGDIR, ROOTKEY + ".SD.pkl")
+SUPERTHOERYFILE = os.path.join(WORKINGDIR, ROOTKEY + ".ST.pkl")
 
 M96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_optimized.mod96")
 S96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_optimized.surf96")
@@ -49,7 +56,10 @@ CLEAR_LIST = [NODEFILELOCAL,
      DFILES,
      FDFILES,
      M96FILEOUTS,
-     S96FILEOUTS]
+     S96FILEOUTS,
+     SUPERPARAMETERIZERFILE,
+     SUPERDATACODERFILE,
+     SUPERTHOERYFILE]
 
 
 def mfile2niter(mfile):
@@ -243,6 +253,60 @@ class NodeFileLocal(NodeFile):
         datacoders = [makedatacoder(datacoder_string, which=Datacoder_log) for datacoder_string in datacoder_strings]
         return SuperDatacoder(datacoders)
 
+    def build_or_load_forward_problem(self, verbose, mapkwargs):
+        """
+
+        :param verbose:
+        :param mapkwargs:
+        :return:
+        """
+        if verbose:
+            print('building the forward problem operator ...')
+
+        if os.path.isfile(SUPERPARAMETERIZERFILE):
+            if verbose:
+                print('loading ', SUPERPARAMETERIZERFILE)
+            with open(SUPERPARAMETERIZERFILE, 'rb') as fid:
+                superparameterizer = pickle.load(fid)
+
+        else:
+            superparameterizer = self.get_superparameterizer(verbose, mapkwargs)
+            with open(SUPERPARAMETERIZERFILE, 'wb') as fid:
+                fid.write(pickle.dumps(superparameterizer))
+
+        if os.path.isfile(SUPERDATACODERFILE):
+            if verbose:
+                print('loading ', SUPERDATACODERFILE)
+            with open(SUPERDATACODERFILE, 'rb') as fid:
+                superdatacoder = pickle.load(fid)
+
+        else:
+            superdatacoder = self.get_superdatacoder(verbose)
+            with open(SUPERDATACODERFILE, 'wb') as fid:
+                fid.write(pickle.dumps(superdatacoder))
+
+        if os.path.isfile(SUPERTHOERYFILE):
+            if verbose:
+                print('loading ', SUPERTHOERYFILE)
+            with open(SUPERTHOERYFILE, 'rb') as fid:
+                supertheory = pickle.load(fid)
+
+        else:
+            supertheory = SuperTheory(
+                superparameterizer=superparameterizer,
+                superdatacoder=superdatacoder,
+                verbose=verbose,
+                mapkwargs=mapkwargs)
+            with open(SUPERTHOERYFILE, 'wb') as fid:
+                fid.write(pickle.dumps(supertheory))
+
+        n_data_points, n_parameters = supertheory.shape
+
+        if verbose:
+            print('done')
+
+        return n_data_points, n_parameters, superdatacoder, superparameterizer, supertheory
+
     def get_CM(
             self, horizontal_smoothing_distance, vertical_smoothing_distance,
             trunc_horizontal_smoothing_distance=0.,
@@ -252,11 +316,11 @@ class NodeFileLocal(NodeFile):
             scale_uncertainties=1.,
             add_uncertainty=0.,
             norm="L1",
-            visual_qc=False):
+            visual_qc=False,
+            verbose=True):
 
         ztop = self.ztop
         zmid = self.zmid
-        dz = np.abs(zmid - zmid[:, np.newaxis])
 
         if trunc_vertical_smoothing_distance is None or trunc_vertical_smoothing_distance <= 0.:
             # truncate the covariance beyond 10 times the smoothing distance
@@ -280,6 +344,11 @@ class NodeFileLocal(NodeFile):
             hsd, thsd = 1.0, 0.
 
         assert hsd > 0 and vsd > 0
+
+        dz = np.abs(zmid - zmid[:, np.newaxis])
+        # compute the vertical distance (2d)
+        Itrunc = dz.flat[:] <= tvsd
+
         # ========= load vs uncertainty at each node
         vs_uncertainties = []
         for nnode in range(len(self)):
@@ -302,26 +371,30 @@ class NodeFileLocal(NodeFile):
         CM_col_ind = np.array([], int)
         CM_data = np.array([], float)
 
+        if verbose:
+            wb = waitbarpipe('building CM')
+
         for nnode in range(len(self)):
+
             vs_unc_n = vs_uncertainties[nnode]
 
             for mnode in range(nnode, len(self)):
                 vs_unc_m = vs_uncertainties[mnode]
 
                 # compute the horizontal distance (scalar)
-                horizontal_distance_nm = haversine(
-                    loni=self.lons[nnode],
-                    lati=self.lats[nnode],
-                    lonj=self.lons[mnode],
-                    latj=self.lats[mnode])
+                if mnode == nnode:
+                    horizontal_distance_nm = 0.0
+                else:
+                    horizontal_distance_nm = haversine(
+                        loni=self.lons[nnode],
+                        lati=self.lats[nnode],
+                        lonj=self.lons[mnode],
+                        latj=self.lats[mnode])
 
                 if horizontal_distance_nm > thsd:
                     # the two cells are farther than trunc_horizontal_smoothing_distance
                     # leave covariance = 0
                     continue
-
-                # compute the vertical distance (2d)
-                Itrunc = dz.flat[:] <= tvsd
 
                 if norm == "L2":
                     # square distance
@@ -361,6 +434,11 @@ class NodeFileLocal(NodeFile):
                     CM_row_ind = np.hstack((CM_row_ind, col_ind_big))
                     CM_col_ind = np.hstack((CM_col_ind, row_ind_big))
                     CM_data = np.hstack((CM_data, covnm))
+            if verbose:
+                wb.refresh(nnode / float(len(self)))
+
+        if verbose:
+            wb.close()
 
         CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)),
                 shape=(len(self) * len(ztop), len(self) * len(ztop)))
@@ -919,7 +997,7 @@ def optimize(argv, verbose, mapkwargs):
             for filename in [mfile, dfile, fdfile]:
                 rm_nofail(filename, verbose=verbose)
 
-    # =================================
+    # ================================= exit now if possible
     for key in argv.keys():
         if key in ["-prior", "-data", "-fd", "-upd", "-show", "-save"]:
             # continue execution only if one of the options is active
@@ -931,22 +1009,15 @@ def optimize(argv, verbose, mapkwargs):
 
     # =================================
     # (re)read the local node file
-    if verbose:
-        print('building the forward problem operator (SuperTheory)...')
-
     nodefile = NodeFileLocal(NODEFILELOCAL)
     nodefile.fill_extraction_files()
 
-    # Compute the initialization matrixes
-    superparameterizer = nodefile.get_superparameterizer(verbose, mapkwargs)
-    superdatacoder = nodefile.get_superdatacoder(verbose)
-    supertheory = SuperTheory(
-        superparameterizer=superparameterizer,
-        superdatacoder=superdatacoder,
-        verbose=verbose,
-        mapkwargs=mapkwargs)
-    n_data_points, n_parameters = supertheory.shape
-    print('done')
+    # reload or build the forward problem operator
+    n_data_points, n_parameters, \
+        superdatacoder, superparameterizer, \
+        supertheory = \
+            nodefile.build_or_load_forward_problem(
+            verbose=verbose, mapkwargs=mapkwargs)
 
     if "-prior" in argv.keys():
         horizontal_smoothing_distance = argv["-prior"][0]
@@ -1155,3 +1226,4 @@ def optimize(argv, verbose, mapkwargs):
 
             with open(s96fileout, 'w') as fid:
                 fid.write(s96string)
+
