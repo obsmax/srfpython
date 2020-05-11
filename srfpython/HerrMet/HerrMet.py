@@ -19,7 +19,7 @@ from srfpython.HerrMet.files import DEFAULTROOTNAMES
 check_herrmann_codes()
 
 # -------------------------------------
-version = "6.0"
+version = "7.0"
 default_verbose = 1
 default_rootnames = DEFAULTROOTNAMES
 default_nworkers = None
@@ -43,7 +43,7 @@ authorized_keys = \
      "--extract",
      "--display",
      "--optimize",
-     "--default",]
+     "--default"]
 
 # -------------------------------------
 help = '''HerrMet V{version}
