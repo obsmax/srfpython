@@ -17,8 +17,7 @@ from srfpython.Herrmann.Herrmann import CPiSDomainError
 from srfpython.HerrMet.files import ROOTKEY
 from srfpython.coordinates import haversine
 
-# TODO replace shell commands using python
-# TODO add convergence interruption
+# TODO add convergence interruption warning
 
 WORKINGDIR = "."
 NODEFILELOCAL = os.path.join(WORKINGDIR, ROOTKEY + "nodes.txt")
@@ -39,8 +38,7 @@ S96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_optimized.surf96")
 M96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_optimized.mod96")
 S96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_optimized.surf96")
 
-CLEAR_COMMAND = 'trash ' + " ".join(
-    [NODEFILELOCAL,
+CLEAR_LIST = [NODEFILELOCAL,
      MPRIORFILE,
      DOBSFILE,
      CDFILE,
@@ -50,7 +48,7 @@ CLEAR_COMMAND = 'trash ' + " ".join(
      DFILES,
      FDFILES,
      M96FILEOUTS,
-     S96FILEOUTS])
+     S96FILEOUTS]
 
 
 def mfile2niter(mfile):
@@ -744,6 +742,20 @@ def update_frechet_derivatives(supertheory, verbose, mapkwargs):
         return Gi
 
 
+def rm_nofail(filepath, verbose=True):
+    ls = glob.glob(filepath)
+    if len(ls):
+        for filename in ls:
+            if os.path.isfile(filename):
+                if verbose:
+                    print('removing {}'.format(filename))
+                os.remove(filename)
+            elif verbose:
+                print('could not remove {} (not found)'.format(filename))
+    elif verbose:
+        print('could not remove {} (no files)'.format(filepath))
+
+
 def optimize(argv, verbose, mapkwargs):
 
     if '-h' in argv.keys() or "-help" in argv.keys():
@@ -757,8 +769,8 @@ def optimize(argv, verbose, mapkwargs):
         nodefilename_in = argv['-init'][0]
 
         # ========= clear temporary files
-        print(CLEAR_COMMAND)
-        os.system(CLEAR_COMMAND)
+        for filename in CLEAR_LIST:
+            rm_nofail(filename)
 
         # ========= get the node file and copy it in the working directory
         if not os.path.isfile(nodefilename_in):
@@ -771,15 +783,17 @@ def optimize(argv, verbose, mapkwargs):
 
     if "-restart" in argv.keys():
         # ========= clear temporary files except for the initiation files
+        m96fileout = M96FILEOUT.format(node="*")
+        s96fileout = S96FILEOUT.format(node="*")
+        rm_nofail(m96fileout, verbose=verbose)
+        rm_nofail(s96fileout, verbose=verbose)
+
         for niter in range(1, lastiter()+1):
             mfile = MFILE.format(niter=niter)
             dfile = DFILE.format(niter=niter)
             fdfile = FDFILE.format(niter=niter)
-            m96fileout = M96FILEOUT.format(node="*", niter=niter)
-            s96fileout = S96FILEOUT.format(node="*", niter=niter)
-            trashcmd = 'trash {} {} {} {} {}'.format(mfile, dfile, fdfile, m96fileout, s96fileout)
-            print(trashcmd)
-            os.system(trashcmd)
+            for filename in [mfile, dfile, fdfile]:
+                rm_nofail(filename, verbose=verbose)
 
     # =================================
     # (re)read the local node file
