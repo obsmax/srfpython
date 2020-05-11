@@ -10,7 +10,12 @@
 *.run
 *.png
 *.surf96.copy
+*.npy
+*.npz
 .DS_Store
 srfpython/Herrmann/bin/max_srfdis96
 srfpython/Herrmann/bin/max_srfpre96
 /tutorials/02_cube_inversion_example/inversion/
+/tutorials/02_cube_inversion_example/data/
+/tutorials/02_cube_inversion_example/models/
+/tutorials/02_cube_inversion_example/optimize/
