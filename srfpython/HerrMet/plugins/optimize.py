@@ -3,7 +3,7 @@ from builtins import input
 import warnings
 import glob, os
 import numpy as np
-from scipy.sparse import spmatrix, diags, issparse, csc_matrix, \
+from scipy.sparse import spmatrix, diags, issparse, csc_matrix, triu, tril, \
     save_npz as save_sparse_npz, load_npz as load_sparse_npz
 from scipy.sparse.linalg import spsolve, splu  #inv as sparse_inv NO!!!
 import matplotlib.pyplot as plt
@@ -22,6 +22,7 @@ import pickle
 # TODO add convergence interruption warning
 # TODO speed up CM computations
 # TODO add safety gards about the size of CM
+# TODO only save and load the upper triangle of CM (with diagonal)
 
 WORKINGDIR = "."
 NODEFILELOCAL = os.path.join(WORKINGDIR, ROOTKEY + "nodes.txt")
@@ -323,39 +324,16 @@ class NodeFileLocal(NodeFile):
             visual_qc=False,
             verbose=True):
 
-        ztop = self.ztop
-        zmid = self.zmid
-
-        if trunc_vertical_smoothing_distance is None or trunc_vertical_smoothing_distance <= 0.:
-            # truncate the covariance beyond 10 times the smoothing distance
-            trunc_vertical_smoothing_distance = 10.0 * vertical_smoothing_distance
-
-        if trunc_horizontal_smoothing_distance is None or trunc_horizontal_smoothing_distance <= 0.:
-            # truncate the covariance beyond 10 times the smoothing distance
-            trunc_horizontal_smoothing_distance = 10. * horizontal_smoothing_distance
-
+        if norm != "L1":
+            raise NotImplementedError('L2 not recommended (unstable)')
         vsd = vertical_smoothing_distance
         hsd = horizontal_smoothing_distance
         tvsd = trunc_vertical_smoothing_distance
         thsd = trunc_horizontal_smoothing_distance
-
-        if vsd == 0.:
-            # trick (not optimal) to avoid vertical smoothing I set the truncation distance to 0
-            vsd, tvsd = 1.0, 0.
-
-        if hsd == 0.:
-            # trick (not optimal) to avoid horizontal smoothing I set the truncation distance to 0
-            hsd, thsd = 1.0, 0.
-
-        assert hsd > 0 and vsd > 0
-
-        dz = np.abs(zmid - zmid[:, np.newaxis])
-        # compute the vertical distance (2d)
-        Itrunc = dz.flat[:] <= tvsd
-
-        # place the matrix in a large matrix
-        col_ind_small, row_ind_small = np.meshgrid(
-            range(len(ztop)), range(len(ztop)))
+        ztop = self.ztop
+        zmid = self.zmid
+        nlayer = len(ztop)
+        n_parameters = nlayer * len(self)
 
         # ========= load vs uncertainty at each node
         vs_uncertainties = []
@@ -374,99 +352,118 @@ class NodeFileLocal(NodeFile):
             vs_unc_n = np.clip(vs_unc_n, lock_half_space_sigma, np.inf)
             vs_uncertainties.append(vs_unc_n)
 
-        # ========== compute CM
-        CM_row_ind = []
-        CM_col_ind = []
-        CM_data = []
+        # ===========
+        if (vsd == 0 or tvsd == 0) and (hsd == 0. or thsd == 0.):
+            # no smoothing at all, easy
+            CM = diags(np.hstack(vs_uncertainties) ** 2.0,
+                       shape=(n_parameters, n_parameters),
+                       format="csc", dtype=float)
+            return CM
 
-        if verbose:
-            wb = waitbarpipe('building CM')
+        elif vsd > 0 and tvsd > 0:
+            # vertical smoothing at least
+            dz = np.abs(zmid - zmid[:, np.newaxis])
+            rhoz = np.exp(-dz / vsd)
+            rhoz[dz > tvsd] = 0.
+
+            rhoz_triu = triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
+            rhoz_tril = tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
+
+        elif vsd == 0 or tvsd == 0:
+            # horizontal smoothing only
+            rhoz_triu = rhoz_tril = None
+
+        else:
+            raise ValueError(vsd, tvsd)
+
+        # ===========
+        CM_triu_rows = []
+        CM_triu_cols = []
+        CM_triu_data = []
 
         for nnode in range(len(self)):
-
             vs_unc_n = vs_uncertainties[nnode]
 
-            for mnode in range(nnode, len(self)):
-                vs_unc_m = vs_uncertainties[mnode]
+            if vsd > 0 and tvsd > 0:
 
-                # compute the horizontal distance (scalar)
-                if mnode == nnode:
-                    horizontal_distance_nm = 0.0
-                else:
+                covnn_triu_row = rhoz_triu.row
+                covnn_triu_col = rhoz_triu.col
+                covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
+
+                CM_triu_rows.append(nnode * nlayer + covnn_triu_row)
+                CM_triu_cols.append(nnode * nlayer + covnn_triu_col)
+                CM_triu_data.append(covnn_triu_data)
+                # covnn_triu = csc_matrix((covnn_data, (covnn_row, covnn_col)))
+
+                if hsd > 0 and thsd > 0:
+                    na, nb = len(rhoz_triu.data), len(rhoz_tril.data)
+
+                    for mnode in range(nnode + 1, len(self)):
+                        vs_unc_m = vs_uncertainties[mnode]
+
+                        horizontal_distance_nm = haversine(
+                            loni=self.lons[nnode],
+                            lati=self.lats[nnode],
+                            lonj=self.lons[mnode],
+                            latj=self.lats[mnode])
+                        e = np.exp(-horizontal_distance_nm / hsd)  # scalar
+
+                        covnm_row = np.zeros(na + nb, int)
+                        covnm_col = np.zeros(na + nb, int)
+                        covnm_data = np.zeros(na + nb, float)
+
+                        covnm_row[:na] = rhoz_triu.row
+                        covnm_col[:na] = rhoz_triu.col
+                        covnm_data[:na] = vs_unc_n[rhoz_triu.row] * vs_unc_m[rhoz_triu.col] * rhoz_triu.data * e
+
+                        covnm_row[na:] = rhoz_tril.row
+                        covnm_col[na:] = rhoz_tril.col
+                        covnm_data[na:] = vs_unc_n[rhoz_tril.row] * vs_unc_m[rhoz_tril.col] * rhoz_tril.data * e
+
+                        CM_triu_rows.append(nnode * nlayer + covnm_row)
+                        CM_triu_cols.append(mnode * nlayer + covnm_col)
+                        CM_triu_data.append(covnm_data)
+                        # covnm = csc_matrix((covnm_data, (covnm_row, covnm_col)))
+
+            elif vsd == 0 or tvsd == 0:
+                covnn_row = np.arange(nlayer)
+                covnn_col = np.arange(nlayer)
+                covnn_data = vs_unc_n ** 2.
+
+                CM_triu_rows.append(nnode * nlayer + covnn_row)
+                CM_triu_cols.append(nnode * nlayer + covnn_col)
+                CM_triu_data.append(covnn_data)
+
+                assert hsd > 0 and thsd > 0  # implicit
+                for mnode in range(nnode + 1, len(self)):
+                    vs_unc_m = vs_uncertainties[mnode]
+
                     horizontal_distance_nm = haversine(
                         loni=self.lons[nnode],
                         lati=self.lats[nnode],
                         lonj=self.lons[mnode],
                         latj=self.lats[mnode])
 
-                if horizontal_distance_nm > thsd:
-                    # the two cells are farther than trunc_horizontal_smoothing_distance
-                    # leave covariance = 0
-                    continue
+                    e = np.exp(-horizontal_distance_nm / hsd)  # scalar
 
-                if norm == "L2":
-                    # square distance
-                    d2 = (dz / vsd) ** 2. + (horizontal_distance_nm / hsd) ** 2.
+                    covnm_row = np.arange(nlayer)
+                    covnm_col = np.arange(nlayer)
+                    covnm_data = vs_unc_n * vs_unc_m * e
 
-                    # linear correlation coefficient
-                    rhonm = np.exp(-0.5 * d2)
+                    CM_triu_rows.append(nnode * nlayer + covnm_row)
+                    CM_triu_cols.append(mnode * nlayer + covnm_col)
+                    CM_triu_data.append(covnm_data)
 
-                elif norm == "L1":
-                    # distance
-                    d1 = np.abs(dz / vsd) + np.abs(horizontal_distance_nm / hsd)
+            else:
+                raise ValueError
 
-                    # linear correlation coefficient
-                    rhonm = np.exp(-d1)
+        CM_triu_rows = np.hstack(CM_triu_rows)
+        CM_triu_cols = np.hstack(CM_triu_cols)
+        CM_triu_data = np.hstack(CM_triu_data)
+        CM_triu = csc_matrix((CM_triu_data, (CM_triu_rows, CM_triu_cols)),
+                       shape=(n_parameters, n_parameters), dtype=float)
 
-                else:
-                    raise
-
-                # covariance matrix
-                covnm = vs_unc_n[:, np.newaxis] * vs_unc_m * rhonm
-                row_ind_big = nnode * len(ztop) + row_ind_small.flat[Itrunc]
-                col_ind_big = mnode * len(ztop) + col_ind_small.flat[Itrunc]
-                covnm = covnm.flat[Itrunc]
-
-                # fill the upper triangle
-                CM_row_ind.append(row_ind_big)
-                CM_col_ind.append(col_ind_big)
-                CM_data.append(covnm)
-
-                if mnode > nnode:
-                    # fill the lower triangle
-                    CM_row_ind.append(col_ind_big)
-                    CM_col_ind.append(row_ind_big)
-                    CM_data.append(covnm)
-
-            if verbose:
-                wb.refresh(nnode / float(len(self)))
-
-        if verbose:
-            wb.close()
-            
-        CM_row_ind = np.hstack(CM_row_ind)
-        CM_col_ind = np.hstack(CM_col_ind)
-        CM_data = np.hstack(CM_data)
-
-        CM = csc_matrix((CM_data, (CM_row_ind, CM_col_ind)),
-                shape=(len(self) * len(ztop), len(self) * len(ztop)))
-
-        # ============== quality control
-        if False:
-            # verifies symmetry
-            check = (CM - CM.T)
-            assert not len(check.data)
-
-        if visual_qc:
-            # warning memory error
-            # visualize the matrix
-            assert input('sure?') == "y"
-            CM_ = CM.toarray()
-            CM_ = np.ma.masked_where(CM_ == 0, CM_)
-            plt.figure()
-            plt.colorbar(plt.imshow(np.log(CM_)))
-            plt.show()
-
+        CM = CM_triu + CM_triu.T - diags(CM_triu.diagonal())
         return CM
 
 
