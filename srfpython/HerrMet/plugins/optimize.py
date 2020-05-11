@@ -827,7 +827,7 @@ def tv23_1(Dobs, Di, CD,
            Mprior, M0, Mi, CM,
            Gi, supertheory):
     """
-
+    Tarantola Valette 1982 eq. 23, modified to control the step size
     :param Dobs:
     :param Di:
     :param CD:
