@@ -161,7 +161,7 @@ def check_keys(argv):
 
 class NodeFileLocal(NodeFile):
 
-    def get_superparameterizer(self, verbose):
+    def get_superparameterizer(self, verbose, mapkwargs):
         """
         construct parameterizers needed to define the theory function in each node
         :param self:
@@ -182,31 +182,38 @@ class NodeFileLocal(NodeFile):
             # force VINF=VSUP => means lock the depth of the interfaces in the theory operator
             parameter_string_header += "-Z{} {} {}\n".format(i, -self.ztop[i], -self.ztop[i])  # add locked depth interfaces
 
-        parameterizer_strings = []
-        if verbose:
-            wb = waitbarpipe('parameterizers')
+        def job_generator():
+            for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(self):
+                yield Job(medianfile, self.ztop, self.zmid)
 
-        for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(self):
+        def job_handler(medianfile, ztop, zmid):
             dm = depthmodel_from_mod96(medianfile)
-            vs = dm.vs.interp(self.zmid)
+            vs = dm.vs.interp(zmid)
 
             parameter_string = parameter_string_header
 
-            for i in range(len(self.ztop)):
+            for i in range(len(ztop)):
                 # SET VINF < VS extracted from pointwise inv < VSUP
                 # such as parameterizer.MMEAN corresponds to the extracted vs
                 parameter_string += "VS{} {} {}\n".format(i, vs[i]-0.01, vs[i]+0.01)
-            parameterizer_strings.append(parameter_string)
+            parameterizer = load_paramfile(parameter_string, verbose=False)[0]
+            return parameter_string, parameterizer
 
-            if verbose:
-                wb.refresh(nnode / float(len(self)))
+        wb = None
+        if verbose:
+            wb = waitbarpipe('parameterizers')
+
+        parameterizers = []
+        with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
+            for jobid, (parameter_string, parameterizer), _, _ in ma:
+                parameterizers.append(parameterizer)
+
+                if verbose:
+                    wb.refresh(jobid / float(len(self)))
 
         if verbose:
             wb.close()
 
-        parameterizer_strings = np.asarray(parameterizer_strings, str)
-        parameterizers = [load_paramfile(parameter_string, verbose=False)[0]
-                          for parameter_string in parameterizer_strings]
         return SuperParameterizer(parameterizers)
 
     def get_superdatacoder(self, verbose):
@@ -550,6 +557,7 @@ class SuperTheory(object):
         self.theorys = []
         if verbose:
             wb = waitbarpipe('forward operators')
+
         for nnode, (parameterizer, datacoder) in enumerate(zip(
                 superparameterizer.parameterizers, superdatacoder.datacoders)):
 
@@ -922,7 +930,7 @@ def optimize(argv, verbose, mapkwargs):
     nodefile.fill_extraction_files()
 
     # Compute the initialization matrixes
-    superparameterizer = nodefile.get_superparameterizer(verbose)
+    superparameterizer = nodefile.get_superparameterizer(verbose, mapkwargs)
     superdatacoder = nodefile.get_superdatacoder(verbose)
     supertheory = SuperTheory(
         superparameterizer=superparameterizer,
