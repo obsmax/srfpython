@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 import curses
 import time
@@ -278,7 +279,7 @@ class InteractiveStdOut(mp.Process):
                 else: continue
         #recall what was printed
         for l in lines: 
-            if len(l): print l
+            if len(l): print(l)
 
 
 # --------------------------------------
@@ -299,7 +300,7 @@ def MultiPrint(gen, maxlines = 10000):
 if __name__ == "__main__":
     if True:
         w = waitbar('test')
-        for i in xrange(100):
+        for i in range(100):
             time.sleep(0.1)
             w.refresh(i / 100.)
         #w.refresh(1.)
@@ -307,7 +308,7 @@ if __name__ == "__main__":
     time.sleep(2.)
     if True:
         def gen():
-            for i in xrange(100000):
+            for i in range(100000):
                 line = int(i / 1000) #chose a line number
                 yield line, "ligne %d %f" % (line, np.random.rand())
         

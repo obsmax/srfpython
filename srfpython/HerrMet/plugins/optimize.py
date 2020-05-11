@@ -13,6 +13,7 @@ from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
 from srfpython.HerrMet.theory import Theory
 from srfpython.standalone.multipro8 import Job, MapSync
+from srfpython.standalone.stdout import waitbarpipe
 from srfpython.Herrmann.Herrmann import CPiSDomainError
 from srfpython.HerrMet.files import ROOTKEY
 from srfpython.coordinates import haversine
@@ -68,7 +69,7 @@ def lastiter():
 default_option = None
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-option", "-init", "-restart", "-prior",
+authorized_keys = ["-init", "-restart", "-prior",
                    "-data", "-fd", "-upd", "-show", "-save",
                    "-h", "-help"]
 
@@ -160,7 +161,7 @@ def check_keys(argv):
 
 class NodeFileLocal(NodeFile):
 
-    def get_superparameterizer(self):
+    def get_superparameterizer(self, verbose):
         """
         construct parameterizers needed to define the theory function in each node
         :param self:
@@ -182,6 +183,9 @@ class NodeFileLocal(NodeFile):
             parameter_string_header += "-Z{} {} {}\n".format(i, -self.ztop[i], -self.ztop[i])  # add locked depth interfaces
 
         parameterizer_strings = []
+        if verbose:
+            wb = waitbarpipe('parameterizers')
+
         for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(self):
             dm = depthmodel_from_mod96(medianfile)
             vs = dm.vs.interp(self.zmid)
@@ -194,23 +198,39 @@ class NodeFileLocal(NodeFile):
                 parameter_string += "VS{} {} {}\n".format(i, vs[i]-0.01, vs[i]+0.01)
             parameterizer_strings.append(parameter_string)
 
+            if verbose:
+                wb.refresh(nnode / float(len(self)))
+
+        if verbose:
+            wb.close()
+
         parameterizer_strings = np.asarray(parameterizer_strings, str)
         parameterizers = [load_paramfile(parameter_string, verbose=False)[0]
                           for parameter_string in parameterizer_strings]
         return SuperParameterizer(parameterizers)
 
-    def get_superdatacoder(self):
+    def get_superdatacoder(self, verbose):
         """
 
         :param self:
         :return:
         """
         datacoder_strings = []
+
+        if verbose:
+            wb = waitbarpipe('datacoders    ')
+
         for nnode, (node, lon, lat, targetfile, paramfile, medianfile, p16file, p84file) in enumerate(self):
 
             with open(targetfile, 'r') as fid:
                 datacoder_string = "".join(fid.readlines())
                 datacoder_strings.append(datacoder_string)
+
+            if verbose:
+                wb.refresh(nnode / float(len(self)))
+
+        if verbose:
+            wb.close()
 
         datacoder_strings = np.asarray(datacoder_strings, str)
         datacoders = [makedatacoder(datacoder_string, which=Datacoder_log) for datacoder_string in datacoder_strings]
@@ -229,6 +249,7 @@ class NodeFileLocal(NodeFile):
 
         ztop = self.ztop
         zmid = self.zmid
+        dz = np.abs(zmid - zmid[:, np.newaxis])
 
         if trunc_vertical_smoothing_distance is None or trunc_vertical_smoothing_distance <= 0.:
             # truncate the covariance beyond 10 times the smoothing distance
@@ -293,7 +314,6 @@ class NodeFileLocal(NodeFile):
                     continue
 
                 # compute the vertical distance (2d)
-                dz = np.abs(zmid - zmid[:, np.newaxis])
                 Itrunc = dz.flat[:] <= tvsd
 
                 if norm == "L2":
@@ -339,13 +359,15 @@ class NodeFileLocal(NodeFile):
                 shape=(len(self) * len(ztop), len(self) * len(ztop)))
 
         # ============== quality control
-        # verifies symmetry
-        check = (CM - CM.T)
-        assert not len(check.data)
+        if False:
+            # verifies symmetry
+            check = (CM - CM.T)
+            assert not len(check.data)
 
         if visual_qc:
             # warning memory error
             # visualize the matrix
+            assert input('sure?') == "y"
             CM_ = CM.toarray()
             CM_ = np.ma.masked_where(CM_ == 0, CM_)
             plt.figure()
@@ -356,8 +378,12 @@ class NodeFileLocal(NodeFile):
 
 
 class SuperParameterizer(object):
+
     def __init__(self, parameterizers):
         self.parameterizers = parameterizers
+
+    def __len__(self):
+        return len(self.parameterizers)
 
     def get_Mprior(self):
         Mprior = []
@@ -427,6 +453,9 @@ class SuperParameterizer(object):
 class SuperDatacoder(object):
     def __init__(self, datacoders):
         self.datacoders = datacoders
+
+    def __len__(self):
+        return len(self.datacoders)
 
     def get_Dobs(self):
         Dobs = []
@@ -510,19 +539,36 @@ class SuperDatacoder(object):
 
 
 class SuperTheory(object):
-    def __init__(self, superparameterizer, superdatacoder):
+    def __init__(self, superparameterizer, superdatacoder, verbose=True):
+        assert isinstance(superdatacoder, SuperDatacoder)
+        assert isinstance(superparameterizer, SuperParameterizer)
+        assert len(superparameterizer) == len(superdatacoder)
+
         self.superparameterizer = superparameterizer
         self.superdatacoder = superdatacoder
+
         self.theorys = []
-        for parameterizer, datacoder in zip(superparameterizer.parameterizers,
-                                            superdatacoder.datacoders):
+        if verbose:
+            wb = waitbarpipe('forward operators')
+        for nnode, (parameterizer, datacoder) in enumerate(zip(
+                superparameterizer.parameterizers, superdatacoder.datacoders)):
+
             theory = Theory(parameterizer=parameterizer, datacoder=datacoder)
             self.theorys.append(theory)
+            if verbose:
+                wb.refresh(nnode/float(len(self)))
+
+        if verbose:
+            wb.close()
+
         # number of data points for each node
         self.nds = np.asarray([len(theory.datacoder.values) for theory in self.theorys], int)
 
         # number of parameters for each node
         self.nps = np.asarray([len(theory.parameterizer.MMEAN) for theory in self.theorys], int)
+
+    def __len__(self):
+        return len(self.superdatacoder)
 
     @property
     def shape(self):
@@ -612,7 +658,7 @@ def save_matrix(filename, matrix, verbose):
         n = matrix.count_nonzero()
         s = np.prod(matrix.shape)
         sparsity = 100. * (1. - n / float(s))
-        size = s * matrix.data.itemsize
+        size = n * matrix.data.itemsize
 
     if verbose:
         print('saving {:<30s} {:<10s} {:<14s} {:<10s} {:<10s} {:<10s}'.format(
@@ -761,6 +807,63 @@ def rm_nofail(filepath, verbose=True):
         print('could not remove {} (no files)'.format(filepath))
 
 
+def tv23_1(Dobs, Di, CD,
+           Mprior, M0, Mi, CM,
+           Gi, supertheory):
+    """
+
+    :param Dobs:
+    :param Di:
+    :param CD:
+    :param Mprior:
+    :param M0:
+    :param Mi:
+    :param CM:
+    :param Gi:
+    :param supertheory:
+    :return:
+    """
+    # nan issues
+    # nan can occur in the predicted data if a data point is above the cut off period
+    # let ignore them
+    Inan = np.isnan(Di) | np.isnan(Dobs)
+    Dobs[Inan] = Di[Inan] = 0.
+    Xi = Dobs - Di + Gi * (Mi - Mprior)
+
+    CMGiT = CM * Gi.T
+
+    Ai = CD + Gi * CMGiT
+
+    if False:
+        Aiinv_dot_Xi = spsolve(A=Ai, b=Xi)
+    else:
+        lu = splu(Ai)
+        Aiinv_dot_Xi = lu.solve(Xi)
+
+    error = np.abs(Xi - Ai * Aiinv_dot_Xi).sum()
+    print('error on A.x=b : {}'.format(error))
+
+    KiXi = CMGiT * Aiinv_dot_Xi
+
+    mu = 1.0
+    Minew = Dinew = None
+    while mu > 0.001:
+        try:
+            Minew = Mi + mu * (M0 + KiXi - Mi)
+            Dinew = supertheory(Minew)
+            break
+        except CPiSDomainError as e:
+            print('the step was too large and leaded to an error in the forward problem \n({}), '
+                  'try reducing the step length'.format(str(e)))
+            mu /= 2.0
+            continue
+
+    if Minew is None:
+        raise Exception('fail')
+
+    return Dinew, Minew
+
+
 def optimize(argv, verbose, mapkwargs):
 
     if '-h' in argv.keys() or "-help" in argv.keys():
@@ -801,17 +904,32 @@ def optimize(argv, verbose, mapkwargs):
                 rm_nofail(filename, verbose=verbose)
 
     # =================================
+    for key in argv.keys():
+        if key in ["-prior", "-data", "-fd", "-upd", "-show", "-save"]:
+            # continue execution only if one of the options is active
+            break
+    else:
+        import sys
+        print('no more options, exiting now')
+        sys.exit(0)
+
+    # =================================
     # (re)read the local node file
+    if verbose:
+        print('building the forward problem operator (SuperTheory)...')
+
     nodefile = NodeFileLocal(NODEFILELOCAL)
     nodefile.fill_extraction_files()
 
     # Compute the initialization matrixes
-    superparameterizer = nodefile.get_superparameterizer()
-    superdatacoder = nodefile.get_superdatacoder()
+    superparameterizer = nodefile.get_superparameterizer(verbose)
+    superdatacoder = nodefile.get_superdatacoder(verbose)
     supertheory = SuperTheory(
         superparameterizer=superparameterizer,
-        superdatacoder=superdatacoder)
+        superdatacoder=superdatacoder,
+        verbose=verbose)
     n_data_points, n_parameters = supertheory.shape
+    print('done')
 
     if "-prior" in argv.keys():
         horizontal_smoothing_distance = argv["-prior"][0]
@@ -1020,48 +1138,3 @@ def optimize(argv, verbose, mapkwargs):
 
             with open(s96fileout, 'w') as fid:
                 fid.write(s96string)
-
-
-def tv23_1(Dobs, Di, CD,
-           Mprior, M0, Mi, CM,
-           Gi, supertheory):
-
-    # nan issues
-    # nan can occur in the predicted data if a data point is above the cut off period
-    # let ignore them
-    Inan = np.isnan(Di) | np.isnan(Dobs)
-    Dobs[Inan] = Di[Inan] = 0.
-    Xi = Dobs - Di + Gi * (Mi - Mprior)
-
-    CMGiT = CM * Gi.T
-
-    Ai = CD + Gi * CMGiT
-
-    if False:
-        Aiinv_dot_Xi = spsolve(A=Ai, b=Xi)
-    else:
-        lu = splu(Ai)
-        Aiinv_dot_Xi = lu.solve(Xi)
-
-    error = np.abs(Xi - Ai * Aiinv_dot_Xi).sum()
-    print('error on A.x=b : {}'.format(error))
-
-    KiXi = CMGiT * Aiinv_dot_Xi
-
-    mu = 1.0
-    Minew = Dinew = None
-    while mu > 0.001:
-        try:
-            Minew = Mi + mu * (M0 + KiXi - Mi)
-            Dinew = supertheory(Minew)
-            break
-        except CPiSDomainError as e:
-            print('the step was too large and leaded to an error in the forward problem \n({}), '
-                  'try reducing the step length'.format(str(e)))
-            mu /= 2.0
-            continue
-
-    if Minew is None:
-        raise Exception('fail')
-
-    return Dinew, Minew
