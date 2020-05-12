@@ -788,8 +788,10 @@ class SuperTheory(object):
         G = sp.csc_matrix((G_fd_data, (G_row_ind, G_col_ind)), shape=G_shape)
         return G
 
-    def get_CMGiT(self, CM, Gi):
-        print('get_CMGiT...')
+    def get_CMGiT(self, CM, Gi, mapkwargs, verbose):
+        if verbose:
+            print('computing CM . G.T ...')
+            
         assert Gi.shape == self.shape
 
         d_end = np.cumsum(self.nds)  # excluded
@@ -798,26 +800,52 @@ class SuperTheory(object):
         p_begin = np.hstack((0, p_end[:-1]))  # included
         assert len(p_begin) == len(p_end) == len(d_begin) == len(d_end)
         assert Gi.shape == (d_end[-1], p_end[-1])
-        # raise
+
+        def job_generator():
+            for mnode, (pb, pe, db, de) in enumerate(zip(p_begin, p_end, d_begin, d_end)):
+                yield Job(pb, pe, db, de)
+
+        class JobHandler(object):
+            def __init__(self):
+                self.Gi = Gi
+                self.CM = CM
+
+            def __call__(self, pb, pe, db, de):
+                GimmT = Gi[db:de, pb:pe].T
+                rows = []
+                cols = []
+                datas = []
+
+                for qb, qe in zip(p_begin, p_end):
+                    CMnm = CM[qb:qe, pb:pe]
+                    CMGiTnm = (CMnm * GimmT).tocoo()
+                    if len(CMGiTnm.row):
+                        rows.append(qb + CMGiTnm.row)
+                        cols.append(db + CMGiTnm.col)
+                        datas.append(CMGiTnm.data)
+
+                rows = np.hstack(rows)
+                cols = np.hstack(cols)
+                datas = np.hstack(datas)
+
+                return rows, cols, datas
 
         CMGiT_rows = []
         CMGiT_cols = []
         CMGiT_data = []
+        if verbose:
+            wb = waitbarpipe('')
+        with MapSync(JobHandler(), job_generator(), **mapkwargs) as ma:
+            for jobid, (rows, cols, datas), _, _ in ma:
 
-        for mnode, (pb, pe, db, de) in enumerate(zip(p_begin, p_end, d_begin, d_end)):
-            # the "super colonne" is CM[:, jb:je]
-            GimmT = Gi[db:de, pb:pe].T
-
-            for nnode, (qb, qe) in enumerate(zip(p_begin, p_end)):
-                CMnm = CM[qb:qe, pb:pe]
-                # if CMnm.count_nonzero() == 0:
-                #     continue
-
-                CMGiTnm = (CMnm * GimmT).tocoo()
-
-                CMGiT_rows.append(qb + CMGiTnm.row)
-                CMGiT_cols.append(db + CMGiTnm.col)
-                CMGiT_data.append(CMGiTnm.data)
+                if len(rows):
+                    CMGiT_rows.append(rows)
+                    CMGiT_cols.append(cols)
+                    CMGiT_data.append(datas)
+                if verbose:
+                    wb.refresh(jobid / float(len(p_begin)))
+        if verbose:
+            wb.close()
 
         CMGiT_rows = np.hstack(CMGiT_rows)
         CMGiT_cols = np.hstack(CMGiT_cols)
@@ -837,6 +865,47 @@ class SuperTheory(object):
             plt.show()
         print('ok')
         return CMGiT
+        #
+        #
+        #
+        # CMGiT_rows = []
+        # CMGiT_cols = []
+        # CMGiT_data = []
+        #
+        # for mnode, (pb, pe, db, de) in enumerate(zip(p_begin, p_end, d_begin, d_end)):
+        #     # the "super colonne" is CM[:, jb:je]
+        #     GimmT = Gi[db:de, pb:pe].T
+        #
+        #     for nnode, (qb, qe) in enumerate(zip(p_begin, p_end)):
+        #         CMnm = CM[qb:qe, pb:pe]
+        #         if CMnm.count_nonzero() == 0:
+        #             continue
+        #
+        #         CMGiTnm = (CMnm * GimmT).tocoo()
+        #
+        #         if len(CMGiTnm.row):
+        #             CMGiT_rows.append(qb + CMGiTnm.row)
+        #             CMGiT_cols.append(db + CMGiTnm.col)
+        #             CMGiT_data.append(CMGiTnm.data)
+        #
+        # CMGiT_rows = np.hstack(CMGiT_rows)
+        # CMGiT_cols = np.hstack(CMGiT_cols)
+        # CMGiT_data = np.hstack(CMGiT_data)
+        #
+        # CMGiT = sp.csc_matrix((CMGiT_data, (CMGiT_rows, CMGiT_cols)),
+        #                       shape=(CM.shape[0], Gi.shape[0]),
+        #                       dtype=float)
+        # if False:
+        #     assert input('sure?') == "y"
+        #     assert np.all(CMGiT.toarray() == (CM * Gi.T).toarray())
+        #     plt.figure()
+        #     plt.subplot(121)
+        #     plt.imshow(CMGiT.toarray())
+        #     plt.subplot(122)
+        #     plt.imshow((CM * Gi.T).toarray())
+        #     plt.show()
+        # print('ok')
+        # return CMGiT
 
 
 def load_CM(CMFILE):
@@ -1205,6 +1274,8 @@ def optimize(argv, verbose, mapkwargs):
         update_G = bool(argv["-upd"][1]) if len(argv["-upd"]) > 1 else True
 
         # ================ load data
+        if verbose:
+            print('loading ...')
         Mprior = np.load(MPRIORFILE)
         M0 = np.load(MFILE.format(niter=0))
         Dobs = np.load(DOBSFILE)
@@ -1216,7 +1287,7 @@ def optimize(argv, verbose, mapkwargs):
         if not update_G:
             # find the last version of the frechet derivatives, compute G0 if none is found
             Gi = load_last_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
-            CMGiT = supertheory.get_CMGiT(CM, Gi)
+            CMGiT = supertheory.get_CMGiT(CM, Gi, mapkwargs=mapkwargs, verbose=verbose)
 
         for _ in range(number_of_iterations):
             niter = lastiter()
@@ -1224,7 +1295,7 @@ def optimize(argv, verbose, mapkwargs):
             if update_G:
                 # compute frechet derivatives for this iteration (if not already computed)
                 Gi = update_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
-                CMGiT = supertheory.get_CMGiT(CM, Gi)
+                CMGiT = supertheory.get_CMGiT(CM, Gi, mapkwargs=mapkwargs, verbose=verbose)
 
             # ==== save the current model state
             mfilename = MFILE.format(niter=niter)
