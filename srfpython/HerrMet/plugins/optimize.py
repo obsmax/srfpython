@@ -455,13 +455,18 @@ class NodeFileLocal(NodeFile):
         CM_triu = sp.csc_matrix((CM_triu_data, (CM_triu_rows, CM_triu_cols)),
                        shape=(n_parameters, n_parameters), dtype=float)
 
-        if visual_qc:
+        if 1 or visual_qc:
+            plt.figure()
+            plt.plot(self.lons, self.lats, 'ko')
+            for lon, lat, node in zip(self.lons, self.lats, self.nodes):
+                plt.text(lon, lat, node)
+
             if input('are you sure you want to display this matrix (risk of memory saturation)?') == "y":
                 plt.figure()
                 A = CM_triu.toarray()
                 A = np.ma.masked_where(A == 0, A)
                 plt.imshow(A)
-                plt.show()
+            plt.show()
 
         # CM = CM_triu + CM_triu.T - diags(CM_triu.diagonal())
         return CM_triu

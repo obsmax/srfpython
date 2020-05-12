@@ -15,8 +15,8 @@ cd optimize || exit 1
 # do not work
 HerrMet --optimize -init ../nodes.txt \
   -data 1. 0.0 \
-  -prior  100. 1. \
-          110. 2. \
+  -prior  30. 1. \
+          30. 2. \
           1 \
           1.0 0.5 \
   -upd 3 0 \
