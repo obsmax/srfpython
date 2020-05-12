@@ -321,7 +321,8 @@ class NodeFileLocal(NodeFile):
             add_uncertainty=0.,
             norm="L1",
             visual_qc=False,
-            verbose=True):
+            verbose=True,
+            mapkwargs=None):
 
         if norm != "L1":
             raise NotImplementedError('L2 not recommended (unstable)')
@@ -339,12 +340,14 @@ class NodeFileLocal(NodeFile):
         hsmooth = hsd > 0 and thsd > 0
 
         # ========= load vs uncertainty array at each node
+        print('    get_vs_uncertainties')
         vs_uncertainties = self.get_vs_uncertainties(
             scale_uncertainties=scale_uncertainties,
             add_uncertainty=add_uncertainty,
             lock_half_space=lock_half_space,
-            lock_half_space_sigma=lock_half_space_sigma)
-
+            lock_half_space_sigma=lock_half_space_sigma,
+            mapkwargs=mapkwargs)
+        print('    done')
         # ===========
         if not (vsmooth or hsmooth):
             # no smoothing at all, easy
@@ -354,15 +357,22 @@ class NodeFileLocal(NodeFile):
             return CM_triu
 
         # =========== prepare smoothing
+        print('    prepare_vertical_smoothing')
         rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril = \
             self.prepare_vertical_smoothing(vsd, tvsd)
+        print('    done')
 
-        rhod_triu = self.prepare_horizontal_smoothing(hsd, thsd)
+        print('    prepare_horizontal_smoothing')
+        rhod_triu = self.prepare_horizontal_smoothing(hsd, thsd, mapkwargs)
+        print('    done')
 
         # ===========
         CM_triu_rows = []
         CM_triu_cols = []
         CM_triu_data = []
+
+        if verbose:
+            wb = waitbarpipe()
 
         for nnode in range(len(self)):
             vs_unc_n = vs_uncertainties[nnode, :]
@@ -434,6 +444,11 @@ class NodeFileLocal(NodeFile):
                     CM_triu_cols.append(covnm_col)
                     CM_triu_data.append(covnm_data)
 
+            if verbose:
+                wb.refresh(nnode / float(len(self)))
+
+        if verbose:
+            wb.close()
         CM_triu_rows = np.hstack(CM_triu_rows)
         CM_triu_cols = np.hstack(CM_triu_cols)
         CM_triu_data = np.hstack(CM_triu_data)
@@ -451,33 +466,52 @@ class NodeFileLocal(NodeFile):
         # CM = CM_triu + CM_triu.T - diags(CM_triu.diagonal())
         return CM_triu
 
-    def prepare_horizontal_smoothing(self, hsd, thsd):
+    def prepare_horizontal_smoothing(self, hsd, thsd, mapkwargs):
         if hsd == 0 and thsd == 0:
             rhod_triu = None
 
         else:
-            nnodes = len(self)
-            # warning : I do not fill the lower triangle and diagonal !!!
-            rhod_triu = sp.triu(np.zeros((nnodes, nnodes), float), k=1, format="lil")
+            Nnodes = len(self)
 
-            # fill diagonal terms
-            rhod_triu += sp.diags(np.ones(nnodes))
+            # warning : I do not fill the lower triangle and diagonal !!!
+            rhod_rows = [np.arange(Nnodes)]
+            rhod_cols = [np.arange(Nnodes)]
+            rhod_datas = [np.ones(Nnodes)]
 
             # fill non-diagonal terms
-            for nnode in range(nnodes - 1):
-                for mnode in range(nnode + 1, nnodes):
+            def job_generator():
+                for nnode in range(Nnodes - 1):
+                    yield Job(nnode,
+                              loni=self.lons[nnode],
+                              lati=self.lats[nnode],
+                              lonj=self.lons[nnode + 1:],
+                              latj=self.lats[nnode + 1:])
 
-                    horizontal_distance = \
-                        haversine(
-                            loni=self.lons[nnode],
-                            lati=self.lats[nnode],
-                            lonj=self.lons[mnode],
-                            latj=self.lats[mnode])
+            def job_handler(nnode, **kwargs):
+                horizontal_distances = haversine(**kwargs)
+                mnodes = np.arange(nnode+1, Nnodes)
 
-                    if horizontal_distance > thsd:
-                        continue
+                I = horizontal_distances < thsd
+                nnodes = nnode * np.ones(I.sum())
+                mnodes = mnodes[I]
+                horizontal_distances = horizontal_distances[I]
+                datas = np.exp(-horizontal_distances / hsd)
 
-                    rhod_triu[nnode, mnode] = np.exp(-horizontal_distance / thsd)
+                return nnodes, mnodes, datas
+
+            with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
+                for jobid, (nnodes, mnodes, datas), _, _ in ma:
+                    rhod_rows.append(nnodes)
+                    rhod_cols.append(mnodes)
+                    rhod_datas.append(datas)
+
+
+        rhod_rows = np.hstack(rhod_rows)
+        rhod_cols = np.hstack(rhod_cols)
+        rhod_datas = np.hstack(rhod_datas)
+
+        rhod_triu = sp.csc_matrix((rhod_datas, (rhod_rows, rhod_cols)),
+                                  shape=(Nnodes, Nnodes), dtype=float)
         return rhod_triu
 
     def prepare_vertical_smoothing(self, vsd, tvsd):
@@ -494,13 +528,42 @@ class NodeFileLocal(NodeFile):
 
         return rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril
 
-    def get_vs_uncertainties(self, scale_uncertainties, add_uncertainty, lock_half_space, lock_half_space_sigma):
+    def get_vs_uncertainties(self, scale_uncertainties, add_uncertainty, lock_half_space, lock_half_space_sigma, mapkwargs):
         ztop = self.ztop
         zmid = self.zmid
         nnodes = len(self)
         nlayer = len(ztop)
 
         vs_uncertainties = np.zeros((nnodes, nlayer), float)  # one row per node, one col per layer
+        #
+        # def job_generator():
+        #     for nnode in range(nnodes):
+        #         p16file, p84file = self.p16files[nnode], self.p84files[nnode]
+        #         yield Job(nnode, p16file, p84file)
+        #
+        # def job_handler(nnode, p16file, p84file):
+        #     vs84_n = depthmodel_from_mod96(p84file).vs
+        #     vs16_n = depthmodel_from_mod96(p16file).vs
+        #     vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
+        #     vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
+        #     vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
+        #     vs_unc_n = scale_uncertainties * vs_unc_n + add_uncertainty
+        #
+        #     if lock_half_space:
+        #         vs_unc_n[-1] = lock_half_space_sigma
+        #
+        #     # make sure all uncertainties are positive
+        #     vs_unc_n = np.clip(vs_unc_n, lock_half_space_sigma, np.inf)
+        #     return nnode, vs_unc_n
+        #
+        # if mapkwargs is None:
+        #     mapkwargs = {}
+        # with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
+        #     for jobid, (nnode, vs_unc_n), _, _ in ma:
+        #         vs_uncertainties[nnode, :] = vs_unc_n
+        # return vs_uncertainties
+
+
         for nnode in range(nnodes):
             vs84_n = depthmodel_from_mod96(self.p84files[nnode]).vs
             vs16_n = depthmodel_from_mod96(self.p16files[nnode]).vs
@@ -530,8 +593,8 @@ class SuperParameterizer(object):
         Mprior = []
         for parameterizer in self.parameterizers:
             mprior = parameterizer.MMEAN
-            Mprior = np.hstack((Mprior, mprior))
-        return np.asarray(Mprior, float)
+            Mprior.append(mprior)
+        return np.hstack(Mprior)
 
     def split(self, Model):
         """
@@ -1225,7 +1288,13 @@ def optimize(argv, verbose, mapkwargs):
         add_uncertainty = argv["-prior"][6]
 
         # ========= set the prior model and covariance matrix
+        if verbose:
+            print('get Mprior...')
         Mprior = superparameterizer.get_Mprior()
+        if verbose:
+            print('done')
+
+            print('get CM_triu ...')
         CM_triu = nodefile.get_CM(
             horizontal_smoothing_distance=horizontal_smoothing_distance,
             vertical_smoothing_distance=vertical_smoothing_distance,
@@ -1235,7 +1304,11 @@ def optimize(argv, verbose, mapkwargs):
             scale_uncertainties=scale_uncertainties,
             add_uncertainty=add_uncertainty,
             norm="L1",
-            visual_qc=False)
+            visual_qc=False,
+            mapkwargs=mapkwargs)
+
+        if verbose:
+            print('done')
 
         save_matrix(MPRIORFILE, Mprior, verbose)
         save_matrix(CMFILE, CM_triu, verbose)
