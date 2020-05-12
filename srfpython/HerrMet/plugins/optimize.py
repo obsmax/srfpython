@@ -329,10 +329,8 @@ class NodeFileLocal(NodeFile):
         hsd = horizontal_smoothing_distance
         tvsd = trunc_vertical_smoothing_distance
         thsd = trunc_horizontal_smoothing_distance
-        ztop = self.ztop
-        zmid = self.zmid
         nnodes = len(self)
-        nlayer = len(ztop)
+        nlayer = len(self.ztop)
         n_parameters = nlayer * nnodes
 
         if not vsd >= 0 and tvsd >= 0 and hsd >= 0 and thsd >= 0:
@@ -366,68 +364,71 @@ class NodeFileLocal(NodeFile):
         CM_triu_cols = []
         CM_triu_data = []
 
-        case1 = vsmooth and hsmooth
-        case2 = vsmooth and not hsmooth
-        case3 = hsmooth and not vsmooth
-        case4 = not vsmooth and not hsmooth
-
         for nnode in range(len(self)):
             vs_unc_n = vs_uncertainties[nnode, :]
 
             if vsmooth:
 
-                covnn_triu_row = rhoz_triu.row
-                covnn_triu_col = rhoz_triu.col
+                covnn_triu_row = nnode * nlayer + rhoz_triu.row
+                covnn_triu_col = nnode * nlayer + rhoz_triu.col
                 covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
 
-                CM_triu_rows.append(nnode * nlayer + covnn_triu_row)
-                CM_triu_cols.append(nnode * nlayer + covnn_triu_col)
+                CM_triu_rows.append(covnn_triu_row)
+                CM_triu_cols.append(covnn_triu_col)
                 CM_triu_data.append(covnn_triu_data)
-                # covnn_triu = csc_matrix((covnn_data, (covnn_row, covnn_col)))
 
                 if hsmooth:
 
                     for mnode in range(nnode + 1, len(self)):
                         vs_unc_m = vs_uncertainties[mnode, :]
 
-                        covnm_row = np.zeros(rhoz_nupper + rhoz_nlower, int)
-                        covnm_col = np.zeros(rhoz_nupper + rhoz_nlower, int)
-                        covnm_data = np.zeros(rhoz_nupper + rhoz_nlower, float)
+                        if 1:
+                            covnm_row = np.zeros(rhoz_nupper + rhoz_nlower, int)
+                            covnm_col = np.zeros(rhoz_nupper + rhoz_nlower, int)
+                            covnm_data = np.zeros(rhoz_nupper + rhoz_nlower, float)
 
-                        covnm_row[:rhoz_nupper] = rhoz_triu.row
-                        covnm_col[:rhoz_nupper] = rhoz_triu.col
-                        covnm_data[:rhoz_nupper] = vs_unc_n[rhoz_triu.row] * vs_unc_m[rhoz_triu.col] \
-                                          * rhoz_triu.data * rhod_triu[nnode, mnode]
+                            covnm_row[:rhoz_nupper] = nnode * nlayer + rhoz_triu.row
+                            covnm_col[:rhoz_nupper] = mnode * nlayer + rhoz_triu.col
+                            covnm_data[:rhoz_nupper] = vs_unc_n[rhoz_triu.row] * vs_unc_m[rhoz_triu.col] \
+                                              * rhoz_triu.data * rhod_triu[nnode, mnode]
 
-                        covnm_row[rhoz_nupper:] = rhoz_tril.row
-                        covnm_col[rhoz_nupper:] = rhoz_tril.col
-                        covnm_data[rhoz_nupper:] = vs_unc_n[rhoz_tril.row] * vs_unc_m[rhoz_tril.col] \
-                                          * rhoz_tril.data * rhod_triu[nnode, mnode]
+                            covnm_row[rhoz_nupper:] = nnode * nlayer + rhoz_tril.row
+                            covnm_col[rhoz_nupper:] = mnode * nlayer + rhoz_tril.col
+                            covnm_data[rhoz_nupper:] = vs_unc_n[rhoz_tril.row] * vs_unc_m[rhoz_tril.col] \
+                                              * rhoz_tril.data * rhod_triu[nnode, mnode]
 
-                        CM_triu_rows.append(nnode * nlayer + covnm_row)
-                        CM_triu_cols.append(mnode * nlayer + covnm_col)
-                        CM_triu_data.append(covnm_data)
-                        # covnm = csc_matrix((covnm_data, (covnm_row, covnm_col)))
+                            CM_triu_rows.append(covnm_row)
+                            CM_triu_cols.append(covnm_col)
+                            CM_triu_data.append(covnm_data)
+                        else:
+                            # only accounts for the diagonal terms since nnode != mnode
+                            raise Exception('seems wrong : inversion fails')
+                            covnm_row = nnode * nlayer + np.arange(nlayer)
+                            covnm_col = mnode * nlayer + np.arange(nlayer)
+                            covnm_data = vs_unc_n * vs_unc_m * rhod_triu[nnode, mnode]
+                            CM_triu_rows.append(covnm_row)
+                            CM_triu_cols.append(covnm_col)
+                            CM_triu_data.append(covnm_data)
 
             else:
                 assert hsmooth  # implicit
-                covnn_row = np.arange(nlayer)
-                covnn_col = np.arange(nlayer)
+                covnn_row = nnode * nlayer + np.arange(nlayer)
+                covnn_col = nnode * nlayer + np.arange(nlayer)
                 covnn_data = vs_unc_n ** 2.
 
-                CM_triu_rows.append(nnode * nlayer + covnn_row)
-                CM_triu_cols.append(nnode * nlayer + covnn_col)
+                CM_triu_rows.append(covnn_row)
+                CM_triu_cols.append(covnn_col)
                 CM_triu_data.append(covnn_data)
 
                 for mnode in range(nnode + 1, len(self)):
                     vs_unc_m = vs_uncertainties[mnode, :]
 
-                    covnm_row = np.arange(nlayer)
-                    covnm_col = np.arange(nlayer)
+                    covnm_row = nnode * nlayer + np.arange(nlayer)
+                    covnm_col = mnode * nlayer + np.arange(nlayer)
                     covnm_data = vs_unc_n * vs_unc_m * rhod_triu[nnode, mnode]
 
-                    CM_triu_rows.append(nnode * nlayer + covnm_row)
-                    CM_triu_cols.append(mnode * nlayer + covnm_col)
+                    CM_triu_rows.append(covnm_row)
+                    CM_triu_cols.append(covnm_col)
                     CM_triu_data.append(covnm_data)
 
         CM_triu_rows = np.hstack(CM_triu_rows)
@@ -437,12 +438,12 @@ class NodeFileLocal(NodeFile):
                        shape=(n_parameters, n_parameters), dtype=float)
 
         if visual_qc:
-            assert input('are you sure you want to display this matrix (risk of memory saturation)?')
-            plt.figure()
-            A = CM_triu.toarray()
-            A = np.ma.masked_where(A == 0, A)
-            plt.imshow(A)
-            plt.show()
+            if input('are you sure you want to display this matrix (risk of memory saturation)?') == "y":
+                plt.figure()
+                A = CM_triu.toarray()
+                A = np.ma.masked_where(A == 0, A)
+                plt.imshow(A)
+                plt.show()
 
         # CM = CM_triu + CM_triu.T - diags(CM_triu.diagonal())
         return CM_triu
@@ -457,7 +458,7 @@ class NodeFileLocal(NodeFile):
             rhod_triu = sp.triu(np.zeros((nnodes, nnodes), float), k=1, format="lil")
 
             # fill diagonal terms
-            rhod_triu[:nnodes, :nnodes] = 1.0
+            rhod_triu += sp.diags(np.ones(nnodes))
 
             # fill non-diagonal terms
             for nnode in range(nnodes - 1):
@@ -1190,15 +1191,14 @@ def optimize(argv, verbose, mapkwargs):
 
     if "-show" in argv.keys():
 
-        mpriorfile = MPRIORFILE
         modelfiles = np.sort(glob.glob(MFILES))
         datafiles = np.sort(glob.glob(DFILES))
 
         Dobs = np.load(DOBSFILE)
-        Mprior = np.load(mpriorfile)
-        CM_triu = sp.load_npz(CMFILE)
+        Mprior = np.load(MPRIORFILE)
+        CM = load_CM(CMFILE)
         CDinv = sp.load_npz(CDINVFILE)
-        Mpriorunc = CM_triu.diagonal() ** 0.5
+        Mpriorunc = CM.diagonal() ** 0.5
 
         # =================== display the data fit
         fig_costs = plt.figure()
@@ -1214,8 +1214,8 @@ def optimize(argv, verbose, mapkwargs):
             Model = np.load(modelfile)
             Data = np.load(datafile)
 
-            data_cost = chi2_data(None, Data=Data, Dobs=Dobs, CDinv=CDinv)
-            model_cost = chi2_model(None, Model=Model, Mprior=Mprior, CM=CM)
+            data_cost = chi2_data(Data=Data, Dobs=Dobs, CDinv=CDinv)
+            model_cost = chi2_model(Model=Model, Mprior=Mprior, CM=CM)
 
             if verbose:
                 print_costs(niter, data_cost=data_cost, model_cost=model_cost)
