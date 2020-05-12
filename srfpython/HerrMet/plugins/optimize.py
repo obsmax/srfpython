@@ -803,39 +803,37 @@ class SuperTheory(object):
 
         def job_generator():
             for mnode, (pb, pe, db, de) in enumerate(zip(p_begin, p_end, d_begin, d_end)):
-                yield Job(pb, pe, db, de)
-
-        class JobHandler(object):
-            def __init__(self):
-                self.Gi = Gi
-                self.CM = CM
-
-            def __call__(self, pb, pe, db, de):
                 GimmT = Gi[db:de, pb:pe].T
-                rows = []
-                cols = []
-                datas = []
+                CM_supercol = CM[:, pb:pe]
+                yield Job(pb, pe, db, de, GimmT, CM_supercol)
 
-                for qb, qe in zip(p_begin, p_end):
-                    CMnm = CM[qb:qe, pb:pe]
-                    CMGiTnm = (CMnm * GimmT).tocoo()
-                    if len(CMGiTnm.row):
-                        rows.append(qb + CMGiTnm.row)
-                        cols.append(db + CMGiTnm.col)
-                        datas.append(CMGiTnm.data)
+        def job_handler(pb, pe, db, de, GimmT, CM_supercol):
 
-                rows = np.hstack(rows)
-                cols = np.hstack(cols)
-                datas = np.hstack(datas)
+            rows = []
+            cols = []
+            datas = []
 
-                return rows, cols, datas
+            for qb, qe in zip(p_begin, p_end):
+                # CMnm = CM[qb:qe, pb:pe]
+                CMGiTnm = (CM_supercol[qb:qe, :] * GimmT).tocoo()
+                if len(CMGiTnm.row):
+                    rows.append(qb + CMGiTnm.row)
+                    cols.append(db + CMGiTnm.col)
+                    datas.append(CMGiTnm.data)
+
+            rows = np.hstack(rows)
+            cols = np.hstack(cols)
+            datas = np.hstack(datas)
+
+            return rows, cols, datas
 
         CMGiT_rows = []
         CMGiT_cols = []
         CMGiT_data = []
         if verbose:
             wb = waitbarpipe('')
-        with MapSync(JobHandler(), job_generator(), **mapkwargs) as ma:
+
+        with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
             for jobid, (rows, cols, datas), _, _ in ma:
 
                 if len(rows):

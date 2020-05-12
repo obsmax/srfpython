@@ -1,16 +1,14 @@
-from stdout import InteractiveStdOut
-from multiprocessing import queues, Process, Queue, cpu_count
-from math import erf as merf
+from multiprocessing import queues, Process, Queue, Array, Value, sharedctypes, Lock, RLock
+import sys, os
+import traceback, inspect, random, time, types, copy, signal
+import curses
 import numpy as np
-import copy
-import inspect
-import os
-import random
-import sys
-import time
-import traceback
-import types
+from math import erf as merf
 
+global debug
+debug = False
+# if debug:
+#     from obsmax4 import printblue, printgreen, printyellow, printred, printpurple
 
 """
 ML 06-2016 (version 5)
@@ -49,557 +47,1172 @@ Tpro   = the total time spent in stacking (s)
 ML 28-11-2017
 new feature : add the possibility to run processes with low priority
 
+ML 24-07-2018
+new feature : attach shared variables to the mapper so that it can be used by several processes, 
+should minimize memory requirements
 
-ML 06-01-2018
-move multipro to a new independent package (-), rename it as multipro8
+ML  27-07-2018
+new feature : add the posibility to use generator targets 
+avoids storing too much data in the worker workspace, see GenAsync
 
-ML 17-02-1028
-create a local copy of this file for srfpython 
+ML  30-07-2018
+new feature : add a waitqueue for to reorder outputs from the GenAsync
+attach it to GenSync mapper
+move some components of obsmax4.tools.stdout here, reorganize the module
+the module is now independent of obsmax4 except in debug mode
+
+ML 14-09-2018
+new feature : attach a lock object to the worker
+
 """
 
 
+# ---------------- functions
 def ut(t):
     s = time.ctime(t)
     return s.split()[3]
+
+
+def workfor(t):
+    "fake working fot t seconds, processor activity will raise (see htop)"
+    start = time.time()
+    while time.time() - start < t:
+        tete_a_toto = 0. + 0.
 
 
 def erf(x):
     return np.asarray([merf(w) for w in x], float)
 
 
-# __________________________________
-# Few exception aliases
+# ---------------- errors and signals
 class GeneratorError(Exception):
+    """denote an error that occured inside the job generator"""
     pass
 
 
 class WorkerError(Exception):
+    """denote an error that occured inside a worker workspace"""
     pass
 
 
 class MissingJob(Exception):
+    """used in waitqueus to mentionned that some jobs never showed up"""
     pass
 
 
-# __________________________________________
 class PoisonPill(object):
-    "kill message"
-    def __str__(self):return "PoisonPill"
-
-
-# __________________________________________
-def feed(q, g, m, verbose = False):
-    """target of the jobgenerator, gets the jobs, measure the generation time,
-       put the jobs into the input queue to the workers
-
-       q = input queue
-       g = job generator
-       m = message queue"""
-    nput, initime = 0, time.time()
-    # --------
-    jobid = 0
-    while True:
-        try:  
-            start = time.time()
-            job = g.next()
-            gentime = (start, time.time())
-
-        except StopIteration:
-            if verbose:
-                m.put(("InputQueue", time.time(), "put PoisonPill", None)) #***#
-
-            # ending signal
-            q.put(PoisonPill())
-            return
-        except Exception:
-            # fatal error, the processing chain cannot survive to a generator error
-            type, value, trace = sys.exc_info()
-            message  = "JobGenerator could not generate job %d\n" % (jobid)
-            message += "    " + "    ".join(traceback.format_exception(type, value, trace, limit=5))
-            q.put(GeneratorError(message))
-            return
-
-        if verbose:
-            m.put(("InputQueue", time.time(), "put job", jobid)) #***#
-        q.put((jobid, job, gentime)); nput += 1 #count only jobs
-
-        jobid += 1
-
-
-# __________________________________________
-class Job(object):
-    """object to be yielded by the job generator
-    arguments and keywordarguments will be passed to the worker in their respective workspaces
+    """used a a killin signal for communication between processes
     """
-    args, kwargs = (), {}
-    def __init__(self, *args, **kwargs):
-        self.args   = args
-        self.kwargs = kwargs
+
+    def __str__(self):
+        return "PoisonPill"
 
 
-# __________________________________________
-class InputQueue(queues.Queue):
-    """input queue joining the job generator and the workers"""
-    def __init__(self, maxsize, generator, messagequeue):
+class ExitedISO(Exception):
+    """used for advanced printing options"""
+    pass
+
+
+# ---------------- printers
+class multiline(object):
+    """prints stuff dynamically on several lines at the same time"""
+
+    def __init__(self, maxlines):
+        self.maxlines = maxlines
+
+    # ____________________________________
+    def __enter__(self):
+        self.win = curses.initscr()
+        curses.noecho()
+        curses.cbreak()
+        self.win.keypad(True)
+        self.win.scrollok(True)
+        self.lines = ["" for i in xrange(self.maxlines)]
+        self.line0 = 0  # first line printed
+        self.lastcommunication = ""
+        self.reset_termsize()
+        return self
+
+    # ____________________________________
+    def __exit__(self, type, value, trace):
+        curses.echo()
+        curses.nocbreak()
+        self.win.keypad(0)
+        self.win.scrollok(False)
+        curses.endwin()
+
+    # ____________________________________
+    def reset_termsize(self):
+        self.nmax, self.mmax = self.win.getmaxyx()
+        self.nmax -= 1
+        self.mmax -= 1
+
+    # ____________________________________
+    def refresh(self):
+        self.win.refresh()
+
+    # ____________________________________
+    def communicate(self, message):
+        self.lastcommunication = message
+        self.reset_termsize()
+        self.win.addstr(self.nmax, 0, message[:self.mmax])
+        self.win.clrtoeol()
+        self.refresh()
+
+    # ____________________________________
+    def write(self, i, message, refresh=True):
+        self.lines[i] = message
+
+        while True:
+            if i < self.line0:
+                return
+            elif i > self.line0 + self.nmax:
+                return
+            try:
+                self.win.addstr(i - self.line0, 0, message[:self.mmax])
+                self.win.clrtoeol()
+                break
+            except curses.error:
+                self.reset_termsize()
+                continue
+
+        if refresh: self.refresh()
+
+        # ____________________________________
+
+    def move(self, line0):
+        self.line0 = line0
+        for i in xrange(self.line0, self.line0 + self.nmax + 1):
+            self.write(i, self.lines[i], refresh=False)
+        self.communicate(self.lastcommunication)
+        self.refresh()
+
+    # ____________________________________
+    def pause(self):
+        self.communicate("pause")
+        return self.win.getstr()
+
+
+class InteractiveStdOut(Process):
+
+    def __init__(self, maxlines, message_queue=None):
+        Process.__init__(self)
+        if message_queue is None:
+            self.message_queue = Queue()  # default queue
+        else:
+            self.message_queue = message_queue  # user defined queue
+        self.maxlines = maxlines
+
+    def write(self, line, message):
+        if not self.is_alive():
+            raise ExitedISO('')
+        self.message_queue.put((line, message))
+
+    def communicate(self, message):
+        """to be customized, put a message that must be understood by interpretor so that the output of interpretor will be : -1, message
+        message "exit iso" forces the printer to leave (equivalent to pressing "q")
         """
-        :param maxsize: integer, maximum number of jobs that can fit in the inputqueue
-        :param generator: generator, objects that can yield Job objects
-        :param messagequeue: queues.Queue, queue where to leave verbose messages
-        """
-        queues.Queue.__init__(self, maxsize=maxsize)
-        self.p = Process(target = feed, args = (self, generator, messagequeue, messagequeue is not None))
-        self.p.start() 
+        self.message_queue.put((-1, message))
 
-    # ----------------------
-    def close(self):
-        self.p.join()        
-        queues.Queue.close(self)
+    def interpretor(self, tup):
+        """to be customized, tell me how to convert the message_queue outputs into a tuple like (line, message)"""
+        line, message = tup
+        return line, message
+
+    def run(self):
+        with multiline(maxlines=self.maxlines) as ml:
+            ml.win.nodelay(True)
+            autofollow = False
+            while True:
+                ml.reset_termsize()
+                # ------------------------
+                try:
+                    line, message = self.interpretor(self.message_queue.get_nowait())
+                    if message.lower() == "exit iso":
+                        lines = ml.lines
+                        break  # ending signal from outside
+
+                    if line == -1:
+                        ml.communicate(message)
+                    else:
+                        ml.write(line, message)
+                        if autofollow:
+                            if line - ml.line0 >= ml.nmax:
+                                ml.move(np.min([np.max([0, line - 2]), ml.maxlines - ml.nmax - 1]))
+
+                except queues.Empty:
+                    pass
+                except KeyboardInterrupt:
+                    raise
+                except Exception as Detail:
+                    ml.communicate("%s" % Detail)
+
+                # ------------------------
+                ch = ml.win.getch()
+                # cursor up
+                if ch in (ord('k'), ord('K'), curses.KEY_UP):
+                    ml.move(max([0, ml.line0 - 1]))
+                    continue
+                # cursor down
+                elif ch in (ord('j'), ord('j'), curses.KEY_DOWN):
+                    ml.move(min([ml.maxlines - ml.nmax - 1, ml.line0 + 1]))
+                    continue
+                    # page previous
+                elif ch in (curses.KEY_PPAGE, curses.KEY_BACKSPACE, 0x02):
+                    ml.move(max([0, ml.line0 - ml.nmax]))
+                    continue
+                # page next
+                elif ch in (curses.KEY_NPAGE, ord(' '), 0x06):  # Ctrl-F
+                    ml.move(min([ml.maxlines - ml.nmax - 1, ml.line0 + ml.nmax]))
+                    continue
+                # home
+                elif ch in (curses.KEY_HOME, 0x01):
+                    ml.move(0)
+                    continue
+                # end
+                elif ch in (curses.KEY_END, 0x05):
+                    ml.move(ml.maxlines - ml.nmax - 1)
+                    continue
+                # enter
+                elif ch in (10, 13):
+                    ml.move(min([ml.maxlines - ml.nmax - 1, ml.line0 + ml.nmax]))
+                    continue
+                # resize
+                elif ch == curses.KEY_RESIZE:
+                    ml.reset_termsize()
+                    ml.move(ml.line0)
+                    continue
+                # cursor left
+                # elif ch == curses.KEY_LEFT: continue
+                # cursor right
+                # elif ch == curses.KEY_RIGHT: continue
+                # toggle .dot-files
+                elif ch == 0x08:  # Ctrl-H
+                    autofollow = not autofollow  # toggle autofollow mode
+                    ml.communicate('autofollow : %s' % str(autofollow))
+
+                # quit
+                elif ch in (ord('q'), ord('Q')):
+                    lines = ml.lines
+                    break  # , curses.KEY_F10, 0x03):
+                else:
+                    continue
+        # recall what was printed
+        for l in lines:
+            if len(l):
+                print l
 
 
-# __________________________________________
+# def multiprint(gen, maxlines = 10000):
+#     iso = InteractiveStdOut(maxlines = maxlines)
+#
+#     iso.start()
+#     for line, message in gen:
+#         try:
+#             iso.write(line, message)
+#         except ExitedISO:
+#             break
+#
+#     iso.communicate('done, press q')
+#     while iso.is_alive(): time.sleep(1.)
+#     iso.join()
+
+
+class NoPrinter(object):
+    """use that printer to shut the processes up"""
+
+    def __init__(self, noqueue):
+        self.pid = -1
+        # messagequeue is None
+
+    def start(self):
+        return
+
+    def join(self):
+        return
+
+    def terminate(self):
+        return
+
+    def communicate(self, message):
+        print message
+
+
 class BasicPrinter(Process):
-    """Object to handle messages from the messagequeue
-       the Basic Printer simply print messages on screen as they come from the messagequeue
-    """
+    """standard printing to stdout"""
+
     def __init__(self, messagequeue):
         Process.__init__(self)
         self.messagequeue = messagequeue
 
-    # ------------------------
     def communicate(self, message):
         print message
 
-    # ------------------------
     def run(self):
-        """custom section of any Process object"""
         while True:
             packet = self.messagequeue.get()
             if isinstance(packet, PoisonPill): break
             sender, tim, mess, jobid = packet
             message = "%s at %s : %s " % (sender + " " * (20 - len(sender)), str(ut(tim)), mess)
             if jobid is not None: message += str(jobid)
-            print message #basic version : simply print on screen
+            print message
         return
 
-# __________________________________________
-class NoPrinter(object):
-    """the printer to use if the verbose mode is off"""
-    def __init__(self, noqueue):
-        self.pid = -1
-        #messagequeue is None
-    # ------------------------
-    def start(self):
-        return
 
-    # ------------------------
-    def join(self):
-        return
-
-    # ------------------------
-    def terminate(self):
-        return
-
-    # ------------------------
-    def communicate(self, message):
-        print message
-
-
-# __________________________________________
 class ProcessPrinter(InteractiveStdOut):
-    """the printer to use in process-oriented display
-       all messages related to a given worker will appear on the same line on terminal
-    """
     def __init__(self, messagequeue):
-        InteractiveStdOut.__init__(self, maxlines = 1000, message_queue = messagequeue)
+        InteractiveStdOut.__init__(self, maxlines=1000, message_queue=messagequeue)
 
-    # ------------------------
     def communicate(self, message):
         self.message_queue.put(("User", time.time(), message, None))
 
-    # ------------------------
     def interpretor(self, tup):
-        """how the message from the messagequeue should be handled"""
-        if isinstance(tup, PoisonPill): 
-            return -1, "exit iso" #send the exit signal to the printer
+        if isinstance(tup, PoisonPill):
+            return -1, "exit iso"  # send the exit signal to the printer
 
         sender, tim, mess, jobid = tup
 
-        if   sender == "InputQueue": 
-            line    = 0
+        if sender == "InputQueue":
+            line = 0
             message = "%s at %s : %s " % (sender + " " * (20 - len(sender)), str(ut(tim)), mess)
             if jobid is not None: message += str(jobid)
-        elif sender.split('-')[0] == "Worker": 
+        elif sender.split('-')[0] == "Worker":
             line = int(sender.split('-')[-1])
             message = "%s at %s : %s " % (sender + " " * (20 - len(sender)), str(ut(tim)), mess)
             if jobid is not None: message += str(jobid)
-        elif sender == "MessageQueue": 
+        elif sender == "MessageQueue":
             line = -1
             message = sender + mess
-        elif sender == "User": 
+        elif sender == "User":
             line = -1
             message = mess
-        else: #raise Exception('message not understood')
+        else:  # raise Exception('message not understood')
             line = -1
             message = mess
         return line, message
 
 
-# __________________________________________
 class JobPrinter(InteractiveStdOut):
-    """the printer to use in job-oriented display
-       all messages related to a given job will appear on the same line on terminal
-    """
     def __init__(self, messagequeue):
-        InteractiveStdOut.__init__(self, maxlines = 100000, message_queue = messagequeue)
+        InteractiveStdOut.__init__(self, maxlines=100000, message_queue=messagequeue)
 
-    # ------------------------
     def communicate(self, message):
         self.message_queue.put(("User", time.time(), message, None))
 
-    # ------------------------
     def interpretor(self, tup):
-        if isinstance(tup, PoisonPill): 
-            return -1, "exit iso" #send the exit signal to the printer
+        if isinstance(tup, PoisonPill):
+            return -1, "exit iso"  # send the exit signal to the printer
 
         sender, tim, mess, jobid = tup
-        if sender == "User": 
+        if sender == "User":
             line = -1
             message = mess
-        elif jobid is None: 
+        elif jobid is None:
             line = -1
             message = mess
         elif isinstance(jobid, int):
             line = jobid
-            if sender == "InputQueue": message = "Job%d%s at %s  : %s" % (jobid, " " * (10 - len(str(jobid))), ut(tim), sender)
-            elif "Worker"   in sender:
-                if "got"    in mess: message = message = "Job%d%s at %s  : %s" % (jobid, " " * (10 - len(str(jobid))), ut(tim), sender)
-                elif "put"  in mess: message = message = "Job%d%s at %s  : %s" % (jobid, " " * (10 - len(str(jobid))), ut(tim), "done")
-                elif "fail" in mess: message = message = "Job%d%s at %s  : %s" % (jobid, " " * (10 - len(str(jobid))), ut(tim), "failed (see /tmp/multiproerrors.log)")
-                else: line, message = -1, mess
-            else: line, message = -1, mess
-        else: line, message = -1, mess
+            if sender == "InputQueue":
+                message = "Job%d%s at %s  : %s" % (jobid, " " * (10 - len(str(jobid))), ut(tim), sender)
+            elif "Worker" in sender:
+                if "got" in mess:
+                    message = message = "Job%d%s at %s  : %s" % (jobid, " " * (10 - len(str(jobid))), ut(tim), sender)
+                elif "put" in mess:
+                    message = message = "Job%d%s at %s  : %s" % (jobid, " " * (10 - len(str(jobid))), ut(tim), "done")
+                elif "fail" in mess:
+                    message = message = "Job%d%s at %s  : %s" % (
+                    jobid, " " * (10 - len(str(jobid))), ut(tim), "failed (see /tmp/multiproerrors.log)")
+                else:
+                    line, message = -1, mess
+            else:
+                line, message = -1, mess
+        else:
+            line, message = -1, mess
         return line, message
 
 
-# __________________________________________
-class Target(object):
-    """An object to host the target function or callable object provided by user
-       this object will be stored into the workers (one copy for each of them)
-       the jobs will be taken from the input queue (only way to enter the workspace of the workers)
-       and results will be put in the outputqueue
+class FakePrinter(object):
+    def communicate(self, message):
+        print message
 
+
+# ----------------
+def feed(q, g, m, verbose=False):
+    """ the target of a InputQueue, this function will feed the inputqueue with jobs
+        from the job generator in the same time as the workers are getting jobs
+    :param q: input queue
+    :param g: job generator
+    :param m: message queue"""
+    nput, initime = 0, time.time()
+
+    jobid = 0
+    while True:
+        try:
+            start = time.time()
+            job = g.next()
+            gentime = (start, time.time())
+
+        except StopIteration:
+            if verbose: m.put(("InputQueue", time.time(), "put PoisonPill", None))  # ***#
+
+            q.put(PoisonPill())  # ending signal
+            return
+        except:  # fatal error, the processing chain cannot survive to a generator error
+            type, value, trace = sys.exc_info()
+            message = "JobGenerator could not generate job %d\n" % (jobid)
+            message += "    " + "    ".join(traceback.format_exception(type, value, trace, limit=5))
+            q.put(GeneratorError(message))
+            return
+
+        if verbose: m.put(("InputQueue", time.time(), "put job", jobid))  # ***#
+        q.put((jobid, job, gentime));
+        nput += 1  # count only jobs
+
+        jobid += 1
+
+
+# ########################## Exchanging Queues
+class InputQueue(queues.Queue):
+    def __init__(self, maxsize, generator, messagequeue):
+        queues.Queue.__init__(self, maxsize=maxsize)
+        self.p = Process(target=feed, args=(self, generator, messagequeue, messagequeue is not None))
+        self.p.start()
+
+    def close(self):
+        self.p.join()
+        queues.Queue.close(self)
+
+
+class WaitQueue_old:
+    """receive processing outputs in a random order
+    make them wait until the right ones shows up
+    returns them in the correct order
+
+    packet = received from the outputqueue
+            tuple like (jobid, answer, gentime, jobtime)
+            jobid is the number attributed to the job when it was generated,
+            we use that number to re-order the packets
     """
+
+    def __init__(self, generator, limit=1e50):
+        raise Exception('obsolet')
+        """
+        generator must return jobid, something
+        the jobid list must be exaustive from 0 to N
+        """
+        self.l = []  # a list with waiting packets
+        self.currentjob = 0  # index of the currently expexted jobid
+        self.generator = generator  # a generator of packets
+        self.limit = limit  # max size
+
+    def __len__(self):
+        return len(self.l)
+
+    def append(self, jobid, packet):
+        if len(self) >= self.limit:
+            raise Exception('the {} was full'.format(self.__class__.__name__))
+
+        if not len(self.l):
+            # first packet received
+            self.l.append((jobid, packet))
+            return
+
+        # place (jobid, packet) at the right place in self.l
+        i = 0
+        while self.l[i][0] < jobid:
+            i += 1
+            if i == len(self.l):
+                break
+        self.l.insert(i, (jobid, packet))
+
+    def pop(self, index):
+        "extract the packet in self.l[index], remove it from self.l"
+        jobid, packet = self.l.pop(index)
+        return packet
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if len(self) and self.l[0][0] == self.currentjob:
+            # the first item in self.l is the expected packet,
+            # remove it from self.l and return it
+            # increment the expected packet number
+            self.currentjob += 1
+            return self.pop(0)
+
+        while True:
+            try:
+                # get the next packet from the generator (i.e. the outputqueue)
+                packet = self.generator.next()
+                # the first item of the packet must be the jobid
+                jobid = packet[0]
+            except StopIteration:
+                break
+
+            if jobid > self.currentjob:
+                # this packet came too soon, store it and do not return it yet
+                self.append(jobid, packet)
+
+            elif jobid == self.currentjob:
+                # got the right packet, move to the net one
+                self.currentjob += 1
+                return packet
+
+        if len(self):
+            # may append if some processes have failed
+            # print "warning : job %s never showed up" % self.currentjob
+            self.currentjob += 1
+            return self.currentjob - 1, MissingJob()
+        raise StopIteration
+
+
+class WaitQueue(object):
+    """receive outputs from the output queue in a random order
+        make them wait until the right ones shows up
+        returns them in the correct order
+
+        packet = received from the outputqueue
+                tuple like (jobid, answer, gentime, jobtime)
+                jobid is the number attributed to the job when it was generated,
+                we use that number to re-order the packets
+        """
+
+    def __init__(self, generator, limit=1e50):
+        """
+        generator must return jobid, something
+        the jobid list must be exaustive from 0 to N
+        """
+        self.jobids = []
+        self.packets = []
+        self.currentjob = 0  # index of the currently expexted jobid
+        self.generator = generator  # a generator of packets
+        self.limit = limit  # max size
+
+    def __len__(self):
+        return len(self.packets)
+
+    def append(self, jobid, packet):
+        if len(self) >= self.limit:
+            raise Exception('the {} was full'.format(self.__class__.__name__))
+
+        if not len(self.packets):
+            # first packet received
+            # self.l.append((jobid, packet))
+            self.jobids.append(jobid)
+            self.packets.append(packet)
+            return
+
+        # place (jobid, packet) at the right place in self.l
+        i = np.searchsorted(self.jobids, jobid)
+        self.jobids.insert(i, jobid)
+        self.packets.insert(i, packet)
+
+    def pop(self):
+        "extract the packet in self.l[0], remove it from self.l"
+        self.jobids.pop(0)
+        packet = self.packets.pop(0)
+        return packet
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if len(self) and self.jobids[0] == self.currentjob:
+            # the first item in self.l is the expected packet,
+            # remove it from self.l and return it
+            # increment the expected packet number
+            self.currentjob += 1
+            return self.pop()
+
+        while True:
+            try:
+                # get the next packet from the generator (i.e. the outputqueue)
+                packet = self.generator.next()
+                # the first item of the packet must be the jobid
+                jobid = packet[0]
+            except StopIteration:
+                break
+
+            if jobid > self.currentjob:
+                # this packet came too soon, store it and do not return it yet
+                self.append(jobid, packet)
+
+            elif jobid == self.currentjob:
+                # got the right packet, move to the net one
+                self.currentjob += 1
+                return packet
+
+        if len(self):
+            # may append if some processes have failed
+            # print "warning : job %s never showed up" % self.currentjob
+            self.currentjob += 1
+            return self.currentjob - 1, MissingJob()
+        raise StopIteration
+
+
+class WaitQueueGen(WaitQueue):
+    """receive outputs from the output queue in a random order
+        make them wait until the right ones shows up
+        returns them in the correct order
+
+        packet = received from the outputqueue
+                tuple like ((jobid, nitem), answer, gentime, jobtime)
+                jobid is the number attributed to the job when it was generated,
+                nitem is the iteration number in job jobid, -1 means StopIteration
+                we use that number to re-order the packets
+        """
+
+    def __init__(self, generator, limit=1e50):
+        """
+        generator must return jobid, something
+        the jobid list must be exaustive from 0 to N
+
+        example :
+        self.jobids = [ 1,      4,      7]
+        self.nitems = [[0, 3], [2, 5], [0, 1, -1]]
+        self.packets = same shape as self.nitems
+
+
+        """
+        self.jobids = []
+        self.nitems = []
+        self.packets = []
+        self.currentjob = 0  # index of the currently expexted jobid
+        self.currentitem = 0
+        self.generator = generator  # a generator of packets
+        self.limit = limit  # max size
+
+    def __len__(self):
+        return len(self.jobids)
+
+    def append(self, jobid, nitem, packet):
+
+        if len(self) >= self.limit:
+            raise Exception('the {} was full'.format(self.__class__.__name__))
+
+        if not len(self.packets):
+            # first packet received
+            self.jobids.append(jobid)
+            self.nitems.append([nitem])
+            self.packets.append([packet])
+            return
+
+        # place (jobid, packet) at the right place in self.l
+        i = np.searchsorted(self.jobids, jobid)
+        if i < len(self.jobids) and self.jobids[i] == jobid:
+            # jobid already in self.jobids
+            # j = np.searchsorted(self.nitems[i], nitem)
+            # self.nitems[i].insert(j, nitem)
+            # self.packets[i].insert(j, packet)
+            assert nitem == -1 or nitem == self.nitems[i][-1] + 1
+            self.nitems[i].append(nitem)
+            self.packets[i].append(packet)
+        else:
+            self.jobids.insert(i, jobid)
+            self.nitems.insert(i, [nitem])
+            self.packets.insert(i, [packet])
+
+    def pop(self):
+        "extract the packet in self.l[index], remove it from self.l"
+        # print ">>>", self.jobids
+        # print ">>>", self.nitems
+        if len(self.nitems[0]) == 1 and self.nitems[0][0] == -1:
+            # only one item with nitem==-1 remaining, remove this jobid from the store
+            jobid = self.jobids.pop(0)  # e.g. 3
+            nitem = self.nitems.pop(0)[0]  # e.g. [12]
+            packet = self.packets.pop(0)[0]
+        else:
+            jobid = self.jobids[0]
+            nitem = self.nitems[0].pop(0)
+            packet = self.packets[0].pop(0)
+        return packet
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if len(self.jobids) and self.jobids[0] == self.currentjob and len(
+                self.nitems[0]):  # and self.nitems[0] == self.currentitem:
+            # the first item in self.l is the expected packet,
+            # remove it from self.l and return it
+            # increment the expected packet number
+            if self.nitems[0][0] == -1:
+                self.currentitem = 0
+                self.currentjob += 1
+            else:
+                self.currentitem += 1
+
+            packet = self.pop()
+            if debug:
+                printyellow('return from store', packet)
+            return packet
+
+        while True:
+            try:
+                # get the next packet from the generator (i.e. the outputqueue)
+                packet = self.generator.next()
+                if debug:
+                    printgreen("$", packet)
+
+                # the first item of the packet must be the jobid
+                jobid, nitem = packet[0]
+            except StopIteration:
+                break
+
+            if jobid > self.currentjob:  # and nitem > self.currentitem:
+                # this packet came too soon, store it and do not return it yet
+                if debug:
+                    printpurple("append", jobid, nitem, packet)
+
+                self.append(jobid, nitem, packet)
+
+            elif jobid == self.currentjob:
+                # got the right packet, move to the next one
+
+                if nitem == -1:
+                    if debug:
+                        printred("???", self.jobids)
+                        printred("???", self.nitems)
+                    if len(self.nitems) and not len(self.nitems[0]):
+                        # remove empty lists corresponding to jobid (done)
+                        self.jobids.pop(0)
+                        self.nitems.pop(0)
+                        self.packets.pop(0)
+                    self.currentjob += 1
+                    self.currentitem = 0
+
+                elif nitem == self.currentitem:
+                    self.currentitem += 1
+
+                if debug:
+                    printblue("return directly", jobid, nitem, packet)
+                return packet
+                # print "append", jobid, nitem, packet
+                # self.append(jobid, nitem, packet)
+
+        if len(self):
+            raise Exception('missing jobs')
+            # may append if some processes have failed
+            # print "warning : job %s never showed up" % self.currentjob
+            self.currentjob += 1
+            return self.currentjob - 1, MissingJob()
+        raise StopIteration
+
+
+# ###################################
+class Job(object):
+    """ an object to store job arguments and keywordarguments
+    use it to pack jobs out of the job-generator
+
+    def jobgenerator(N):
+        for n in xrange(N):
+            yield Job(n, twotimesn = 2 * n)
+    """
+    args, kwargs = (), {}
+
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+
+class Target(object):
     def __init__(self, smth):
         """
-        smth : function or callable object to be packed into the target object
-               smth will receive arguments as jobs
-               the function must be define as any other function, *args and **kwargs allowed
-               e.g. >>def fun(x, y, *args, **kwargs): ...
-               e.g. >>class Fun(object):
-                    >>    def __call__(self, x, y, *args, **kwargs): ...
-               the user may require the worker to be passed to the function by naming the first argument "worker"
-               e.g. >>def fun(worker, x, y, *args, **kwargs): ...
-               e.g. >>class Fun(object):
-                    >>    def __call__(self, worker, x, y, *args, **kwargs): ...
-
+        :param smth: a function or object with __call__ method
         """
         if isinstance(smth, types.FunctionType):
-            self.core        = smth
-            self.parent      = None
-            self.passparent  = False
-            self.passworker  = inspect.getargspec(self.core).args[0] == "worker"
+            self.core = smth
+            self.parent = None
+            self.passparent = False
+            self.passworker = inspect.getargspec(self.core).args[0] == "worker"
         elif isinstance(smth, types.ObjectType):
-            self.core        = smth.__call__#target.__getattribute__("__call__")
-            self.parent      = smth
-            self.passparent  = True
-            self.passworker  = inspect.getargspec(self.core).args[:2] == ["self", "worker"]
-        else: raise NotImplementedError('')
+            self.core = smth.__call__
+            self.parent = smth
+            self.passparent = True
+            self.passworker = inspect.getargspec(self.core).args[:2] == ["self", "worker"]
+        else:
+            raise NotImplementedError('')
 
-    # --------------------
     def __call__(self, *args, **kwargs):
-        if self.passparent: 
-            #return self.core(self.parent, *args, **kwargs) #doesnt work (?)
+        if self.passparent:
+            # return self.core(self.parent, *args, **kwargs) #doesnt work (?)
             return self.parent(*args, **kwargs)
-        else: return self.core(*args, **kwargs)
+        else:
+            return self.core(*args, **kwargs)
 
 
-# __________________________________________
+# ################################### WORKERS
 class Worker(Process):
-    """The object that will run into a separate workspace, taking jobs from the iputqueue,
-       passing them to the target object, and put results into the output queue.
-       It may also put messages into the messagequeue
-       the worker has some methods that may be useful for the target function and can enter it through the keyword argument "worker"
-    """
-    def __init__(self, target, inputqueue, outputqueue, messagequeue, raiseiferror=False, seed=None):
+    def __init__(self, target, inputqueue, outputqueue, messagequeue, raiseiferror=False, seed=None, parent=None, lock=None):
         """
-        :param target: function or callable, the function to be attached to the worker
-        :param inputqueue: queues.Queue, the queue where to find jobs
-        :param outputqueue: queues.Queue, the queue where to put results
-        :param messagequeue: queues.Queue or None, the queue where to put messages
-        :param raiseiferror: bool, whether the whole process should be interrputed in case of failure
-        :param seed: integer or None, the seed to attach to the worker for random applications
+        :param target: a Target object, the function or object to call inside the dedicated workspaces
+        :param inputqueue: a InputQueue object, the queue that transmit jobs from the main workspace inside the dedicated workspaces
+        :param outputqueue:
+        :param messagequeue:
+        :param raiseiferror:
+        :param seed:
+        :param parent: the parent object, may be MapAsync, MapSync, StackAsync, ...
+        :param lock:
         """
         Process.__init__(self)
-        self.inputqueue   = inputqueue
-        self.outputqueue  = outputqueue
+        self.inputqueue = inputqueue
+        self.outputqueue = outputqueue
         self.messagequeue = messagequeue
-        self.target       = target
+        self.target = target
         self.raiseiferror = raiseiferror
-        self.seed         = seed
-        self.verbose      = messagequeue is not None#not NoPrinter
+        self.seed = seed
+        self.verbose = messagequeue is not None  # not NoPrinter
+        self.parent = parent
+        self.is_locked = False
+        self.lock = lock
 
-        ##------ attach random functions to the worker
+        # ------ attach random functions to the worker
         if self.seed is None:
-            #seedtmp    = self.pid + 10 * int((time.time() * 1.e4) % 10.)
-            #randfuntmp = random.Random(seedtmp).random
-            #self.seed = int(1000. * randfuntmp())
-            #time.sleep(0.1)
-            raise Exception('seed is None is no longer supported')
-        self.rand_  = random.Random(self.seed).random
-        self.tgauss = np.linspace(-10., 10., 100) 
-        self.Fgauss = 0.5 * (1. + erf((self.tgauss - 0.) / (1. * np.sqrt(2.)))) #repart fun of the normal pdf
+            # seedtmp    = self.pid + 10 * int((time.time() * 1.e4) % 10.)
+            # randfuntmp = random.Random(seedtmp).random
+            # self.seed = int(1000. * randfuntmp())
+            # time.sleep(0.1)
+            raise Exception('')
+        self.rand_ = random.Random(self.seed).random
+        self.tgauss = np.linspace(-10., 10., 100)
+        self.Fgauss = 0.5 * (1. + erf((self.tgauss - 0.) / (1. * np.sqrt(2.))))  # repart fun of the normal pdf
         self.Fgauss[0], self.Fgauss[-1] = 0., 1.0
-        ##------
+        # ------
 
-    #----
-    def rand(self, N = 1):
-        """return a random number based on a uniform pdf between 0 and 1
-        if N is 1 : returns a float
-        elif N > 1: returns an array"""
-        if N == 1: return self.rand_()
-        else: return np.array([self.rand_() for i in xrange(N)])
+    def acquire(self):
+        if self.is_locked:
+            raise Exception('{} is already locked'.format(self.name))
+        self.is_locked = True
+        self.lock.acquire()
 
-    #----
-    def randn(self, N = 1):
-        """same as rand, but following a gaussian pdf (mean 0, std 1)"""
-        return np.interp(self.rand(N), xp = self.Fgauss, fp = self.tgauss)
-        
-    #----    
-    def communicate(self, message):#!#
-        """put message into the message queue"""
-        self.messagequeue.put((self.name, time.time(), message, None)) #!# 
+    def release(self):
+        if not self.is_locked:
+            raise Exception('{} is not locked'.format(self.name))
+        self.is_locked = False
+        self.lock.release()
 
-    #----
+    def rand(self, N=1):
+        if N == 1:
+            return self.rand_()
+        else:
+            return np.array([self.rand_() for i in xrange(N)])
+
+    def randn(self, N=1):
+        return np.interp(self.rand(N), xp=self.Fgauss, fp=self.tgauss)
+
+    def communicate(self, message):  # !#
+        self.messagequeue.put((self.name, time.time(), message, None))  # !#
+
     def run(self):
-        """gets jobs from the inputqueue and runs it until 
+        """gets jobs from the inputqueue and runs it until
            it gets the ending signal
         """
 
-        #----- for statistics
-        ngot, nput, nfail  = 0, 0, 0
+        # ----- for statistics
+        ngot, nput, nfail = 0, 0, 0
         inittime = time.time()
-        #-----
+        # -----
 
         while True:
             packet = self.inputqueue.get()
-            if isinstance(packet, PoisonPill):  #got the ending signal
-                if self.verbose: self.messagequeue.put((self.name, time.time(), "got PoisonPill", None)) #***#
+            if isinstance(packet, PoisonPill):  # got the ending signal
+                if self.verbose: self.messagequeue.put((self.name, time.time(), "got PoisonPill", None))  # ***#
 
-                self.inputqueue.put(packet)  #resend the ending signal for the other workers
-                self.outputqueue.put(packet) #ending signal
+                self.inputqueue.put(packet)  # resend the ending signal for the other workers
+                self.outputqueue.put(packet)  # ending signal
                 return
-            elif isinstance(packet, GeneratorError):   #generator has failed
-                self.inputqueue.put(PoisonPill())    #send the ending signal for the other workers
-                self.outputqueue.put(packet) #transmit the GeneratorError
+            elif isinstance(packet, GeneratorError):  # generator has failed
+                self.inputqueue.put(PoisonPill())  # send the ending signal for the other workers
+                self.outputqueue.put(packet)  # transmit the GeneratorError
                 return
-
 
             jobid, job, gentime = packet
             assert isinstance(job, Job)
-            ngot += 1 #count only jobs, not signals or errors
+            ngot += 1  # count only jobs, not signals or errors
 
-            if self.verbose: self.messagequeue.put((self.name, time.time(), "got job", jobid)) #***#
+            if self.verbose: self.messagequeue.put((self.name, time.time(), "got job", jobid))  # ***#
 
-
-            try: 
+            try:
                 start = time.time()
-                if self.target.passworker: 
-                    answer = self.target(self, *job.args, **job.kwargs) #pass self (i.e. the worker to self.target as first argument)
-                else:               
-                    answer = self.target(*job.args, **job.kwargs) #call the target function here!!!
+                if self.target.passworker:
+                    answer = self.target(self, *job.args,
+                                         **job.kwargs)  # pass self (i.e. the worker to self.target as first argument)
+                else:
+                    answer = self.target(*job.args, **job.kwargs)  # call the target function here!!!
                 jobtime = (start, time.time())
+
             except:
                 nfail += 1
                 type, value, trace = sys.exc_info()
-                message  = "Worker %s failed during job %d\n" % (self.name, jobid)
+                message = "Worker %s failed during job %d\n" % (self.name, jobid)
                 message += "    " + "    ".join(traceback.format_exception(type, value, trace, limit=5))
-                self.outputqueue.put(WorkerError(message))
-                if self.raiseiferror: 
-                    self.inputqueue.put(PoisonPill())    #send the ending signal for the other workers
-                    return #stop the execution
-                if self.verbose: self.messagequeue.put((self.name, time.time(), "failed", jobid)) #***#
-                continue #ignore the error and continue getting tasks
-            self.outputqueue.put((jobid, answer, gentime, jobtime))
-            nput += 1 #count only jobs, not signals or errors
 
-            if self.verbose: self.messagequeue.put((self.name, time.time(), "put job", jobid)) #***#
-#----------------------
+                self.outputqueue.put(WorkerError(message))
+
+                if self.raiseiferror:
+                    self.inputqueue.put(PoisonPill())  # send the ending signal for the other workers
+                    return  # stop the execution
+
+                if self.verbose:
+                    self.messagequeue.put((self.name, time.time(), "failed", jobid))  # ***#
+                continue  # ignore the error and continue getting tasks
+
+            self.outputqueue.put((jobid, answer, gentime, jobtime))
+            nput += 1  # count only jobs, not signals or errors
+
+            if self.verbose:
+                self.messagequeue.put((self.name, time.time(), "put job", jobid))  # ***#
+
+
 class WorkerStacker(Worker):
     """
     same as Worker, but do not put results into the output queue, unless the ending signal has been received
-    use it for instance for stacking processes
+    use it for istance for stacking processes
     see tutorials
     """
-    #----
+
     def run(self):
-        """gets jobs from the inputqueue and runs it until 
+        """gets jobs from the inputqueue and runs it until
            it gets the ending signal
         """
 
-        #----- for statistics
-        ngot, nput, nfail  = 0, 0, 0
-        #!#inittime = time.time()
-        jobids, answer = [],None #!#
-        Tgen = 0.#!#
-        Tpro = 0.#!#
-        #-----
+        # ----- for statistics
+        ngot, nput, nfail = 0, 0, 0
+        # !#inittime = time.time()
+        jobids, answer = [], None  # !#
+        Tgen = 0.  # !#
+        Tpro = 0.  # !#
+        # -----
 
         while True:
             packet = self.inputqueue.get()
-            if isinstance(packet, PoisonPill):  #got the ending signal
-                if self.verbose: self.messagequeue.put((self.name, time.time(), "got PoisonPill", None)) #***#
-                if answer is not None:#!#
-                    self.outputqueue.put((jobids, answer, Tgen, Tpro))#!#
+            if isinstance(packet, PoisonPill):  # got the ending signal
+                if self.verbose: self.messagequeue.put((self.name, time.time(), "got PoisonPill", None))  # ***#
+                if answer is not None:  # !#
+                    self.outputqueue.put((jobids, answer, Tgen, Tpro))  # !#
 
-                self.inputqueue.put(packet)  #resend the ending signal for the other workers
-                self.outputqueue.put(packet) #ending signal
+                self.inputqueue.put(packet)  # resend the ending signal for the other workers
+                self.outputqueue.put(packet)  # ending signal
                 return
-            elif isinstance(packet, GeneratorError):   #generator has failed
-                if answer is not None:#!#
-                    self.outputqueue.put((jobids, answer, Tgen, Tpro))#!#
+            elif isinstance(packet, GeneratorError):  # generator has failed
+                if answer is not None:  # !#
+                    self.outputqueue.put((jobids, answer, Tgen, Tpro))  # !#
 
-                self.inputqueue.put(PoisonPill())    #send the ending signal for the other workers
-                self.outputqueue.put(packet) #transmit the GeneratorError
+                self.inputqueue.put(PoisonPill())  # send the ending signal for the other workers
+                self.outputqueue.put(packet)  # transmit the GeneratorError
                 return
-
 
             jobid, job, gentime = packet
             assert isinstance(job, Job)
-            ngot += 1 #count only jobs, not signals or errors
-            if self.verbose: self.messagequeue.put((self.name, time.time(), "got job", jobid)) #***#
+            ngot += 1  # count only jobs, not signals or errors
+            if self.verbose: self.messagequeue.put((self.name, time.time(), "got job", jobid))  # ***#
 
-
-            try: 
+            try:
                 start = time.time()
-                if self.target.passworker: 
-                    answer = self.target(self, *job.args, **job.kwargs) #pass self (i.e. the worker) to self.target as first argument
-                else:               
-                    answer = self.target(*job.args, **job.kwargs) #call the target function here!!!
+                if self.target.passworker:
+                    answer = self.target(self, *job.args,
+                                         **job.kwargs)  # pass self (i.e. the worker) to self.target as first argument
+                else:
+                    answer = self.target(*job.args, **job.kwargs)  # call the target function here!!!
                 jobtime = (start, time.time())
-                Tgen += gentime[1] - gentime[0]#!#
-                Tpro += jobtime[1] - jobtime[0]#!#
-                jobids.append(jobid)#!#
+                Tgen += gentime[1] - gentime[0]  # !#
+                Tpro += jobtime[1] - jobtime[0]  # !#
+                jobids.append(jobid)  # !#
             except:
                 nfail += 1
                 type, value, trace = sys.exc_info()
-                message  = "Worker %s failed during job %d\n" % (self.name, jobid)
+                message = "Worker %s failed during job %d\n" % (self.name, jobid)
                 message += "    " + "    ".join(traceback.format_exception(type, value, trace, limit=5))
                 self.outputqueue.put(WorkerError(message))
-                if self.raiseiferror: 
-                    self.inputqueue.put(PoisonPill())    #send the ending signal for the other workers
-                    return #stop the execution
-                if self.verbose: self.messagequeue.put((self.name, time.time(), "failed", jobid)) #***#
-                continue #ignore the error and continue getting tasks
-            #!#self.outputqueue.put((jobid, answer, gentime, jobtime))
-            #!#nput += 1 #count only jobs, not signals or errors
-            if self.verbose: self.messagequeue.put((self.name, time.time(), "put job", jobid)) #***#
-#__________________________________
-class MapAsync(object):
-    whichworker = Worker
-    def __init__(self, funobj, generator, Nworkers=None, RaiseIfError=True, Taskset = None, Verbose=False, LowPriority=False):
-        """Run a processing session, takes input from the job generator, and generates results when requested
-        Arguments :
-            funobj      = function/callble-object or Nworkers-list of functions/callble-objects,
-                          the function(s) must be defined as usual, *args and **kwargs allowed
-                          e.g. >>def fun(x, y, *args, **kwargs):
-                               >>    t = kwargs['t']
-                               >>    return x + y + t
-                          e.g. >>class Fun(object):
-                               >>    def __call__(self, x, y, *args, **kwargs):
-                               >>        ...
-                          the user may require the worker to be passed to the function
-                          by naming the first argument "worker"
-                          e.g. >>def fun(worker, x, y, *args, **kwargs):
-                               >>    return x + y + kwargs['t'] + worker.randn()
-                          e.g. >>class Fun(object): ...
+                if self.raiseiferror:
+                    self.inputqueue.put(PoisonPill())  # send the ending signal for the other workers
+                    return  # stop the execution
+                if self.verbose: self.messagequeue.put((self.name, time.time(), "failed", jobid))  # ***#
+                continue  # ignore the error and continue getting tasks
+            # !#self.outputqueue.put((jobid, answer, gentime, jobtime))
+            # !#nput += 1 #count only jobs, not signals or errors
+            if self.verbose: self.messagequeue.put((self.name, time.time(), "put job", jobid))  # ***#
 
-            generator    = Job generator, must yield Job instances with arguments
-                           and keyword arguments to be passed to the function
-                           if used, do not include the worker argument in the jobs
-                           e.g. (Job(x, y, t=1) for x, y in zip([1, 2], [2, 3]))
-            Nworkers     = int, number of workers to use, None means use cpu_count
-            RaiseIfError = bool, should we interrupt the whole process in case of failure
-            Taskset      = string like "0-11" or None, the range of physical threads to be used (check with htop)
-            LowPriority  = bool, run the processes with lower priority than default
 
-        Use : always call it into a "with" statement, iterate over it to get results
-            >>with MapAsync(myfunction, myjobgenerator, ...) as ma:
-            >>    for jobid, results, generation_times, processing_times in ma:
-            >>        #jobid = integer, index of the job as provided by the jobgenerator (starting with 0)
-            >>        #        map async may return jobs in wrong order, see MapSync for ordered results
-            >>        #results = whatever is returned by the function
-            >>        #generation_times = tuple with two floats = starting and ending times at which the job was generated
-            >>        #processing_times = tuple with two floats = starting and ending times at which the job was processed
-            >>        do_something_with(results) #if too slow, then the parallelization may be inefficient
+class WorkerGenerator(Worker):
+    """
+    same as Worker, but do not put results into the output queue, unless the ending signal has been received
+    use it for istance for stacking processes
+    see tutorials
+    """
 
-        See tutorials for detailed usage instructions
-
+    def run(self):
+        """gets jobs from the inputqueue and runs it until
+           it gets the ending signal
         """
 
-        if Nworkers is None: Nworkers = cpu_count()
+        # ----- for statistics
+        ngot, nput, nfail = 0, 0, 0
+        inittime = time.time()
+        # -----
+
+        while True:
+            packet = self.inputqueue.get()
+            if isinstance(packet, PoisonPill):  # got the ending signal
+                if self.verbose:
+                    self.messagequeue.put((self.name, time.time(), "got PoisonPill", None))  # ***#
+
+                self.inputqueue.put(packet)  # resend the ending signal for the other workers
+                self.outputqueue.put(packet)  # ending signal
+                return
+            elif isinstance(packet, GeneratorError):  # generator has failed
+                self.inputqueue.put(PoisonPill())  # send the ending signal for the other workers
+                self.outputqueue.put(packet)  # transmit the GeneratorError
+                return
+
+            jobid, job, gentime = packet
+            assert isinstance(job, Job)
+            ngot += 1  # count only jobs, not signals or errors
+
+            if self.verbose:
+                self.messagequeue.put((self.name, time.time(), "got job", jobid))  # ***#
+
+            try:
+                start = time.time()
+                if self.target.passworker:
+                    answer_generator = self.target(self, *job.args,
+                                                   **job.kwargs)  # pass self (i.e. the worker to self.target as first argument)
+                else:
+                    answer_generator = self.target(*job.args, **job.kwargs)  # call the target function here!!!
+
+                for nanswer, answer in enumerate(answer_generator):
+                    self.outputqueue.put(((jobid, nanswer), answer, (-1., -1.), (-1., -1.)))
+                jobtime = (start, time.time())
+            except Exception:
+                nfail += 1
+                type, value, trace = sys.exc_info()
+                message = "Worker %s failed during job %d\n" % (self.name, jobid)
+                message += "    " + "    ".join(traceback.format_exception(type, value, trace, limit=5))
+                self.outputqueue.put(WorkerError(message))
+                if self.raiseiferror:
+                    self.inputqueue.put(PoisonPill())  # send the ending signal for the other workers
+                    return  # stop the execution
+                if self.verbose:
+                    self.messagequeue.put((self.name, time.time(), "failed", jobid))  # ***#
+                continue  # ignore the error and continue getting tasks
+
+            # put one more item in the queue to notify that the iteration is over
+            # use nitem = -1
+            # use answer = StopIteration instance
+            self.outputqueue.put(((jobid, -1), StopIteration('job {} done'.format(jobid)), gentime, jobtime))
+            nput += 1  # count only jobs, not signals or errors
+
+            if self.verbose:
+                self.messagequeue.put((self.name, time.time(), "put job", jobid))  # ***#
+
+
+class FakeWorker(object):
+    def __init__(self):
+        self.name = "FakeWorker"
+        self.rand = np.random.rand
+        self.randn = np.random.randn
+        self.pid = os.getpid()
+
+    def acquire(self):
+        pass
+
+    def release(self):
+        pass
+
+
+class FakeLock(object):
+    def acquire(self):
+        pass
+
+    def release(self):
+        pass
+
+
+# ################################### MAPPERS
+class MapAsync(object):
+    whichworker = Worker
+
+    def __init__(self, funobj, generator, Nworkers=12, RaiseIfError=True, Taskset=None,
+                 Verbose=False, LowPriority=False,
+                 SharedVariables=None):
+        """
+        funobj    = function/callble-object or Nworkers-list of functions/callble-objects, may include the "worker" argument as first argument
+        generator = Job generator, must yield Job instances with arguments and keyword arguments to be passed
+        Nworkers  = int, number of workers to use
+        ...
+        """
+        if Nworkers is None:
+            from multiprocessing import cpu_count
+            Nworkers = cpu_count()
         # ----------- choose the message queue and printer
-        self.Mes     = None
+        self.Mes = None
         self.printer = NoPrinter(self.Mes)
-        if Verbose: #anything else than False
-            self.Mes     = Queue(maxsize = 10000) #message queue  
-            if Verbose is True:                 self.printer = BasicPrinter(self.Mes)
-            elif Verbose.lower() == "job":      self.printer = JobPrinter(self.Mes)
-            elif Verbose.lower() == "process":  self.printer = ProcessPrinter(self.Mes)
-            elif Verbose.lower() == "basic":    self.printer = BasicPrinter(self.Mes)
-            else:                               self.printer = BasicPrinter(self.Mes)
+        if Verbose:  # anything else than False
+            self.Mes = Queue(maxsize=10000)  # message queue
+            if Verbose is True:
+                self.printer = BasicPrinter(self.Mes)
+            elif Verbose.lower() == "job":
+                self.printer = JobPrinter(self.Mes)
+            elif Verbose.lower() == "process":
+                self.printer = ProcessPrinter(self.Mes)
+            elif Verbose.lower() == "basic":
+                self.printer = BasicPrinter(self.Mes)
+            else:
+                self.printer = BasicPrinter(self.Mes)
 
         # ----------- create the input and output queues
-        self.In      = InputQueue(maxsize = Nworkers, generator = generator, messagequeue = self.Mes) #queue for inputs
-        self.Out     = Queue(maxsize = Nworkers) #queue for outputs 
+        self.In = InputQueue(maxsize=Nworkers, generator=generator, messagequeue=self.Mes)  # queue for inputs
+        self.Out = Queue(maxsize=Nworkers)  # queue for outputs
         # ne pas augmenter maxsize : il y a tjrs une meilleur solution a trouver!
 
         # ----------- determine if each worker will have a distinct target or not
         multifunobj = isinstance(funobj, list)
-        if multifunobj:  assert len(funobj) == Nworkers
+        if multifunobj:
+            assert len(funobj) == Nworkers
 
-        #__________________________________
-        self.rand    = random.Random().random
+        self.rand = random.Random().random
         self.raiseiferror = RaiseIfError
         self.taskset = Taskset
         self.lowpriority = LowPriority
         self.Nactive = Nworkers
-        self.ppid    = os.getpid()
+        self.ppid = os.getpid()
         self.verbose = self.Mes is not None
-        #__________________________________
+        self.lock = RLock()  # one locker shared between all workers
+
+        # attach shared variables to self
+        if SharedVariables is not None:
+            for key, val in SharedVariables.items():
+                assert isinstance(val, sharedctypes.SynchronizedArray) or \
+                       isinstance(val, sharedctypes.Synchronized)
+                self.__setattr__(key, val)
+
         self.workers = []
         seedstmp = np.random.rand(Nworkers) * 100000
         if not multifunobj: trgt = Target(funobj)
-        for i in xrange(Nworkers):
+        for i in range(Nworkers):
             if multifunobj: trgt = Target(funobj[i])
-            w = self.whichworker(\
-                target       = trgt,
-                inputqueue   = self.In,
-                outputqueue  = self.Out, 
-                messagequeue = self.Mes,
-                raiseiferror = self.raiseiferror, 
-                seed         = seedstmp[i]) #in case two mapasync a run at the same time
+            w = self.whichworker( \
+                target=trgt,
+                inputqueue=self.In,
+                outputqueue=self.Out,
+                messagequeue=self.Mes,
+                raiseiferror=self.raiseiferror,
+                seed=seedstmp[i],  # in case two mapasync run at the same time
+                parent=self,
+                lock=self.lock)
             w.name = "Worker-%04d" % (i + 1)
             self.workers.append(w)
-    #______________________________________
+
     def __str__(self):
         s = '----------------------------\n'
         s += "Parent pid = %d\n" % self.ppid
         s += "    Generator pid = %d\n" % self.In.p.pid
         s += "    Printer   pid = %d\n" % self.printer.pid
         for w in self.workers:
-            s += "    %s  pid = %d; seed = %d\n" % (w.name, w.pid, w.seed) 
+            s += "    %s  pid = %d; seed = %d\n" % (w.name, w.pid, w.seed)
         return s
-    #______________________________________
+
     def __enter__(self):
 
         for w in self.workers: w.start()
@@ -613,149 +1226,91 @@ class MapAsync(object):
         self.pids.append(self.printer.pid)
         self.printer.start()
 
-
         return self
-    #______________________________________
+
     def __exit__(self, type, value, trace):
-        #case 1 : no error, all outputs have been extracted from Out => join the workers
-        #case 2 : no error, not all outputs extracted from Out => terminate
-        #case 3 : some errors => terminate
+        # case 1 : no error, all outputs have been extracted from Out => join the workers
+        # case 2 : no error, not all outputs extracted from Out => terminate
+        # case 3 : some errors => terminate
         if type is None and self.Nactive == 0:
 
-            for w in self.workers: w.join() #this might be blocking
+            for w in self.workers: w.join()  # this might be blocking
             self.printer.join()
 
             self.In.close()
             self.Out.close()
-            if self.verbose:queues.Queue.close(self.Mes)
+            if self.verbose: queues.Queue.close(self.Mes)
 
         else:
-            #either an error has occured or the user leaves too soon
-            #if self.verbose:print "killing workers and queues"
-            
+            # either an error has occured or the user leaves too soon
+            # if self.verbose:print "killing workers and queues"
+
             queues.Queue.close(self.In)
-            if self.verbose:queues.Queue.close(self.Mes)
+            if self.verbose: queues.Queue.close(self.Mes)
             self.Out.close()
             self.printer.terminate()
             for w in self.workers: w.terminate()
             self.In.p.terminate()
-        #------------
 
-    #______________________________________
     def settask(self):
         if self.taskset is None: return
         if "-" in self.taskset:
             corestart, coreend = [int(x) for x in self.taskset.split('-')]
             assert coreend > corestart >= 0
-            cmd = "taskset -pc %d-%d %%d" % (corestart, coreend)
+            cmd = "taskset -pca %d-%d %%d" % (corestart, coreend)
             cmd = "\n".join([cmd % pid for pid in self.pids])
         else:
             corestart = coreend = int(self.taskset)
             assert coreend == corestart >= 0
-            cmd = "taskset -pc %d %%d" % (corestart)
+            cmd = "taskset -pca %d %%d" % (corestart)
             cmd = "\n".join([cmd % pid for pid in self.pids])
         os.system(cmd)
-    # ______________________________________
+
     def renice(self):
         if self.lowpriority:
-            cmd = "renice -n 10 -p %d"
-            cmd = "\n".join([cmd % pid for pid in self.pids])
+            # cmd = "renice -n 10 -p %d"
+            # cmd = "\n".join([cmd % pid for pid in self.pids])
+            cmd = "renice -n 10 -g %d" % self.ppid
             os.system(cmd)
         else:
             pass
-    #______________________________________
-    def __iter__(self): return self
-    #______________________________________
+
+    def __iter__(self):
+        return self
+
     def communicate(self, *args, **kwargs):
         self.printer.communicate(*args, **kwargs)
-    #______________________________________
+
     def next(self):
-        if not self.Nactive: raise StopIteration
-        while self.Nactive :
+        if not self.Nactive:
+            raise StopIteration
+        while self.Nactive:
             packet = self.Out.get()
             if isinstance(packet, PoisonPill):
                 self.Nactive -= 1
                 continue
             elif isinstance(packet, GeneratorError):
                 raise packet
-            elif isinstance(packet, WorkerError) :
-                with open('/tmp/multiproerrors.log', 'a') as fid:
+            elif isinstance(packet, WorkerError):
+                with open('multiproerrors.log', 'a') as fid:
                     fid.write(str(packet) + "\n")
 
-                if self.raiseiferror: 
-                    self.communicate(str(packet))
+                self.communicate(str(packet))
+                if self.raiseiferror:
                     raise packet
 
                 continue
             else:
-                return packet#tuple jobid, answer, jobtime
+                return packet  # tuple jobid, answer, jobtime
 
         if self.verbose:
             self.Mes.put(("MessageQueue", time.time(), "got PoisonPill", None))
             self.Mes.put(PoisonPill())
         raise StopIteration
-########################################### 
-class waitqueue():
-    """the object to reorder jobs once processed to be used by MapSync"""
-    def __init__(self, generator, limit = 1e50): 
-        """
-        generator must return jobid, something
-        the jobid list must be exaustive from 0 to N
-        """
-        self.l = []
-        self.currentjob = 0
-        self.generator  = generator
-        self.limit      = limit
-    #______________________________________
-    def __len__(self): 
-        return len(self.l)
-    #______________________________________
-    def append(self, jobid, packet):
-        if len(self) >= self.limit: 
-            raise Exception('the waitqueue was full')
 
-        if not len(self.l): 
-            self.l.append((jobid, packet))
-            return
-        i = 0
-        while self.l[i][0] < jobid:
-            i += 1
-            if i == len(self.l): break
-        self.l.insert(i, (jobid, packet))
-    #______________________________________
-    def pop(self, index):
-        jobid, packet = self.l.pop(index)
-        return packet #jobid, answer, ...
-    #______________________________________
-    def __iter__(self): return self
-    #______________________________________
-    def next(self):
-        if len(self) and self.l[0][0] == self.currentjob: #first one is the right one
-            self.currentjob += 1 
-            return self.pop(0)
 
-        while True:
-            try:   
-                packet = self.generator.next()#jobid, answer, ...
-                jobid  = packet[0] #first item of the packet must be the jobid
-            except StopIteration: break
-        
-            if jobid > self.currentjob: #came too soon, put it back
-                self.append(jobid, packet)
-
-            elif jobid == self.currentjob: #this is the one
-                self.currentjob += 1
-                return packet#jobid, answer, ...
-
-        if len(self): 
-            #may append if some processes have failed
-            #print "warning : job %s never showed up" % self.currentjob
-            self.currentjob += 1
-            return self.currentjob - 1, MissingJob()
-        raise StopIteration
-#__________________________________________
 class StackAsync(MapAsync):
-    whichworker = WorkerStacker    
+    whichworker = WorkerStacker
     """usage : 
     class UserStacker(object):
         "the target function designed for internal stack"
@@ -785,85 +1340,224 @@ class StackAsync(MapAsync):
             else: S = S + s #merge all partial stacks using method __add__
     print "Final sum %f" % S.v
     """
-#__________________________________________
+
+
+class GenAsync(MapAsync):
+    whichworker = WorkerGenerator
+    """usage : 
+
+    def JobGen():
+        for jobid in xrange(10):
+            yield Job(N=10)
+
+    def Target(N):
+        # must be a generator, no check
+        for nitem in xrange(N):
+            answer = np.cos(nitem)
+            yield answer
+
+    with GenAsync(Target, JobGen()) as ga:
+        for (jobid, nitem), answer, _, _ in ga:
+            # jobid is the number of the job
+            # nitem is the number of the item yielded by the target function that processed job jobid
+            print jobid, nitem, answer
+
+    """
+
+
 class MapSync(MapAsync):
+    whichwaitqueue = WaitQueue
+
     def __init__(self, *args, **kwargs):
-        """same as MapSync except that the job results are generated in the right order"""
         if 'RaiseIfError' in kwargs.keys() and not kwargs['RaiseIfError']:
             raise NotImplementedError("MapSync doesn't support RaiseIfError = False")
         MapAsync.__init__(self, *args, **kwargs)
 
     def __iter__(self):
-        #jobs that come up too soon are kept in a waiting queue to preserve the input order
-        return waitqueue(self)
-#__________________________________________
-class FakeWorker(object):
-    """simulate a worker object"""
-    def __init__(self):
-        self.name  = "FakeWorker"
-        self.rand  = np.random.rand
-        self.randn = np.random.randn
-        self.pid   = os.getpid()
+        # jobs that come up too soon are kept in a waiting queue to preserve the input order
+        return self.whichwaitqueue(self)
 
-#__________________________________________
-class FakePrinter(object):
-    """simulate a printer object"""
-    def communicate(self, message):print message   
-#__________________________________________
+
+class GenSync(MapSync):
+    whichworker = WorkerGenerator
+    whichwaitqueue = WaitQueueGen  # : need a waitqueue that can handle (jobid, nitem) instead of jobid
+
+
 class FakeMapAsync(object):
     """
     use it istead of MapAsync to switch parallel computing off
     process is not parallelized and jobs are returned in the right order anyway
     """
 
-    def __init__(self, funobj, generator, Nworkers=1, RaiseIfError=True, Taskset = None, Verbose=False, LowPriority=False):
-        self.generator  = generator
+    def __init__(self, funobj, generator, Nworkers=1, RaiseIfError=True, Taskset=None, Verbose=False,
+                 LowPriority=False):
+        self.generator = generator
         self.raiseiferror = RaiseIfError
-        self.printer      = FakePrinter()
+        self.printer = FakePrinter()
         self.jobid = -1
-        self.target = Target(copy.deepcopy(funobj)) #copy funobj to avoid attribute modification as it is for MapAsync
+        self.target = Target(copy.deepcopy(funobj))  # copy funobj to avoid attribute modification as it is for MapAsync
 
-    def __enter__(self): return self
-    def __exit__(self, type, value, trace):return
-    def __iter__(self): return self
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, trace):
+        return
+
+    def __iter__(self):
+        return self
+
     def communicate(self, message):
         self.printer.communicate(message)
-    def next(self): 
-        try : 
+
+    def next(self):
+        try:
             start = time.time()
             job = self.generator.next()
             gentime = (start, time.time())
             self.jobid += 1
-        except StopIteration: raise 
-        except Exception as e: 
+        except StopIteration:
+            raise
+        except Exception as e:
             raise e
-    
-        try:            
+
+        try:
             start = time.time()
-            if self.target.passworker: 
+            if self.target.passworker:
                 answer = self.target(FakeWorker(), *job.args, **job.kwargs)
-            else:                 
+            else:
                 answer = self.target(*job.args, **job.kwargs)
             jobtime = (start, time.time())
             return self.jobid, answer, gentime, jobtime
         except Exception as e:
             print e
             if self.raiseiferror: raise
-#__________________________________________
+
+
 class FakeMapSync(FakeMapAsync):
     """
     use it istead of MapSync to switch parallel computing off
     process is not parallelized and jobs are returned in the right order anyway
     """
     pass
-#__________________________________________
-def workfor(t):
-    "fake working fot t seconds, processor activity will raise"
-    start = time.time()
-    while time.time() - start < t:
-        tete_a_toto = 0. + 0.
-#__________________________________________
-if __name__ == "__main__":
-    print "see tutorials for demo"
 
+
+if __name__ == "__main__":
+    from obsmax4.graphictools.gutils import *
+    from obsmax4.graphictools.cmaps import *
+    from obsmax4.statstools.pdf import PDF, ccl
+    import numpy as np
+    import os
+
+    Njob = 96
+    Nworkers = 12
+    # ----------------------
+    if False:  # 1) use a custom function
+        def fun(worker, n, i):
+            """Define your own target function, use arguments or keyword arguments
+            that will be passed from the job generator and return outputs that will be
+            pushed to the output queue.
+            Using argument "worker" as first argument make the worker be passed to target function
+            for thread safe applications (i.e. random numbers)"""
+            workfor(1.0 + 2.0 * worker.rand())
+            # if i == 3: raise Exception('')
+            return worker.pid, worker.rand(n)
+    else:  # 2) use a custom object with dedicated attributes to be stored into the target
+        class Obj(object):
+            def __init__(self, cst=0):
+                """put here the target attributes
+                   remember that the process runs into a separate workspace,
+                   modifications done by the target will be lost after closing the mapper!!
+                   this should only be used to avoid too large data exchanges by
+                   packing into the target the variables that will be used by all jobs"""
+                self.cst = cst
+
+            def __call__(self, worker, n, i):
+                """modifying the "self" attributes will only have an effect inside the dedicated workspace!!!
+                """
+                np.median(np.random.randn(800000))
+                workfor(1.01 + 2.02 * worker.rand())  # workfor(1.0 + 2.0 * worker.rand())
+                # if i == 3: raise Exception('')
+                return worker.pid, worker.rand(n) + self.cst * 5.
+
+
+        # fun = Obj()
+        fun = [Obj(cst=i) for i in xrange(Nworkers)]  # one specific callable per worker
+
+
+    # ----------------------
+    def gen(n):
+        """
+        create the list of arguments and keyword arguments
+        use the Job class to pack the arguments in a convenient package that will be passed to the
+        target as input arguments
+        use the yield command instead of return, so the jobs will be generated
+        when required by the workers
+        """
+        for i in xrange(n):
+            workfor(0.1)
+            # if i == 3: raise Exception('')
+            yield Job(n=10, i=i)
+
+
+    # ----------------------
+    lgd, pids = [], []
+    fig1 = plt.figure()
+    fig2 = plt.figure()
+    fig3 = plt.figure()
+    ax1 = fig1.add_subplot(111)
+    ax2 = fig2.add_subplot(211)
+    ax3 = fig2.add_subplot(212, sharex=ax2)
+
+    # ----------------------
+    with MapSync(fun, gen(Njob), Nworkers=Nworkers, Taskset='0-11',
+                 Verbose=True) as ma:  # Verbose = "Process" Verbose = "Job"
+        """call the mapper with the command with (unindent means closing the processors)
+        use the MapAsync      mapper to get the results as they come (un ordered)
+        --- --- MapSync       ------ -- --- --- ------- in correct order
+        --- --- FakeMapAsync  ------ -- switch parallel computing off
+        """
+        print ma
+        randomseries = []
+        for jobid, (workerid, x), (genstart, genend), (jobstart, jobend) in ma:
+            """iterate over the mapper to get the results"""
+            # print "jobid%d adv%d" % (jobid, int(round((jobend - jobstart) / (genend - genstart))) + 1) #advised worker number
+            ma.printer.communicate("jobid-%d adviced-worker-number-%d" % (
+            jobid, int(round((jobend - jobstart) / (genend - genstart))) + 1))
+
+            clr = np.random.rand(3)  # value2color(jobid / float(Njob), cmap = linecmap(Njob))
+            ax1.plot(x, color=clr)
+            ax2.plot([genstart, genend], [jobid, jobid], "k", linewidth=3)
+            ax2.plot([jobstart, jobend], [jobid, jobid], color=clr, linewidth=3)
+            ax2.text(jobend, jobid, "pid %d" % workerid)
+            ax3.plot([jobstart, jobend], [workerid, workerid], color=clr, linewidth=3)
+
+            pids.append(workerid)
+
+            lgd.append("pid %d" % workerid)
+            randomseries.append(x)
+
+    # ----------------------
+    ax1.legend(lgd)
+    timetick(ax2, "x")
+    ax2.grid()
+
+    timetick(ax3, "x")
+    pids = np.sort(np.unique(pids))
+    ax3.set_yticks(pids)
+    ax3.set_yticklabels(pids)
+    ax3.grid()
+
+    ax1.figure.show()
+    ax2.figure.show()
+
+    #    C = np.zeros((len(randomseries), len(randomseries)))
+    #    for i in xrange(len(randomseries)):
+    #        for j in xrange(i, len(randomseries)):
+    #            C[i, j] = C[j, i] = ccl(randomseries[i], randomseries[j])
+
+    #    plt.figure()
+    #    gca().pcolormesh1(C, vmin = -1.0, vmax = 1.0)
+    #    gcf().show()
+
+    pause()
 
