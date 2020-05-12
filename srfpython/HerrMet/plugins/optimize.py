@@ -3,8 +3,7 @@ from builtins import input
 import warnings
 import glob, os
 import numpy as np
-from scipy.sparse import spmatrix, diags, issparse, csc_matrix, triu, tril, \
-    save_npz as save_sparse_npz, load_npz as load_sparse_npz
+from scipy import sparse as sp
 from scipy.sparse.linalg import spsolve, splu  #inv as sparse_inv NO!!!
 import matplotlib.pyplot as plt
 from srfpython.HerrMet.nodefile import NodeFile
@@ -22,7 +21,6 @@ import pickle
 # TODO add convergence interruption warning
 # TODO speed up CM computations
 # TODO add safety gards about the size of CM
-# TODO only save and load the upper triangle of CM (with diagonal)
 
 WORKINGDIR = "."
 NODEFILELOCAL = os.path.join(WORKINGDIR, ROOTKEY + "nodes.txt")
@@ -36,18 +34,19 @@ FDFILES = os.path.join(WORKINGDIR, ROOTKEY + "G[0-9][0-9][0-9].npz")
 DOBSFILE = os.path.join(WORKINGDIR, ROOTKEY + "Dobs.npy")
 CDFILE = os.path.join(WORKINGDIR, ROOTKEY + "CD.npz")
 CDINVFILE = os.path.join(WORKINGDIR, ROOTKEY + "CDinv.npz")
-CMFILE = os.path.join(WORKINGDIR, ROOTKEY + "CM.npz")
+CMFILE = os.path.join(WORKINGDIR, ROOTKEY + "CM_triu.npz")
 
-SUPERPARAMETERIZERFILE = os.path.join(WORKINGDIR, ROOTKEY + ".SP.pkl")
-SUPERDATACODERFILE = os.path.join(WORKINGDIR, ROOTKEY + ".SD.pkl")
-SUPERTHOERYFILE = os.path.join(WORKINGDIR, ROOTKEY + ".ST.pkl")
+SUPERPARAMETERIZERFILE = os.path.join(WORKINGDIR, ROOTKEY + "SP.pkl")
+SUPERDATACODERFILE = os.path.join(WORKINGDIR, ROOTKEY + "SD.pkl")
+SUPERTHOERYFILE = os.path.join(WORKINGDIR, ROOTKEY + "ST.pkl")
 
 M96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_optimized.mod96")
 S96FILEOUT = os.path.join(WORKINGDIR, ROOTKEY + "{node}_optimized.surf96")
 M96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_optimized.mod96")
 S96FILEOUTS = os.path.join(WORKINGDIR, ROOTKEY + "*_optimized.surf96")
 
-CLEAR_LIST = [NODEFILELOCAL,
+CLEAR_LIST = [
+     NODEFILELOCAL,
      MPRIORFILE,
      DOBSFILE,
      CDFILE,
@@ -332,12 +331,149 @@ class NodeFileLocal(NodeFile):
         thsd = trunc_horizontal_smoothing_distance
         ztop = self.ztop
         zmid = self.zmid
+        nnodes = len(self)
         nlayer = len(ztop)
-        n_parameters = nlayer * len(self)
+        n_parameters = nlayer * nnodes
 
-        # ========= load vs uncertainty at each node
-        vs_uncertainties = []
+        if not vsd >= 0 and tvsd >= 0 and hsd >= 0 and thsd >= 0:
+            raise ValueError(vsd, tvsd, hsd, thsd)
+        vsmooth = vsd > 0 and tvsd > 0
+        hsmooth = hsd > 0 and thsd > 0
+
+        # ========= load vs uncertainty array at each node
+        vs_uncertainties = self.get_vs_uncertainties(
+            scale_uncertainties=scale_uncertainties,
+            add_uncertainty=add_uncertainty,
+            lock_half_space=lock_half_space,
+            lock_half_space_sigma=lock_half_space_sigma)
+
+        # ===========
+        if not (vsmooth or hsmooth):
+            # no smoothing at all, easy
+            CM = sp.diags(vs_uncertainties.flat[:] ** 2.0,
+                       shape=(n_parameters, n_parameters),
+                       format="csc", dtype=float)
+            return CM
+
+        # =========== prepare computations
+        rhod_triu = rhoz = rhoz_triu = rhoz_tril = None
+        if vsmooth:
+            dz = np.abs(zmid - zmid[:, np.newaxis])
+            rhoz = np.exp(-dz / vsd)
+            rhoz[dz > tvsd] = 0.
+
+            rhoz_triu = sp.triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
+            rhoz_tril = sp.tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
+
+        if hsmooth:
+            # warning : I do not fill the lower triangle and diagonal !!!
+            rhod_triu = sp.triu(sp.diags(np.ones(nnodes, float), dtype=float, format="csr"), k=1, format="csr")
+
+            for nnode in range(nnodes-1):
+                for mnode in range(nnode + 1, nnodes):
+
+                    horizontal_distance = \
+                        haversine(
+                            loni=self.lons[nnode],
+                            lati=self.lats[nnode],
+                            lonj=self.lons[mnode],
+                            latj=self.lats[mnode])
+
+                    if horizontal_distance > thsd:
+                        continue
+
+                    rhod_triu[nnode, mnode] = np.exp(-horizontal_distance / thsd)
+
+        # ===========
+        CM_triu_rows = []
+        CM_triu_cols = []
+        CM_triu_data = []
+
         for nnode in range(len(self)):
+            vs_unc_n = vs_uncertainties[nnode, :]
+
+            if vsmooth:
+
+                covnn_triu_row = rhoz_triu.row
+                covnn_triu_col = rhoz_triu.col
+                covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
+
+                CM_triu_rows.append(nnode * nlayer + covnn_triu_row)
+                CM_triu_cols.append(nnode * nlayer + covnn_triu_col)
+                CM_triu_data.append(covnn_triu_data)
+                # covnn_triu = csc_matrix((covnn_data, (covnn_row, covnn_col)))
+
+                if hsmooth:
+                    na, nb = len(rhoz_triu.data), len(rhoz_tril.data)
+
+                    for mnode in range(nnode + 1, len(self)):
+                        vs_unc_m = vs_uncertainties[mnode, :]
+
+                        covnm_row = np.zeros(na + nb, int)
+                        covnm_col = np.zeros(na + nb, int)
+                        covnm_data = np.zeros(na + nb, float)
+
+                        covnm_row[:na] = rhoz_triu.row
+                        covnm_col[:na] = rhoz_triu.col
+                        covnm_data[:na] = vs_unc_n[rhoz_triu.row] * vs_unc_m[rhoz_triu.col] \
+                                          * rhoz_triu.data * rhod_triu[nnode, mnode]
+
+                        covnm_row[na:] = rhoz_tril.row
+                        covnm_col[na:] = rhoz_tril.col
+                        covnm_data[na:] = vs_unc_n[rhoz_tril.row] * vs_unc_m[rhoz_tril.col] \
+                                          * rhoz_tril.data * rhod_triu[nnode, mnode]
+
+                        CM_triu_rows.append(nnode * nlayer + covnm_row)
+                        CM_triu_cols.append(mnode * nlayer + covnm_col)
+                        CM_triu_data.append(covnm_data)
+                        # covnm = csc_matrix((covnm_data, (covnm_row, covnm_col)))
+
+            else:
+                assert hsmooth  # implicit
+                covnn_row = np.arange(nlayer)
+                covnn_col = np.arange(nlayer)
+                covnn_data = vs_unc_n ** 2.
+
+                CM_triu_rows.append(nnode * nlayer + covnn_row)
+                CM_triu_cols.append(nnode * nlayer + covnn_col)
+                CM_triu_data.append(covnn_data)
+
+                for mnode in range(nnode + 1, len(self)):
+                    vs_unc_m = vs_uncertainties[mnode, :]
+
+                    covnm_row = np.arange(nlayer)
+                    covnm_col = np.arange(nlayer)
+                    covnm_data = vs_unc_n * vs_unc_m * rhod_triu[nnode, mnode]
+
+                    CM_triu_rows.append(nnode * nlayer + covnm_row)
+                    CM_triu_cols.append(mnode * nlayer + covnm_col)
+                    CM_triu_data.append(covnm_data)
+
+        CM_triu_rows = np.hstack(CM_triu_rows)
+        CM_triu_cols = np.hstack(CM_triu_cols)
+        CM_triu_data = np.hstack(CM_triu_data)
+        CM_triu = sp.csc_matrix((CM_triu_data, (CM_triu_rows, CM_triu_cols)),
+                       shape=(n_parameters, n_parameters), dtype=float)
+
+        if visual_qc:
+            assert input('are you sure you want to display this matrix (risk of memory saturation)?')
+            plt.figure()
+            A = CM_triu.toarray()
+            A = np.ma.masked_where(A == 0, A)
+            plt.imshow(A)
+            plt.show()
+
+        # CM = CM_triu + CM_triu.T - diags(CM_triu.diagonal())
+        return CM_triu
+
+    def get_vs_uncertainties(self, scale_uncertainties, add_uncertainty, lock_half_space, lock_half_space_sigma):
+        ztop = self.ztop
+        zmid = self.zmid
+        nnodes = len(self)
+        nlayer = len(ztop)
+
+        vs_uncertainties = np.zeros((nnodes, nlayer), float)  # one row per node, one col per layer
+        for nnode in range(nnodes):
             vs84_n = depthmodel_from_mod96(self.p84files[nnode]).vs
             vs16_n = depthmodel_from_mod96(self.p16files[nnode]).vs
             vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
@@ -350,121 +486,8 @@ class NodeFileLocal(NodeFile):
 
             # make sure all uncertainties are positive
             vs_unc_n = np.clip(vs_unc_n, lock_half_space_sigma, np.inf)
-            vs_uncertainties.append(vs_unc_n)
-
-        # ===========
-        if (vsd == 0 or tvsd == 0) and (hsd == 0. or thsd == 0.):
-            # no smoothing at all, easy
-            CM = diags(np.hstack(vs_uncertainties) ** 2.0,
-                       shape=(n_parameters, n_parameters),
-                       format="csc", dtype=float)
-            return CM
-
-        elif vsd > 0 and tvsd > 0:
-            # vertical smoothing at least
-            dz = np.abs(zmid - zmid[:, np.newaxis])
-            rhoz = np.exp(-dz / vsd)
-            rhoz[dz > tvsd] = 0.
-
-            rhoz_triu = triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
-            rhoz_tril = tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
-
-        elif vsd == 0 or tvsd == 0:
-            # horizontal smoothing only
-            rhoz_triu = rhoz_tril = None
-
-        else:
-            raise ValueError(vsd, tvsd)
-
-        # ===========
-        CM_triu_rows = []
-        CM_triu_cols = []
-        CM_triu_data = []
-
-        for nnode in range(len(self)):
-            vs_unc_n = vs_uncertainties[nnode]
-
-            if vsd > 0 and tvsd > 0:
-
-                covnn_triu_row = rhoz_triu.row
-                covnn_triu_col = rhoz_triu.col
-                covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
-
-                CM_triu_rows.append(nnode * nlayer + covnn_triu_row)
-                CM_triu_cols.append(nnode * nlayer + covnn_triu_col)
-                CM_triu_data.append(covnn_triu_data)
-                # covnn_triu = csc_matrix((covnn_data, (covnn_row, covnn_col)))
-
-                if hsd > 0 and thsd > 0:
-                    na, nb = len(rhoz_triu.data), len(rhoz_tril.data)
-
-                    for mnode in range(nnode + 1, len(self)):
-                        vs_unc_m = vs_uncertainties[mnode]
-
-                        horizontal_distance_nm = haversine(
-                            loni=self.lons[nnode],
-                            lati=self.lats[nnode],
-                            lonj=self.lons[mnode],
-                            latj=self.lats[mnode])
-                        e = np.exp(-horizontal_distance_nm / hsd)  # scalar
-
-                        covnm_row = np.zeros(na + nb, int)
-                        covnm_col = np.zeros(na + nb, int)
-                        covnm_data = np.zeros(na + nb, float)
-
-                        covnm_row[:na] = rhoz_triu.row
-                        covnm_col[:na] = rhoz_triu.col
-                        covnm_data[:na] = vs_unc_n[rhoz_triu.row] * vs_unc_m[rhoz_triu.col] * rhoz_triu.data * e
-
-                        covnm_row[na:] = rhoz_tril.row
-                        covnm_col[na:] = rhoz_tril.col
-                        covnm_data[na:] = vs_unc_n[rhoz_tril.row] * vs_unc_m[rhoz_tril.col] * rhoz_tril.data * e
-
-                        CM_triu_rows.append(nnode * nlayer + covnm_row)
-                        CM_triu_cols.append(mnode * nlayer + covnm_col)
-                        CM_triu_data.append(covnm_data)
-                        # covnm = csc_matrix((covnm_data, (covnm_row, covnm_col)))
-
-            elif vsd == 0 or tvsd == 0:
-                covnn_row = np.arange(nlayer)
-                covnn_col = np.arange(nlayer)
-                covnn_data = vs_unc_n ** 2.
-
-                CM_triu_rows.append(nnode * nlayer + covnn_row)
-                CM_triu_cols.append(nnode * nlayer + covnn_col)
-                CM_triu_data.append(covnn_data)
-
-                assert hsd > 0 and thsd > 0  # implicit
-                for mnode in range(nnode + 1, len(self)):
-                    vs_unc_m = vs_uncertainties[mnode]
-
-                    horizontal_distance_nm = haversine(
-                        loni=self.lons[nnode],
-                        lati=self.lats[nnode],
-                        lonj=self.lons[mnode],
-                        latj=self.lats[mnode])
-
-                    e = np.exp(-horizontal_distance_nm / hsd)  # scalar
-
-                    covnm_row = np.arange(nlayer)
-                    covnm_col = np.arange(nlayer)
-                    covnm_data = vs_unc_n * vs_unc_m * e
-
-                    CM_triu_rows.append(nnode * nlayer + covnm_row)
-                    CM_triu_cols.append(mnode * nlayer + covnm_col)
-                    CM_triu_data.append(covnm_data)
-
-            else:
-                raise ValueError
-
-        CM_triu_rows = np.hstack(CM_triu_rows)
-        CM_triu_cols = np.hstack(CM_triu_cols)
-        CM_triu_data = np.hstack(CM_triu_data)
-        CM_triu = csc_matrix((CM_triu_data, (CM_triu_rows, CM_triu_cols)),
-                       shape=(n_parameters, n_parameters), dtype=float)
-
-        CM = CM_triu + CM_triu.T - diags(CM_triu.diagonal())
-        return CM
+            vs_uncertainties[nnode, :] = vs_unc_n
+        return vs_uncertainties
 
 
 class SuperParameterizer(object):
@@ -565,8 +588,8 @@ class SuperDatacoder(object):
 
         CDinv_diag = np.concatenate(CDinv_diag)
 
-        CDinv = diags(CDinv_diag, offsets=0, format="csc", dtype=float)
-        CD = diags(CDinv_diag ** -1.0, offsets=0, format="csc", dtype=float)
+        CDinv = sp.diags(CDinv_diag, offsets=0, format="csc", dtype=float)
+        CD = sp.diags(CDinv_diag ** -1.0, offsets=0, format="csc", dtype=float)
         return CD, CDinv
 
     def split(self, Data):
@@ -734,19 +757,32 @@ class SuperTheory(object):
                 G_col_ind = np.concatenate((G_col_ind, G_cols))
                 G_fd_data = np.concatenate((G_fd_data, G_datas))
 
-        G = csc_matrix((G_fd_data, (G_row_ind, G_col_ind)), shape=G_shape)
+        G = sp.csc_matrix((G_fd_data, (G_row_ind, G_col_ind)), shape=G_shape)
         return G
 
 
-def sparsedet(M):
-    lu = splu(M)
-    diagL = lu.L.diagonal()
-    diagU = lu.U.diagonal()
-    diagL = diagL.astype(np.complex128)
-    diagU = diagU.astype(np.complex128)
-    logdet = np.log(diagL).sum() + np.log(diagU).sum()
-    det = np.exp(logdet)  # usually underflows/overflows for large matrices
-    return det.real
+def load_CM(CMFILE):
+    # load CM_triu and compute full CM 
+
+    CM_triu = sp.load_npz(CMFILE)
+    if sp.isspmatrix_dia(CM_triu):
+        CM = CM_triu
+
+    else:
+        CM = CM_triu + CM_triu.T - sp.diags(CM_triu.diagonal())
+
+    return CM
+
+#
+# def sparsedet(M):
+#     lu = splu(M)
+#     diagL = lu.L.diagonal()
+#     diagU = lu.U.diagonal()
+#     diagL = diagL.astype(np.complex128)
+#     diagU = diagU.astype(np.complex128)
+#     logdet = np.log(diagL).sum() + np.log(diagU).sum()
+#     det = np.exp(logdet)  # usually underflows/overflows for large matrices
+#     return det.real
 
 
 def sizeformat(size):
@@ -760,7 +796,7 @@ def sizeformat(size):
 
 
 def save_matrix(filename, matrix, verbose):
-    if not issparse(matrix):
+    if not sp.issparse(matrix):
         sparsity = 0.
         size = matrix.size * matrix.itemsize
 
@@ -784,10 +820,10 @@ def save_matrix(filename, matrix, verbose):
             raise ValueError('{} does not end with .npy'.format(filename))
         np.save(filename, matrix, allow_pickle=False)
 
-    elif isinstance(matrix, spmatrix):
+    elif isinstance(matrix, sp.spmatrix):
         if not filename.endswith('.npz'):
             raise ValueError('{} does not end with .npz'.format(filename))
-        save_sparse_npz(filename, matrix)
+        sp.save_npz(filename, matrix)
 
     else:
         raise NotImplementedError
@@ -804,7 +840,7 @@ def Ainv_dot_b(A, b):
     :param b:
     :return:
     """
-    if issparse(A):
+    if sp.issparse(A):
         return spsolve(A=A, b=b)
 
     elif isinstance(A, np.ndarray) or isinstance(A, np.matrix):
@@ -814,15 +850,10 @@ def Ainv_dot_b(A, b):
         raise TypeError
 
 
-def chi2_data(niter=None, Data=None, Dobs=None, CDinv=None):
-    if Data is None:
-        Data = np.load(DFILE.format(niter=niter))
-    if Dobs is None:
-        Dobs = np.load(DOBSFILE)
-    if CDinv is None:
-        CDinv = load_sparse_npz(CDINVFILE.format(niter))
-    assert issparse(CDinv)
-    assert not issparse(Data - Dobs)
+def chi2_data(Data, Dobs, CDinv):
+
+    assert sp.issparse(CDinv)
+    assert not sp.issparse(Data - Dobs)
 
     Inan = np.isnan(Data) | np.isnan(Dobs)
     Dobs[Inan] = Data[Inan] = 0.  # so that they do not act on the data misfit
@@ -830,27 +861,15 @@ def chi2_data(niter=None, Data=None, Dobs=None, CDinv=None):
     return np.dot((Data - Dobs), CDinv * (Data - Dobs))  # only because CDinv is known exactly
 
 
-def chi2_model(niter=None, Model=None, Mprior=None, CM=None):
+def chi2_model(Model, Mprior, CM):
 
-    assert issparse(CM)
-    assert not issparse(Model - Mprior)
-
-    if Model is None:
-        Model = np.load(MFILE.format(niter=niter))
-    if Mprior is None:
-        Mprior = np.load(MPRIORFILE)
-    if CM is None:
-        CM = load_sparse_npz(CMFILE.format(niter))
+    assert sp.issparse(CM)
+    assert not sp.issparse(Model - Mprior)
 
     return np.dot(Model - Mprior, Ainv_dot_b(A=CM, b=Model - Mprior))
 
 
-def print_costs(niter, data_cost=None, model_cost=None):
-    if data_cost is None:
-        data_cost = chi2_data(niter=niter)
-    if model_cost is None:
-        model_cost = chi2_model(niter=niter)
-
+def print_costs(niter, data_cost, model_cost):
     print('iter {:03d}: chi2_data={:<16f} chi2_model={:<16f} chi2={:<16f}'.format(
         niter, data_cost, model_cost, data_cost + model_cost))
 
@@ -862,7 +881,7 @@ def load_last_frechet_derivatives(supertheory, verbose, mapkwargs):
         if os.path.isfile(fdfilename):
             if verbose:
                 print('loading {}'.format(fdfilename))
-            Gi = load_sparse_npz(fdfilename)
+            Gi = sp.load_npz(fdfilename)
             return Gi
         niter -= 1
 
@@ -881,7 +900,7 @@ def update_frechet_derivatives(supertheory, verbose, mapkwargs):
     """
     # if os.path.isfile(FDFILE.format(niter=0)):
     #     # test do not update the FD
-    #     G0 = load_sparse_npz(FDFILE.format(niter=0))
+    #     G0 = sp.load_npz(FDFILE.format(niter=0))
     #     return G0
 
     # ========= compute the frechet derivatives for the last model found
@@ -899,7 +918,7 @@ def update_frechet_derivatives(supertheory, verbose, mapkwargs):
     else:
         if verbose:
             print('{} exists already'.format(fdfilename))
-        Gi = load_sparse_npz(fdfilename)
+        Gi = sp.load_npz(fdfilename)
         return Gi
 
 
@@ -1046,7 +1065,7 @@ def optimize(argv, verbose, mapkwargs):
 
         # ========= set the prior model and covariance matrix
         Mprior = superparameterizer.get_Mprior()
-        CM = nodefile.get_CM(
+        CM_triu = nodefile.get_CM(
             horizontal_smoothing_distance=horizontal_smoothing_distance,
             vertical_smoothing_distance=vertical_smoothing_distance,
             trunc_horizontal_smoothing_distance=trunc_horizontal_smoothing_distance,
@@ -1058,7 +1077,7 @@ def optimize(argv, verbose, mapkwargs):
             visual_qc=False)
 
         save_matrix(MPRIORFILE, Mprior, verbose)
-        save_matrix(CMFILE, CM, verbose)
+        save_matrix(CMFILE, CM_triu, verbose)
 
         M0 = Mprior
         m0filename = MFILE.format(niter=0)
@@ -1100,9 +1119,9 @@ def optimize(argv, verbose, mapkwargs):
         M0 = np.load(MFILE.format(niter=0))
         Dobs = np.load(DOBSFILE)
 
-        CM = load_sparse_npz(CMFILE)
-        CD = load_sparse_npz(CDFILE)
-        CDinv = load_sparse_npz(CDINVFILE)
+        CM = load_CM(CMFILE)
+        CD = sp.load_npz(CDFILE)
+        CDinv = sp.load_npz(CDINVFILE)
 
         for _ in range(number_of_iterations):
             niter = lastiter()
@@ -1121,7 +1140,7 @@ def optimize(argv, verbose, mapkwargs):
 
             Mi = np.load(mfilename)
             Di = np.load(dfile)  # g(Mi)
-            # Gi = load_sparse_npz(fdfilename)
+            # Gi = sp.load_npz(fdfilename)
 
             # ==== update the current model
             has_nan = np.isnan(Dobs).any()
@@ -1141,8 +1160,8 @@ def optimize(argv, verbose, mapkwargs):
             # save_matrix(fdfilename_new, Ginew, verbose)
 
             if verbose:
-                data_cost = chi2_data(niter=None, Data=Dinew, Dobs=Dobs, CDinv=CDinv)
-                model_cost = chi2_model(niter=None, Model=Minew, Mprior=Mprior, CM=CM)
+                data_cost = chi2_data(Data=Dinew, Dobs=Dobs, CDinv=CDinv)
+                model_cost = chi2_model(Model=Minew, Mprior=Mprior, CM=CM)
                 print_costs(niter+1, data_cost=data_cost, model_cost=model_cost)
 
     if "-show" in argv.keys():
@@ -1153,9 +1172,9 @@ def optimize(argv, verbose, mapkwargs):
 
         Dobs = np.load(DOBSFILE)
         Mprior = np.load(mpriorfile)
-        CM = load_sparse_npz(CMFILE)
-        CDinv = load_sparse_npz(CDINVFILE)
-        Mpriorunc = np.asarray(CM[np.arange(n_parameters), np.arange(n_parameters)]).flat[:] ** 0.5
+        CM_triu = sp.load_npz(CMFILE)
+        CDinv = sp.load_npz(CDINVFILE)
+        Mpriorunc = CM_triu.diagonal() ** 0.5
 
         # =================== display the data fit
         fig_costs = plt.figure()
