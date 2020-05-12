@@ -350,44 +350,26 @@ class NodeFileLocal(NodeFile):
         # ===========
         if not (vsmooth or hsmooth):
             # no smoothing at all, easy
-            CM = sp.diags(vs_uncertainties.flat[:] ** 2.0,
+            CM_triu = sp.diags(vs_uncertainties.flat[:] ** 2.0,
                        shape=(n_parameters, n_parameters),
                        format="csc", dtype=float)
-            return CM
+            return CM_triu
 
-        # =========== prepare computations
-        rhod_triu = rhoz = rhoz_triu = rhoz_tril = None
-        if vsmooth:
-            dz = np.abs(zmid - zmid[:, np.newaxis])
-            rhoz = np.exp(-dz / vsd)
-            rhoz[dz > tvsd] = 0.
+        # =========== prepare smoothing
+        rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril = \
+            self.prepare_vertical_smoothing(vsd, tvsd)
 
-            rhoz_triu = sp.triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
-            rhoz_tril = sp.tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
-
-        if hsmooth:
-            # warning : I do not fill the lower triangle and diagonal !!!
-            rhod_triu = sp.triu(sp.diags(np.ones(nnodes, float), dtype=float, format="csr"), k=1, format="csr")
-
-            for nnode in range(nnodes-1):
-                for mnode in range(nnode + 1, nnodes):
-
-                    horizontal_distance = \
-                        haversine(
-                            loni=self.lons[nnode],
-                            lati=self.lats[nnode],
-                            lonj=self.lons[mnode],
-                            latj=self.lats[mnode])
-
-                    if horizontal_distance > thsd:
-                        continue
-
-                    rhod_triu[nnode, mnode] = np.exp(-horizontal_distance / thsd)
+        rhod_triu = self.prepare_horizontal_smoothing(hsd, thsd)
 
         # ===========
         CM_triu_rows = []
         CM_triu_cols = []
         CM_triu_data = []
+
+        case1 = vsmooth and hsmooth
+        case2 = vsmooth and not hsmooth
+        case3 = hsmooth and not vsmooth
+        case4 = not vsmooth and not hsmooth
 
         for nnode in range(len(self)):
             vs_unc_n = vs_uncertainties[nnode, :]
@@ -404,23 +386,22 @@ class NodeFileLocal(NodeFile):
                 # covnn_triu = csc_matrix((covnn_data, (covnn_row, covnn_col)))
 
                 if hsmooth:
-                    na, nb = len(rhoz_triu.data), len(rhoz_tril.data)
 
                     for mnode in range(nnode + 1, len(self)):
                         vs_unc_m = vs_uncertainties[mnode, :]
 
-                        covnm_row = np.zeros(na + nb, int)
-                        covnm_col = np.zeros(na + nb, int)
-                        covnm_data = np.zeros(na + nb, float)
+                        covnm_row = np.zeros(rhoz_nupper + rhoz_nlower, int)
+                        covnm_col = np.zeros(rhoz_nupper + rhoz_nlower, int)
+                        covnm_data = np.zeros(rhoz_nupper + rhoz_nlower, float)
 
-                        covnm_row[:na] = rhoz_triu.row
-                        covnm_col[:na] = rhoz_triu.col
-                        covnm_data[:na] = vs_unc_n[rhoz_triu.row] * vs_unc_m[rhoz_triu.col] \
+                        covnm_row[:rhoz_nupper] = rhoz_triu.row
+                        covnm_col[:rhoz_nupper] = rhoz_triu.col
+                        covnm_data[:rhoz_nupper] = vs_unc_n[rhoz_triu.row] * vs_unc_m[rhoz_triu.col] \
                                           * rhoz_triu.data * rhod_triu[nnode, mnode]
 
-                        covnm_row[na:] = rhoz_tril.row
-                        covnm_col[na:] = rhoz_tril.col
-                        covnm_data[na:] = vs_unc_n[rhoz_tril.row] * vs_unc_m[rhoz_tril.col] \
+                        covnm_row[rhoz_nupper:] = rhoz_tril.row
+                        covnm_col[rhoz_nupper:] = rhoz_tril.col
+                        covnm_data[rhoz_nupper:] = vs_unc_n[rhoz_tril.row] * vs_unc_m[rhoz_tril.col] \
                                           * rhoz_tril.data * rhod_triu[nnode, mnode]
 
                         CM_triu_rows.append(nnode * nlayer + covnm_row)
@@ -465,6 +446,49 @@ class NodeFileLocal(NodeFile):
 
         # CM = CM_triu + CM_triu.T - diags(CM_triu.diagonal())
         return CM_triu
+
+    def prepare_horizontal_smoothing(self, hsd, thsd):
+        if hsd == 0 and thsd == 0:
+            rhod_triu = None
+
+        else:
+            nnodes = len(self)
+            # warning : I do not fill the lower triangle and diagonal !!!
+            rhod_triu = sp.triu(np.zeros((nnodes, nnodes), float), k=1, format="lil")
+
+            # fill diagonal terms
+            rhod_triu[:nnodes, :nnodes] = 1.0
+
+            # fill non-diagonal terms
+            for nnode in range(nnodes - 1):
+                for mnode in range(nnode + 1, nnodes):
+
+                    horizontal_distance = \
+                        haversine(
+                            loni=self.lons[nnode],
+                            lati=self.lats[nnode],
+                            lonj=self.lons[mnode],
+                            latj=self.lats[mnode])
+
+                    if horizontal_distance > thsd:
+                        continue
+
+                    rhod_triu[nnode, mnode] = np.exp(-horizontal_distance / thsd)
+        return rhod_triu
+
+    def prepare_vertical_smoothing(self, vsd, tvsd):
+        if vsd == 0 and tvsd == 0:
+            rhoz_nupper = rhoz_nlower = rhoz_triu = rhoz_tril = None
+        else:
+            zmid = self.zmid
+            dz = np.abs(zmid - zmid[:, np.newaxis])
+            rhoz = np.exp(-dz / vsd)
+            rhoz[dz > tvsd] = 0.
+            rhoz_triu = sp.triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
+            rhoz_tril = sp.tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
+            rhoz_nupper, rhoz_nlower = len(rhoz_triu.data), len(rhoz_tril.data)
+
+        return rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril
 
     def get_vs_uncertainties(self, scale_uncertainties, add_uncertainty, lock_half_space, lock_half_space_sigma):
         ztop = self.ztop
