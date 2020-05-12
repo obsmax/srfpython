@@ -460,6 +460,19 @@ class NodeFileLocal(NodeFile):
             plt.plot(self.lons, self.lats, 'ko')
             for lon, lat, node in zip(self.lons, self.lats, self.nodes):
                 plt.text(lon, lat, node)
+            for i in range(len(self)-1):
+                for j in range(i+1, len(self)):
+                    dij = haversine(
+                        loni=self.lons[i],
+                        lati=self.lats[i],
+                        lonj=self.lons[j],
+                        latj=self.lats[j])
+                    from srfpython.standalone.display import value2color
+                    plt.plot([self.lons[i], self.lons[j]],
+                             [self.lats[i], self.lats[j]])
+                    plt.text(np.mean([self.lons[i], self.lons[j]]),
+                             np.mean([self.lats[i], self.lats[j]]), round(dij))
+
 
             if input('are you sure you want to display this matrix (risk of memory saturation)?') == "y":
                 plt.figure()
