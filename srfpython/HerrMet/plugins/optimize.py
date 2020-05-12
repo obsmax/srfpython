@@ -380,6 +380,9 @@ class NodeFileLocal(NodeFile):
                 if hsmooth:
 
                     for mnode in range(nnode + 1, len(self)):
+                        if rhod_triu[nnode, mnode] == 0.:
+                            continue
+
                         vs_unc_m = vs_uncertainties[mnode, :]
 
                         if 1:
@@ -785,6 +788,56 @@ class SuperTheory(object):
         G = sp.csc_matrix((G_fd_data, (G_row_ind, G_col_ind)), shape=G_shape)
         return G
 
+    def get_CMGiT(self, CM, Gi):
+        print('get_CMGiT...')
+        assert Gi.shape == self.shape
+
+        d_end = np.cumsum(self.nds)  # excluded
+        d_begin = np.hstack((0, d_end[:-1]))  # included
+        p_end = np.cumsum(self.nps)  # excluded
+        p_begin = np.hstack((0, p_end[:-1]))  # included
+        assert len(p_begin) == len(p_end) == len(d_begin) == len(d_end)
+        assert Gi.shape == (d_end[-1], p_end[-1])
+        # raise
+
+        CMGiT_rows = []
+        CMGiT_cols = []
+        CMGiT_data = []
+
+        for mnode, (pb, pe, db, de) in enumerate(zip(p_begin, p_end, d_begin, d_end)):
+            # the "super colonne" is CM[:, jb:je]
+            GimmT = Gi[db:de, pb:pe].T
+
+            for nnode, (qb, qe) in enumerate(zip(p_begin, p_end)):
+                CMnm = CM[qb:qe, pb:pe]
+                # if CMnm.count_nonzero() == 0:
+                #     continue
+
+                CMGiTnm = (CMnm * GimmT).tocoo()
+
+                CMGiT_rows.append(qb + CMGiTnm.row)
+                CMGiT_cols.append(db + CMGiTnm.col)
+                CMGiT_data.append(CMGiTnm.data)
+
+        CMGiT_rows = np.hstack(CMGiT_rows)
+        CMGiT_cols = np.hstack(CMGiT_cols)
+        CMGiT_data = np.hstack(CMGiT_data)
+
+        CMGiT = sp.csc_matrix((CMGiT_data, (CMGiT_rows, CMGiT_cols)),
+                              shape=(CM.shape[0], Gi.shape[0]),
+                              dtype=float)
+        if False:
+            assert input('sure?') == "y"
+            assert np.all(CMGiT.toarray() == (CM * Gi.T).toarray())
+            plt.figure()
+            plt.subplot(121)
+            plt.imshow(CMGiT.toarray())
+            plt.subplot(122)
+            plt.imshow((CM * Gi.T).toarray())
+            plt.show()
+        print('ok')
+        return CMGiT
+
 
 def load_CM(CMFILE):
     # load CM_triu and compute full CM 
@@ -963,7 +1016,8 @@ def rm_nofail(filepath, verbose=True):
 
 def tv23_1(Dobs, Di, CD,
            Mprior, M0, Mi, CM,
-           Gi, supertheory):
+           Gi, supertheory, CMGiT=None,
+           verbose=False):
     """
     Tarantola Valette 1982 eq. 23, modified to control the step size
     :param Dobs:
@@ -982,22 +1036,33 @@ def tv23_1(Dobs, Di, CD,
     # let ignore them
     Inan = np.isnan(Di) | np.isnan(Dobs)
     Dobs[Inan] = Di[Inan] = 0.
+    print('computing Dobs - Di + Gi * (Mi - Mprior)...')
     Xi = Dobs - Di + Gi * (Mi - Mprior)
+    print('ok')
 
-    CMGiT = CM * Gi.T
+    if CMGiT is None:
+        print('computing CM . Gi.T...')
+        CMGiT = CM * Gi.T
+        print('ok')
 
+    print('computing CD + Gi . CM . Gi.T...')
     Ai = CD + Gi * CMGiT
+    print('ok')
 
+    print('computing (CD + Gi *. CM . Gi.T)^-1 . (Dobs - Di + Gi . (Mi - Mprior)) ...')
     if False:
         Aiinv_dot_Xi = spsolve(A=Ai, b=Xi)
     else:
         lu = splu(Ai)
         Aiinv_dot_Xi = lu.solve(Xi)
+    print('ok')
 
     error = np.abs(Xi - Ai * Aiinv_dot_Xi).sum()
     print('error on A.x=b : {}'.format(error))
 
+    print('computing CM . Gi.T . (CD + Gi . CM . Gi.T)^-1 . (Dobs - Di + Gi . (Mi - Mprior)) ...')
     KiXi = CMGiT * Aiinv_dot_Xi
+    print('ok')
 
     mu = 1.0
     Minew = Dinew = None
@@ -1148,15 +1213,18 @@ def optimize(argv, verbose, mapkwargs):
         CD = sp.load_npz(CDFILE)
         CDinv = sp.load_npz(CDINVFILE)
 
+        if not update_G:
+            # find the last version of the frechet derivatives, compute G0 if none is found
+            Gi = load_last_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
+            CMGiT = supertheory.get_CMGiT(CM, Gi)
+
         for _ in range(number_of_iterations):
             niter = lastiter()
 
             if update_G:
                 # compute frechet derivatives for this iteration (if not already computed)
                 Gi = update_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
-            else:
-                # find the last version of the frechet derivatives, compute G0 if none is found
-                Gi = load_last_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
+                CMGiT = supertheory.get_CMGiT(CM, Gi)
 
             # ==== save the current model state
             mfilename = MFILE.format(niter=niter)
@@ -1168,10 +1236,11 @@ def optimize(argv, verbose, mapkwargs):
             # Gi = sp.load_npz(fdfilename)
 
             # ==== update the current model
+
             has_nan = np.isnan(Dobs).any()
             Dinew, Minew = tv23_1(Dobs, Di, CD,
                        Mprior, M0, Mi, CM,
-                       Gi, supertheory)
+                       Gi, supertheory, CMGiT=CMGiT)
             if has_nan:
                 assert np.isnan(Dobs).any()
 
