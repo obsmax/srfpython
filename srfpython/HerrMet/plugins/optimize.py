@@ -1083,7 +1083,8 @@ def rm_nofail(filepath, verbose=True):
 
 def tv23_1(Dobs, Di, CD,
            Mprior, M0, Mi, CM,
-           Gi, supertheory, CMGiT=None,
+           Gi, supertheory,
+           CMGiT=None, LUi=None,
            verbose=False):
     """
     Tarantola Valette 1982 eq. 23, modified to control the step size
@@ -1112,20 +1113,23 @@ def tv23_1(Dobs, Di, CD,
         CMGiT = CM * Gi.T
         print('ok')
 
-    print('computing CD + Gi . CM . Gi.T...')
-    Ai = CD + Gi * CMGiT
-    print('ok')
+    Ai = None
+    if LUi is None:
+        print('computing CD + Gi . CM . Gi.T...')
+        Ai = CD + Gi * CMGiT
+        print('ok')
+
+        print('factorizing CD + Gi . CM . Gi.T...')
+        LUi = splu(Ai)
+        print('ok')
 
     print('computing (CD + Gi *. CM . Gi.T)^-1 . (Dobs - Di + Gi . (Mi - Mprior)) ...')
-    if False:
-        Aiinv_dot_Xi = spsolve(A=Ai, b=Xi)
-    else:
-        lu = splu(Ai)
-        Aiinv_dot_Xi = lu.solve(Xi)
+    Aiinv_dot_Xi = LUi.solve(Xi)
     print('ok')
 
-    error = np.abs(Xi - Ai * Aiinv_dot_Xi).sum()
-    print('error on A.x=b : {}'.format(error))
+    if Ai is not None:
+        error = np.abs(Xi - Ai * Aiinv_dot_Xi).sum()
+        print('error on A.x=b : {}'.format(error))
 
     print('computing CM . Gi.T . (CD + Gi . CM . Gi.T)^-1 . (Dobs - Di + Gi . (Mi - Mprior)) ...')
     KiXi = CMGiT * Aiinv_dot_Xi
@@ -1147,7 +1151,7 @@ def tv23_1(Dobs, Di, CD,
     if Minew is None:
         raise Exception('fail')
 
-    return Dinew, Minew
+    return Dinew, Minew, LUi
 
 
 def optimize(argv, verbose, mapkwargs):
@@ -1282,6 +1286,7 @@ def optimize(argv, verbose, mapkwargs):
         CD = sp.load_npz(CDFILE)
         CDinv = sp.load_npz(CDINVFILE)
 
+        LUi = None   # the factorized version of CD + Gi . CM . Gi^T
         if not update_G:
             # find the last version of the frechet derivatives, compute G0 if none is found
             Gi = load_last_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
@@ -1294,6 +1299,7 @@ def optimize(argv, verbose, mapkwargs):
                 # compute frechet derivatives for this iteration (if not already computed)
                 Gi = update_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
                 CMGiT = supertheory.get_CMGiT(CM, Gi, mapkwargs=mapkwargs, verbose=verbose)
+                LUi = None   # force recompute LUi since Gi has been updated
 
             # ==== save the current model state
             mfilename = MFILE.format(niter=niter)
@@ -1305,13 +1311,11 @@ def optimize(argv, verbose, mapkwargs):
             # Gi = sp.load_npz(fdfilename)
 
             # ==== update the current model
-
-            has_nan = np.isnan(Dobs).any()
-            Dinew, Minew = tv23_1(Dobs, Di, CD,
+            Dinew, Minew, LUi = tv23_1(Dobs, Di, CD,
                        Mprior, M0, Mi, CM,
-                       Gi, supertheory, CMGiT=CMGiT)
-            if has_nan:
-                assert np.isnan(Dobs).any()
+                       Gi, supertheory,
+                       CMGiT=CMGiT,
+                       LUi=LUi)
 
             # ==== save the new model state
             mfilename_new = MFILE.format(niter=niter + 1)
