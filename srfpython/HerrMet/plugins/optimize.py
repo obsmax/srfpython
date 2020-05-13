@@ -516,58 +516,6 @@ class NodeFileLocal(NodeFile):
 
         return rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril
 
-    def _fill_CM_triu_hsmooth_only(self, vs_uncertainties, rhod_triu):
-        nlayer = len(self.ztop)
-
-        CM_triu_rows = []
-        CM_triu_cols = []
-        CM_triu_data = []
-        for nnode in range(len(self)):
-            vs_unc_n = vs_uncertainties[nnode, :]
-
-            covnn_row = nnode * nlayer + np.arange(nlayer)
-            covnn_col = nnode * nlayer + np.arange(nlayer)
-            covnn_data = vs_unc_n ** 2.
-
-            CM_triu_rows.append(covnn_row)
-            CM_triu_cols.append(covnn_col)
-            CM_triu_data.append(covnn_data)
-
-            for mnode in range(nnode + 1, len(self)):
-                vs_unc_m = vs_uncertainties[mnode, :]
-
-                covnm_row = nnode * nlayer + np.arange(nlayer)
-                covnm_col = mnode * nlayer + np.arange(nlayer)
-                covnm_data = vs_unc_n * vs_unc_m * rhod_triu[nnode, mnode]
-
-                CM_triu_rows.append(covnm_row)
-                CM_triu_cols.append(covnm_col)
-                CM_triu_data.append(covnm_data)
-        CM_triu_rows = np.hstack(CM_triu_rows)
-        CM_triu_cols = np.hstack(CM_triu_cols)
-        CM_triu_data = np.hstack(CM_triu_data)
-        return CM_triu_rows, CM_triu_cols, CM_triu_data
-
-    def _fille_CM_triu_vsmooth_only(self, vs_uncertainties, rhoz_triu):
-        nlayer = len(self.ztop)
-        CM_triu_rows = []
-        CM_triu_cols = []
-        CM_triu_data = []
-        for nnode in range(len(self)):
-            vs_unc_n = vs_uncertainties[nnode, :]
-
-            covnn_triu_row = nnode * nlayer + rhoz_triu.row
-            covnn_triu_col = nnode * nlayer + rhoz_triu.col
-            covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
-
-            CM_triu_rows.append(covnn_triu_row)
-            CM_triu_cols.append(covnn_triu_col)
-            CM_triu_data.append(covnn_triu_data)
-        CM_triu_rows = np.hstack(CM_triu_rows)
-        CM_triu_cols = np.hstack(CM_triu_cols)
-        CM_triu_data = np.hstack(CM_triu_data)
-        return CM_triu_rows, CM_triu_cols, CM_triu_data
-
     def _fill_CM_triu_vsmooth_and_hsmooth(
             self, vs_uncertainties, rhod_triu,
             rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril):
@@ -619,6 +567,58 @@ class NodeFileLocal(NodeFile):
                 CM_triu_cols.append(covnm_col)
                 CM_triu_data.append(covnm_data)
 
+        CM_triu_rows = np.hstack(CM_triu_rows)
+        CM_triu_cols = np.hstack(CM_triu_cols)
+        CM_triu_data = np.hstack(CM_triu_data)
+        return CM_triu_rows, CM_triu_cols, CM_triu_data
+
+    def _fille_CM_triu_vsmooth_only(self, vs_uncertainties, rhoz_triu):
+        nlayer = len(self.ztop)
+        CM_triu_rows = []
+        CM_triu_cols = []
+        CM_triu_data = []
+        for nnode in range(len(self)):
+            vs_unc_n = vs_uncertainties[nnode, :]
+
+            covnn_triu_row = nnode * nlayer + rhoz_triu.row
+            covnn_triu_col = nnode * nlayer + rhoz_triu.col
+            covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
+
+            CM_triu_rows.append(covnn_triu_row)
+            CM_triu_cols.append(covnn_triu_col)
+            CM_triu_data.append(covnn_triu_data)
+        CM_triu_rows = np.hstack(CM_triu_rows)
+        CM_triu_cols = np.hstack(CM_triu_cols)
+        CM_triu_data = np.hstack(CM_triu_data)
+        return CM_triu_rows, CM_triu_cols, CM_triu_data
+
+    def _fill_CM_triu_hsmooth_only(self, vs_uncertainties, rhod_triu):
+        nlayer = len(self.ztop)
+
+        CM_triu_rows = []
+        CM_triu_cols = []
+        CM_triu_data = []
+        for nnode in range(len(self)):
+            vs_unc_n = vs_uncertainties[nnode, :]
+
+            covnn_row = nnode * nlayer + np.arange(nlayer)
+            covnn_col = nnode * nlayer + np.arange(nlayer)
+            covnn_data = vs_unc_n ** 2.
+
+            CM_triu_rows.append(covnn_row)
+            CM_triu_cols.append(covnn_col)
+            CM_triu_data.append(covnn_data)
+
+            for mnode in range(nnode + 1, len(self)):
+                vs_unc_m = vs_uncertainties[mnode, :]
+
+                covnm_row = nnode * nlayer + np.arange(nlayer)
+                covnm_col = mnode * nlayer + np.arange(nlayer)
+                covnm_data = vs_unc_n * vs_unc_m * rhod_triu[nnode, mnode]
+
+                CM_triu_rows.append(covnm_row)
+                CM_triu_cols.append(covnm_col)
+                CM_triu_data.append(covnm_data)
         CM_triu_rows = np.hstack(CM_triu_rows)
         CM_triu_cols = np.hstack(CM_triu_cols)
         CM_triu_data = np.hstack(CM_triu_data)
