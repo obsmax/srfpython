@@ -325,8 +325,10 @@ class NodeFileLocal(NodeFile):
             verbose=True,
             mapkwargs=None):
 
-        if norm != "L1":
-            raise NotImplementedError('L2 not recommended (unstable)')
+        if verbose:
+            print('compute CM ...')
+        # if norm != "L1":
+        #     raise NotImplementedError('L2 not recommended (unstable)')
         vsd = vertical_smoothing_distance
         hsd = horizontal_smoothing_distance
         tvsd = trunc_vertical_smoothing_distance
@@ -374,7 +376,7 @@ class NodeFileLocal(NodeFile):
             CM_triu_data = []
 
             if verbose:
-                wb = waitbarpipe()
+                wb = waitbarpipe('    filling CM')
 
             for nnode in range(len(self)):
                 vs_unc_n = vs_uncertainties[nnode, :]
@@ -397,7 +399,7 @@ class NodeFileLocal(NodeFile):
 
                             vs_unc_m = vs_uncertainties[mnode, :]
 
-                            if 1:
+                            if True:
                                 covnm_row = np.zeros(rhoz_nupper + rhoz_nlower, int)
                                 covnm_col = np.zeros(rhoz_nupper + rhoz_nlower, int)
                                 covnm_data = np.zeros(rhoz_nupper + rhoz_nlower, float)
@@ -417,7 +419,7 @@ class NodeFileLocal(NodeFile):
                                 CM_triu_data.append(covnm_data)
                             else:
                                 # only accounts for the diagonal terms since nnode != mnode
-                                raise Exception('seems wrong : inversion fails')
+                                # raise Exception('seems wrong : inversion fails')
                                 covnm_row = nnode * nlayer + np.arange(nlayer)
                                 covnm_col = mnode * nlayer + np.arange(nlayer)
                                 covnm_data = vs_unc_n * vs_unc_m * rhod_triu[nnode, mnode]
@@ -458,6 +460,8 @@ class NodeFileLocal(NodeFile):
                            shape=(n_parameters, n_parameters), dtype=float)
 
         # =========== fix truncature issues,
+        if verbose:
+            print('    factorize CM = Vp * Lp * Vp.T')
         # approximate CM = Vp * Lp * Vp.T
         # where Vp are the first eigenvectors
         #       Lp is strictly diagonal and positive
@@ -468,7 +472,7 @@ class NodeFileLocal(NodeFile):
         CM = CM_triu + sp.tril(CM_triu.T, k=-1, format="csc")  # add lower triangle without diag (already in triu)
         del CM_triu
         CM_first_eigenvalues, CM_first_eigenvectors = \
-            eigsh(CM, k=CM.shape[0] // 4)
+            eigsh(CM, k=CM.shape[0] // 2, which="LM")
         del CM
         I = CM_first_eigenvalues > 0.
 
@@ -1411,10 +1415,9 @@ def optimize(argv, verbose, mapkwargs):
         if verbose:
             print('get Mprior...')
         Mprior = superparameterizer.get_Mprior()
+
         if verbose:
             print('done')
-
-            print('get CM_triu ...')
 
         CM_Vp, CM_Lp = nodefile.get_CM(
             horizontal_smoothing_distance=horizontal_smoothing_distance,
