@@ -4,7 +4,7 @@ import warnings
 import glob, os
 import numpy as np
 from scipy import sparse as sp
-from scipy.sparse.linalg import spsolve, splu  #inv as sparse_inv NO!!!
+from scipy.sparse.linalg import spsolve, splu, eigsh  #inv as sparse_inv NO!!!
 import matplotlib.pyplot as plt
 from srfpython.HerrMet.nodefile import NodeFile
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel1D
@@ -313,7 +313,8 @@ class NodeFileLocal(NodeFile):
         return n_data_points, n_parameters, superdatacoder, superparameterizer, supertheory
 
     def get_CM(
-            self, horizontal_smoothing_distance, vertical_smoothing_distance,
+            self, horizontal_smoothing_distance,
+            vertical_smoothing_distance,
             trunc_horizontal_smoothing_distance=0.,
             trunc_vertical_smoothing_distance=0.,
             lock_half_space=True,
@@ -338,14 +339,11 @@ class NodeFileLocal(NodeFile):
             raise ValueError(vsd, tvsd, hsd, thsd)
 
         # ========= load vs uncertainty array at each node
-        print('    get_vs_uncertainties')
-        vs_uncertainties = self.get_vs_uncertainties(
+        vs_uncertainties = self._get_vs_uncertainties(
             scale_uncertainties=scale_uncertainties,
             add_uncertainty=add_uncertainty,
             lock_half_space=lock_half_space,
-            lock_half_space_sigma=lock_half_space_sigma,
-            mapkwargs=mapkwargs)
-        print('    done')
+            lock_half_space_sigma=lock_half_space_sigma)
 
         # =========== Compute CM_triu with truncature
         nnodes = len(self)
@@ -353,132 +351,47 @@ class NodeFileLocal(NodeFile):
         n_parameters = nlayer * nnodes
         vsmooth = vsd > 0 and tvsd > 0
         hsmooth = hsd > 0 and thsd > 0
-        if not (vsmooth or hsmooth):
-            # no smoothing at all, easy
-            CM_triu = sp.diags(vs_uncertainties.flat[:] ** 2.0,
-                       shape=(n_parameters, n_parameters),
-                       format="csc", dtype=float)
-        else:
 
-            # =========== prepare smoothing
-            print('    prepare_vertical_smoothing')
+        # =========== prepare smoothing
+        rhoz_nupper = rhoz_nlower = rhoz_triu = \
+            rhoz_tril = rhod_triu = None  # prevent editor warning
+
+        if vsmooth:
             rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril = \
-                self.prepare_vertical_smoothing(vsd, tvsd, norm=norm)
-            print('    done')
+                self._prepare_vertical_smoothing(
+                    vsd, tvsd, norm=norm, verbose=verbose)
 
-            print('    prepare_horizontal_smoothing')
-            rhod_triu = self.prepare_horizontal_smoothing(hsd, thsd, norm=norm, mapkwargs=mapkwargs)
-            print('    done')
+        if hsmooth:
+            rhod_triu = self._prepare_horizontal_smoothing(
+                hsd, thsd, norm=norm,
+                mapkwargs=mapkwargs,
+                verbose=verbose)
 
-            # ===========
-            CM_triu_rows = []
-            CM_triu_cols = []
-            CM_triu_data = []
+        # =========== fill CM_triu
+        if vsmooth and hsmooth:  # both
+            CM_triu_rows, CM_triu_cols, CM_triu_data = \
+                self._fill_CM_triu_vsmooth_and_hsmooth(
+                vs_uncertainties, rhod_triu,
+                rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril)
 
-            if verbose:
-                wb = waitbarpipe('    filling CM')
+        elif vsmooth:  # only
+            CM_triu_rows, CM_triu_cols, CM_triu_data = \
+                self._fille_CM_triu_vsmooth_only(vs_uncertainties, rhoz_triu)
 
-            for nnode in range(len(self)):
-                vs_unc_n = vs_uncertainties[nnode, :]
+        elif hsmooth:  # only
+            CM_triu_rows, CM_triu_cols, CM_triu_data = \
+                self._fill_CM_triu_hsmooth_only(vs_uncertainties, rhod_triu)
 
-                if vsmooth:
+        else:
+            # no smoothing at all, simplest case
+            CM_triu_rows = CM_triu_cols = np.arange(n_parameters)
+            CM_triu_data = vs_uncertainties.flat[:] ** 2.0
 
-                    covnn_triu_row = nnode * nlayer + rhoz_triu.row
-                    covnn_triu_col = nnode * nlayer + rhoz_triu.col
-                    covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
+        CM_triu = sp.csc_matrix((CM_triu_data, (CM_triu_rows, CM_triu_cols)),
+                       shape=(n_parameters, n_parameters), dtype=float)
 
-                    CM_triu_rows.append(covnn_triu_row)
-                    CM_triu_cols.append(covnn_triu_col)
-                    CM_triu_data.append(covnn_triu_data)
-
-                    if hsmooth:
-
-                        for mnode in range(nnode + 1, len(self)):
-                            if rhod_triu[nnode, mnode] == 0.:
-                                continue
-
-                            vs_unc_m = vs_uncertainties[mnode, :]
-
-                            if True:
-                                covnm_row = np.zeros(rhoz_nupper + rhoz_nlower, int)
-                                covnm_col = np.zeros(rhoz_nupper + rhoz_nlower, int)
-                                covnm_data = np.zeros(rhoz_nupper + rhoz_nlower, float)
-
-                                covnm_row[:rhoz_nupper] = nnode * nlayer + rhoz_triu.row
-                                covnm_col[:rhoz_nupper] = mnode * nlayer + rhoz_triu.col
-                                covnm_data[:rhoz_nupper] = vs_unc_n[rhoz_triu.row] * vs_unc_m[rhoz_triu.col] \
-                                                  * rhoz_triu.data * rhod_triu[nnode, mnode]
-
-                                covnm_row[rhoz_nupper:] = nnode * nlayer + rhoz_tril.row
-                                covnm_col[rhoz_nupper:] = mnode * nlayer + rhoz_tril.col
-                                covnm_data[rhoz_nupper:] = vs_unc_n[rhoz_tril.row] * vs_unc_m[rhoz_tril.col] \
-                                                  * rhoz_tril.data * rhod_triu[nnode, mnode]
-
-                                CM_triu_rows.append(covnm_row)
-                                CM_triu_cols.append(covnm_col)
-                                CM_triu_data.append(covnm_data)
-                            else:
-                                # only accounts for the diagonal terms since nnode != mnode
-                                # raise Exception('seems wrong : inversion fails')
-                                covnm_row = nnode * nlayer + np.arange(nlayer)
-                                covnm_col = mnode * nlayer + np.arange(nlayer)
-                                covnm_data = vs_unc_n * vs_unc_m * rhod_triu[nnode, mnode]
-                                CM_triu_rows.append(covnm_row)
-                                CM_triu_cols.append(covnm_col)
-                                CM_triu_data.append(covnm_data)
-
-                else:
-                    assert hsmooth  # implicit
-                    covnn_row = nnode * nlayer + np.arange(nlayer)
-                    covnn_col = nnode * nlayer + np.arange(nlayer)
-                    covnn_data = vs_unc_n ** 2.
-
-                    CM_triu_rows.append(covnn_row)
-                    CM_triu_cols.append(covnn_col)
-                    CM_triu_data.append(covnn_data)
-
-                    for mnode in range(nnode + 1, len(self)):
-                        vs_unc_m = vs_uncertainties[mnode, :]
-
-                        covnm_row = nnode * nlayer + np.arange(nlayer)
-                        covnm_col = mnode * nlayer + np.arange(nlayer)
-                        covnm_data = vs_unc_n * vs_unc_m * rhod_triu[nnode, mnode]
-
-                        CM_triu_rows.append(covnm_row)
-                        CM_triu_cols.append(covnm_col)
-                        CM_triu_data.append(covnm_data)
-
-                if verbose:
-                    wb.refresh(nnode / float(len(self)))
-
-            if verbose:
-                wb.close()
-            CM_triu_rows = np.hstack(CM_triu_rows)
-            CM_triu_cols = np.hstack(CM_triu_cols)
-            CM_triu_data = np.hstack(CM_triu_data)
-            CM_triu = sp.csc_matrix((CM_triu_data, (CM_triu_rows, CM_triu_cols)),
-                           shape=(n_parameters, n_parameters), dtype=float)
-
-        # =========== fix truncature issues,
-        if verbose:
-            print('    factorize CM = Vp * Lp * Vp.T')
-        # approximate CM = Vp * Lp * Vp.T
-        # where Vp are the first eigenvectors
-        #       Lp is strictly diagonal and positive
-        #       Vp.T * Vp = Id
-        #       Vp * Vp.T != Id
-        from scipy.sparse.linalg import eigsh
-
-        CM = CM_triu + sp.tril(CM_triu.T, k=-1, format="csc")  # add lower triangle without diag (already in triu)
-        del CM_triu
-        CM_first_eigenvalues, CM_first_eigenvectors = \
-            eigsh(CM, k=CM.shape[0] // 2, which="LM")
-        del CM
-        I = CM_first_eigenvalues > 0.
-
-        CM_Vp = sp.csc_matrix(CM_first_eigenvectors[:, I])
-        CM_Lp = sp.diags(CM_first_eigenvalues[I], format="csc")
-        CM_Vp.prune()
+        # =========== factorize CM
+        CM_Vp, CM_Lp = self.factorize_CM_triu(CM_triu, verbose=verbose)
 
         if visual_qc:
             CM = CM_Vp * CM_Lp * CM_Vp.T
@@ -493,7 +406,144 @@ class NodeFileLocal(NodeFile):
 
         return CM_Vp, CM_Lp  # to reconstruct CM, use CM_Vp * CM_Lp * CM_Vp.T
 
-    def prepare_horizontal_smoothing(self, hsd, thsd, norm, mapkwargs):
+    def factorize_CM_triu(self, CM_triu, verbose):
+        """
+        approximate CM = Vp * Lp * Vp.T
+        where Vp are the first eigenvectors
+              Lp is strictly diagonal and positive
+              Vp.T * Vp = Id
+              Vp * Vp.T != Id
+        """
+
+        if verbose:
+            print('    factorize CM = Vp * Lp * Vp.T')
+
+        CM = CM_triu + sp.tril(CM_triu.T, k=-1, format="csc")  # add lower triangle without diag (already in triu)
+        del CM_triu
+
+        CM_first_eigenvalues, CM_first_eigenvectors = \
+            eigsh(CM, k=CM.shape[0] // 2, which="LM")
+        del CM
+
+        I = CM_first_eigenvalues > 0.
+        CM_Vp = sp.csc_matrix(CM_first_eigenvectors[:, I])
+        CM_Lp = sp.diags(CM_first_eigenvalues[I], format="csc")
+        CM_Vp.prune()
+
+        return CM_Vp, CM_Lp
+
+    def _fill_CM_triu_hsmooth_only(self, vs_uncertainties, rhod_triu):
+        nlayer = len(self.ztop)
+
+        CM_triu_rows = []
+        CM_triu_cols = []
+        CM_triu_data = []
+        for nnode in range(len(self)):
+            vs_unc_n = vs_uncertainties[nnode, :]
+
+            covnn_row = nnode * nlayer + np.arange(nlayer)
+            covnn_col = nnode * nlayer + np.arange(nlayer)
+            covnn_data = vs_unc_n ** 2.
+
+            CM_triu_rows.append(covnn_row)
+            CM_triu_cols.append(covnn_col)
+            CM_triu_data.append(covnn_data)
+
+            for mnode in range(nnode + 1, len(self)):
+                vs_unc_m = vs_uncertainties[mnode, :]
+
+                covnm_row = nnode * nlayer + np.arange(nlayer)
+                covnm_col = mnode * nlayer + np.arange(nlayer)
+                covnm_data = vs_unc_n * vs_unc_m * rhod_triu[nnode, mnode]
+
+                CM_triu_rows.append(covnm_row)
+                CM_triu_cols.append(covnm_col)
+                CM_triu_data.append(covnm_data)
+        CM_triu_rows = np.hstack(CM_triu_rows)
+        CM_triu_cols = np.hstack(CM_triu_cols)
+        CM_triu_data = np.hstack(CM_triu_data)
+        return CM_triu_rows, CM_triu_cols, CM_triu_data
+
+    def _fille_CM_triu_vsmooth_only(self, vs_uncertainties, rhoz_triu):
+        nlayer = len(self.ztop)
+        CM_triu_rows = []
+        CM_triu_cols = []
+        CM_triu_data = []
+        for nnode in range(len(self)):
+            vs_unc_n = vs_uncertainties[nnode, :]
+
+            covnn_triu_row = nnode * nlayer + rhoz_triu.row
+            covnn_triu_col = nnode * nlayer + rhoz_triu.col
+            covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
+
+            CM_triu_rows.append(covnn_triu_row)
+            CM_triu_cols.append(covnn_triu_col)
+            CM_triu_data.append(covnn_triu_data)
+        CM_triu_rows = np.hstack(CM_triu_rows)
+        CM_triu_cols = np.hstack(CM_triu_cols)
+        CM_triu_data = np.hstack(CM_triu_data)
+        return CM_triu_rows, CM_triu_cols, CM_triu_data
+
+    def _fill_CM_triu_vsmooth_and_hsmooth(
+            self, vs_uncertainties, rhod_triu,
+            rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril):
+
+        nlayer = len(self.ztop)
+
+        CM_triu_rows = []
+        CM_triu_cols = []
+        CM_triu_data = []
+
+        for nnode in range(len(self)):
+            vs_unc_n = vs_uncertainties[nnode, :]
+
+            covnn_triu_row = nnode * nlayer + rhoz_triu.row
+            covnn_triu_col = nnode * nlayer + rhoz_triu.col
+            covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
+
+            CM_triu_rows.append(covnn_triu_row)
+            CM_triu_cols.append(covnn_triu_col)
+            CM_triu_data.append(covnn_triu_data)
+
+            for mnode in range(nnode + 1, len(self)):
+                if rhod_triu[nnode, mnode] == 0.:
+                    continue
+
+                vs_unc_m = vs_uncertainties[mnode, :]
+
+                covnm_row = np.zeros(rhoz_nupper + rhoz_nlower, int)
+                covnm_col = np.zeros(rhoz_nupper + rhoz_nlower, int)
+                covnm_data = np.zeros(rhoz_nupper + rhoz_nlower, float)
+
+                covnm_row[:rhoz_nupper] = nnode * nlayer + rhoz_triu.row
+                covnm_col[:rhoz_nupper] = mnode * nlayer + rhoz_triu.col
+                covnm_data[:rhoz_nupper] = \
+                    vs_unc_n[rhoz_triu.row] * \
+                    vs_unc_m[rhoz_triu.col] * \
+                    rhoz_triu.data * \
+                    rhod_triu[nnode, mnode]
+
+                covnm_row[rhoz_nupper:] = nnode * nlayer + rhoz_tril.row
+                covnm_col[rhoz_nupper:] = mnode * nlayer + rhoz_tril.col
+                covnm_data[rhoz_nupper:] = \
+                    vs_unc_n[rhoz_tril.row] * \
+                    vs_unc_m[rhoz_tril.col] * \
+                    rhoz_tril.data * \
+                    rhod_triu[nnode, mnode]
+
+                CM_triu_rows.append(covnm_row)
+                CM_triu_cols.append(covnm_col)
+                CM_triu_data.append(covnm_data)
+
+        CM_triu_rows = np.hstack(CM_triu_rows)
+        CM_triu_cols = np.hstack(CM_triu_cols)
+        CM_triu_data = np.hstack(CM_triu_data)
+        return CM_triu_rows, CM_triu_cols, CM_triu_data
+
+    def _prepare_horizontal_smoothing(self, hsd, thsd, norm, mapkwargs, verbose=True):
+        if verbose:
+            print('    prepare_horizontal_smoothing')
+
         if hsd == 0 and thsd == 0:
             rhod_triu = None
 
@@ -543,9 +593,16 @@ class NodeFileLocal(NodeFile):
 
             rhod_triu = sp.csc_matrix((rhod_datas, (rhod_rows, rhod_cols)),
                                       shape=(Nnodes, Nnodes), dtype=float)
+
+        if verbose:
+            print('    done')
+
         return rhod_triu
 
-    def prepare_vertical_smoothing(self, vsd, tvsd, norm):
+    def _prepare_vertical_smoothing(self, vsd, tvsd, norm, verbose=True):
+        if verbose:
+            print('    prepare_vertical_smoothing')
+
         if vsd == 0 and tvsd == 0:
             rhoz_nupper = rhoz_nlower = rhoz_triu = rhoz_tril = None
         else:
@@ -562,43 +619,18 @@ class NodeFileLocal(NodeFile):
             rhoz_tril = sp.tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
             rhoz_nupper, rhoz_nlower = len(rhoz_triu.data), len(rhoz_tril.data)
 
+        if verbose:
+            print('    done')
+
         return rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril
 
-    def get_vs_uncertainties(self, scale_uncertainties, add_uncertainty, lock_half_space, lock_half_space_sigma, mapkwargs):
+    def _get_vs_uncertainties(self, scale_uncertainties, add_uncertainty, lock_half_space, lock_half_space_sigma):
         ztop = self.ztop
         zmid = self.zmid
         nnodes = len(self)
         nlayer = len(ztop)
 
         vs_uncertainties = np.zeros((nnodes, nlayer), float)  # one row per node, one col per layer
-        #
-        # def job_generator():
-        #     for nnode in range(nnodes):
-        #         p16file, p84file = self.p16files[nnode], self.p84files[nnode]
-        #         yield Job(nnode, p16file, p84file)
-        #
-        # def job_handler(nnode, p16file, p84file):
-        #     vs84_n = depthmodel_from_mod96(p84file).vs
-        #     vs16_n = depthmodel_from_mod96(p16file).vs
-        #     vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
-        #     vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
-        #     vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
-        #     vs_unc_n = scale_uncertainties * vs_unc_n + add_uncertainty
-        #
-        #     if lock_half_space:
-        #         vs_unc_n[-1] = lock_half_space_sigma
-        #
-        #     # make sure all uncertainties are positive
-        #     vs_unc_n = np.clip(vs_unc_n, lock_half_space_sigma, np.inf)
-        #     return nnode, vs_unc_n
-        #
-        # if mapkwargs is None:
-        #     mapkwargs = {}
-        # with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
-        #     for jobid, (nnode, vs_unc_n), _, _ in ma:
-        #         vs_uncertainties[nnode, :] = vs_unc_n
-        # return vs_uncertainties
-
 
         for nnode in range(nnodes):
             vs84_n = depthmodel_from_mod96(self.p84files[nnode]).vs
