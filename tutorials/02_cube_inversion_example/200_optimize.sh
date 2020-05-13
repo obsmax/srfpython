@@ -19,7 +19,7 @@ HerrMet --optimize -init ../nodes.txt \
           100. 2. \
           1 \
           1.0 0.5 \
-  -upd 3 1 \
+  -upd 3 0 \
   -save
 
 # still not work

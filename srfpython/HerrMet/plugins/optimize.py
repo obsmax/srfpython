@@ -34,7 +34,8 @@ FDFILES = os.path.join(WORKINGDIR, ROOTKEY + "G[0-9][0-9][0-9].npz")
 DOBSFILE = os.path.join(WORKINGDIR, ROOTKEY + "Dobs.npy")
 CDFILE = os.path.join(WORKINGDIR, ROOTKEY + "CD.npz")
 CDINVFILE = os.path.join(WORKINGDIR, ROOTKEY + "CDinv.npz")
-CMFILE = os.path.join(WORKINGDIR, ROOTKEY + "CM_triu.npz")
+CMVPFILE = os.path.join(WORKINGDIR, ROOTKEY + "CMVP.npz")
+CMLPFILE = os.path.join(WORKINGDIR, ROOTKEY + "CMLP.npz")
 
 SUPERPARAMETERIZERFILE = os.path.join(WORKINGDIR, ROOTKEY + "SP.pkl")
 SUPERDATACODERFILE = os.path.join(WORKINGDIR, ROOTKEY + "SD.pkl")
@@ -51,7 +52,7 @@ CLEAR_LIST = [
      DOBSFILE,
      CDFILE,
      CDINVFILE,
-     CMFILE,
+     CMVPFILE, CMLPFILE,
      MFILES,
      DFILES,
      FDFILES,
@@ -117,7 +118,7 @@ long_help = """\
 """.format(workingdir=WORKINGDIR,
            nodefilelocal=NODEFILELOCAL,
            mpriorfile=MPRIORFILE,
-           cmfile=CMFILE,
+           cmfile=CMVPFILE+"|"+CMLPFILE,
            dobsfile=DOBSFILE,
            cdfile=CDFILE,
            fdfile=FDFILES)
@@ -465,17 +466,18 @@ class NodeFileLocal(NodeFile):
         from scipy.sparse.linalg import eigsh
 
         CM = CM_triu + sp.tril(CM_triu.T, k=-1, format="csc")  # add lower triangle without diag (already in triu)
-        CM_first_eigenvalues, CM_first_eigenvectors = eigsh(CM, k=CM.shape[0] // 4)
+        del CM_triu
+        CM_first_eigenvalues, CM_first_eigenvectors = \
+            eigsh(CM, k=CM.shape[0] // 4)
         del CM
         I = CM_first_eigenvalues > 0.
 
         CM_Vp = sp.csc_matrix(CM_first_eigenvectors[:, I])
         CM_Lp = sp.diags(CM_first_eigenvalues[I], format="csc")
-
-        CM_triu = sp.triu(CM_Vp * CM_Lp * CM_Vp.T)
+        CM_Vp.prune()
 
         if visual_qc:
-            CM = CM_triu + sp.tril(CM_triu.T, k=-1, format="csc")  # add lower triangle without diag (already in triu)
+            CM = CM_Vp * CM_Lp * CM_Vp.T
 
             if CM.shape[0] > 2000:
                 raise Exception('CM is too large')
@@ -485,7 +487,7 @@ class NodeFileLocal(NodeFile):
             plt.imshow(A)
             plt.show()
 
-        return CM_triu
+        return CM_Vp, CM_Lp  # to reconstruct CM, use CM_Vp * CM_Lp * CM_Vp.T
 
     def prepare_horizontal_smoothing(self, hsd, thsd, norm, mapkwargs):
         if hsd == 0 and thsd == 0:
@@ -999,17 +1001,17 @@ class SuperTheory(object):
         # return CMGiT
 
 
-def load_CM(CMFILE):
+def load_CM(cmvpfile=CMVPFILE, cmlpfile=CMLPFILE):
     # load CM_triu and compute full CM 
 
-    CM_triu = sp.load_npz(CMFILE)
-    if sp.isspmatrix_dia(CM_triu):
-        CM = CM_triu
+    CM_Vp = sp.load_npz(cmvpfile)
+    CM_Lp = sp.load_npz(cmlpfile)
 
-    else:
-        CM = CM_triu + CM_triu.T - sp.diags(CM_triu.diagonal())
+    assert sp.issparse(CM_Vp)
+    assert sp.issparse(CM_Lp)
 
-    return CM
+    # CM = CM_Vp * CM_Lp * CM_Vp.T
+    return CM_Vp, CM_Lp
 
 #
 # def sparsedet(M):
@@ -1118,49 +1120,27 @@ def sparse_cholesky(A):
         raise Exception('The matrix is not positive definite')
 
 
-def chi2_model(Model, Mprior, CM):
+def chi2_model(Model, Mprior, CM_Vp, CM_Lp):
 
-    assert sp.issparse(CM)
+    assert sp.issparse(CM_Vp)
     assert not sp.issparse(Model - Mprior)
 
-    cost = np.dot(Model - Mprior, Ainv_dot_b(A=CM, b=Model - Mprior))
-    if cost < 0.:
-        print('\n\n\n')
-        warnings.warn('the model cost was negative (numerical instability?)')
-        print('\n\n\n')
+    cost = (np.asarray(CM_Vp.T * (Model - Mprior)) ** 2. * CM_Lp.diagonal() ** -1.0).sum()
 
-        x = Ainv_dot_b(A=CM, b=Model - Mprior)
-        plt.figure()
-        plt.subplot(211)
-        plt.plot(Model - Mprior)
-        plt.plot(CM * x)
-        plt.subplot(212, sharex=plt.gca())
-        plt.plot((Model - Mprior) - CM * x)
-        plt.show()
+    test = False
+    if test:
+        print(cost)
 
+        # test1
+        CMinv = CM_Vp * sp.diags(CM_Lp.diagonal() ** -1.) * CM_Vp.T
+        cost = np.dot(Model - Mprior, CMinv * (Model - Mprior))
+        print(cost)
 
-        lu = splu(CM)
-        b1 = lu.solve(Model - Mprior)
-        b2 = spsolve(CM, Model - Mprior)
-        plt.figure()
-        plt.plot(b1)
-        plt.plot(b2)
-        plt.show()
+        # test2
+        CM = CM_Vp * CM_Lp * CM_Vp.T
+        cost = np.dot(Model - Mprior, Ainv_dot_b(A=CM, b=Model - Mprior))
+        print(cost)
 
-
-#    L = sparse_cholesky(CM)
-
-    # plt.figure()
-    # plt.subplot(211)
-    # plt.plot(Model - Mprior)
-    # plt.plot(Ainv_dot_b(A=CM, b=Model - Mprior))
-    # plt.subplot(212, sharex=plt.gca())
-    # plt.plot((Model - Mprior) * Ainv_dot_b(A=CM, b=Model - Mprior))
-    # plt.show()
-    #
-
-    # use only the diagonal terms of the covariance matrix
-    # cost = np.dot(Model - Mprior, Ainv_dot_b(A=sp.diags(CM.diagonal()), b=Model - Mprior))
     return cost
 
 
@@ -1230,78 +1210,131 @@ def rm_nofail(filepath, verbose=True):
     elif verbose:
         print('could not remove {} (no files)'.format(filepath))
 
+from srfpython.standalone.multipro8 import WorkerError
+class TV23_1(object):
+    def __init__(self, Dobs, CD, Mprior, CM_Vp, CM_Lp, M0, supertheory, verbose=True):
+        self.Dobs = Dobs
+        self.CD = CD
+        self.Mprior = Mprior
+        self.CM_Vp = CM_Vp
+        self.CM_Lp = CM_Lp
+        self.M0 = M0
+        self.supertheory = supertheory
+        self.verbose = verbose
 
-def tv23_1(Dobs, Di, CD,
-           Mprior, M0, Mi, CM,
-           Gi, supertheory,
-           CMGiT=None, LUi=None,
-           verbose=False):
-    """
-    Tarantola Valette 1982 eq. 23, modified to control the step size
-    :param Dobs:
-    :param Di:
-    :param CD:
-    :param Mprior:
-    :param M0:
-    :param Mi:
-    :param CM:
-    :param Gi:
-    :param supertheory:
-    :return:
-    """
-    # nan issues
-    # nan can occur in the predicted data if a data point is above the cut off period
-    # let ignore them
-    Inan = np.isnan(Di) | np.isnan(Dobs)
-    Dobs[Inan] = Di[Inan] = 0.
-    print('computing Dobs - Di + Gi * (Mi - Mprior)...')
-    Xi = Dobs - Di + Gi * (Mi - Mprior)
-    print('ok')
+        self.Gi = None
+        self.CMGiT = None
+        self.LUi = None
 
-    if CMGiT is None:
-        print('computing CM . Gi.T...')
-        CMGiT = CM * Gi.T
-        print('ok')
+    def update_G(self, Gi):
+        self.Gi = Gi
 
-    Ai = None
-    if LUi is None:
-        print('computing CD + Gi . CM . Gi.T...')
-        Ai = CD + Gi * CMGiT
-        print('ok')
+        if self.verbose:
+            print('computing CM * Gi.T')
+        GiVp = Gi * self.CM_Vp
+        VpLp = self.CM_Vp * self.CM_Lp
+        self.CMGiT = VpLp * GiVp.T  # CM * Gi.T
 
-        print('factorizing CD + Gi . CM . Gi.T...')
-        LUi = splu(Ai)
-        print('ok')
+        if self.verbose:
+            print('computing Ai = CD + Gi * CM * Gi.T')
+        Ai = self.CD + Gi * self.CMGiT
 
-    print('computing (CD + Gi *. CM . Gi.T)^-1 . (Dobs - Di + Gi . (Mi - Mprior)) ...')
-    Aiinv_dot_Xi = LUi.solve(Xi)
-    print('ok')
+        if self.verbose:
+            print('factorizing Ai')
+        self.LUi = splu(Ai)
 
-    if Ai is not None:
-        error = np.abs(Xi - Ai * Aiinv_dot_Xi).sum()
-        print('error on A.x=b : {}'.format(error))
+    def solve(self, Di, Mi):
+        Inan = np.isnan(Di) | np.isnan(self.Dobs)
+        self.Dobs[Inan] = Di[Inan] = 0.
+        if self.verbose:
+            print('computing Xi = Dobs - Di + Gi * (Mi - Mprior)...')
+        Xi = self.Dobs - Di + self.Gi * (Mi - self.Mprior)
 
-    print('computing CM . Gi.T . (CD + Gi . CM . Gi.T)^-1 . (Dobs - Di + Gi . (Mi - Mprior)) ...')
-    KiXi = CMGiT * Aiinv_dot_Xi
-    print('ok')
+        if self.verbose:
+            print('solving Ai * x = Xi for x')
+        Aiinv_dot_Xi = self.LUi.solve(Xi)
 
-    mu = 1.0
-    Minew = Dinew = None
-    while mu > 0.001:
-        try:
-            Minew = Mi + mu * (M0 + KiXi - Mi)
-            Dinew = supertheory(Minew)
-            break
-        except CPiSDomainError as e:
-            print('the step was too large and leaded to an error in the forward problem \n({}), '
-                  'try reducing the step length'.format(str(e)))
-            mu /= 2.0
-            continue
+        if self.verbose:
+            print('computing CM * Gi.T * x')
 
-    if Minew is None:
-        raise Exception('fail')
+        KiXi = self.CMGiT * Aiinv_dot_Xi
 
-    return Dinew, Minew, LUi
+        mu = 1.0
+        Minew = Dinew = None
+
+        while mu > 0.001:
+            try:
+                Minew = Mi + mu * (self.M0 + KiXi - Mi)
+                Dinew = self.supertheory(Minew)
+                break
+            except (WorkerError, CPiSDomainError) as e:
+                print('the step was too large and leaded to an error in the forward problem \n({}), '
+                      'try reducing the step length'.format(str(e)))
+                mu /= 2.0
+                continue
+
+        if Minew is None:
+            raise Exception('fail')
+
+        return Dinew, Minew
+
+
+# def tv23_1(Dobs, Di, CD,
+#            Mprior, M0, Mi, CM_Vp, CM_Lp,
+#            Gi, supertheory,
+#            CMGiT=None, LUi=None,
+#            verbose=True):
+#     """
+#     Tarantola Valette 1982 eq. 23, modified to control the step size
+#     :param Dobs:
+#     :param Di:
+#     :param CD:
+#     :param Mprior:
+#     :param M0:
+#     :param Mi:
+#     :param CM:
+#     :param Gi:
+#     :param supertheory:
+#     :return:
+#     """
+#     # nan issues
+#     # nan can occur in the predicted data if a data point is above the cut off period
+#     # let ignore them
+#     Inan = np.isnan(Di) | np.isnan(Dobs)
+#     Dobs[Inan] = Di[Inan] = 0.
+#     print('computing Dobs - Di + Gi * (Mi - Mprior)...')
+#     Xi = Dobs - Di + Gi * (Mi - Mprior)
+#     print('ok')
+#
+#     if CMGiT is None:
+#         GiVp = Gi * CM_Vp
+#         VpLp = CM_Vp * CM_Lp
+#         CMGiT = VpLp * GiVp.T  # CM * Gi.T
+#
+#     if LUi is None:
+#         Ai = CD + Gi * CMGiT
+#         LUi = splu(Ai)
+#
+#     Aiinv_dot_Xi = LUi.solve(Xi)
+#     KiXi = CMGiT * Aiinv_dot_Xi
+#
+#     mu = 1.0
+#     Minew = Dinew = None
+#     while mu > 0.001:
+#         try:
+#             Minew = Mi + mu * (M0 + KiXi - Mi)
+#             Dinew = supertheory(Minew)
+#             break
+#         except CPiSDomainError as e:
+#             print('the step was too large and leaded to an error in the forward problem \n({}), '
+#                   'try reducing the step length'.format(str(e)))
+#             mu /= 2.0
+#             continue
+#
+#     if Minew is None:
+#         raise Exception('fail')
+#
+#     return Dinew, Minew, CMGiT, LUi  # , LUi
 
 
 def optimize(argv, verbose, mapkwargs):
@@ -1382,7 +1415,8 @@ def optimize(argv, verbose, mapkwargs):
             print('done')
 
             print('get CM_triu ...')
-        CM_triu = nodefile.get_CM(
+
+        CM_Vp, CM_Lp = nodefile.get_CM(
             horizontal_smoothing_distance=horizontal_smoothing_distance,
             vertical_smoothing_distance=vertical_smoothing_distance,
             trunc_horizontal_smoothing_distance=trunc_horizontal_smoothing_distance,
@@ -1398,7 +1432,8 @@ def optimize(argv, verbose, mapkwargs):
             print('done')
 
         save_matrix(MPRIORFILE, Mprior, verbose)
-        save_matrix(CMFILE, CM_triu, verbose)
+        save_matrix(CMVPFILE, CM_Vp, verbose)
+        save_matrix(CMLPFILE, CM_Lp, verbose)
 
         M0 = Mprior
         m0filename = MFILE.format(niter=0)
@@ -1442,15 +1477,22 @@ def optimize(argv, verbose, mapkwargs):
         M0 = np.load(MFILE.format(niter=0))
         Dobs = np.load(DOBSFILE)
 
-        CM = load_CM(CMFILE)
+        CM_Vp, CM_Lp = load_CM(CMVPFILE, CMLPFILE)
         CD = sp.load_npz(CDFILE)
         CDinv = sp.load_npz(CDINVFILE)
 
-        LUi = None   # the factorized version of CD + Gi . CM . Gi^T
+        tv23 = TV23_1(
+            Dobs=Dobs, CD=CD,
+            Mprior=Mprior, M0=M0,
+            CM_Vp=CM_Vp, CM_Lp=CM_Lp,
+            supertheory=supertheory,
+            verbose=verbose)
+
+        # LUi = None   # the factorized version of CD + Gi . CM . Gi^T
         if not update_G:
             # find the last version of the frechet derivatives, compute G0 if none is found
             Gi = load_last_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
-            CMGiT = supertheory.get_CMGiT(CM, Gi, mapkwargs=mapkwargs, verbose=verbose)
+            tv23.update_G(Gi)
 
         for _ in range(number_of_iterations):
             niter = lastiter()
@@ -1458,8 +1500,7 @@ def optimize(argv, verbose, mapkwargs):
             if update_G:
                 # compute frechet derivatives for this iteration (if not already computed)
                 Gi = update_frechet_derivatives(supertheory, verbose=verbose, mapkwargs=mapkwargs)
-                CMGiT = supertheory.get_CMGiT(CM, Gi, mapkwargs=mapkwargs, verbose=verbose)
-                LUi = None   # force recompute LUi since Gi has been updated
+                tv23.update_G(Gi)
 
             # ==== save the current model state
             mfilename = MFILE.format(niter=niter)
@@ -1470,12 +1511,8 @@ def optimize(argv, verbose, mapkwargs):
             Di = np.load(dfile)  # g(Mi)
             # Gi = sp.load_npz(fdfilename)
 
-            # ==== update the current model
-            Dinew, Minew, LUi = tv23_1(Dobs, Di, CD,
-                       Mprior, M0, Mi, CM,
-                       Gi, supertheory,
-                       CMGiT=CMGiT,
-                       LUi=LUi)
+            # ==== compute the step
+            Dinew, Minew = tv23.solve(Di=Di, Mi=Mi)
 
             # ==== save the new model state
             mfilename_new = MFILE.format(niter=niter + 1)
@@ -1488,7 +1525,7 @@ def optimize(argv, verbose, mapkwargs):
 
             if verbose:
                 data_cost = chi2_data(Data=Dinew, Dobs=Dobs, CDinv=CDinv)
-                model_cost = chi2_model(Model=Minew, Mprior=Mprior, CM=CM)
+                model_cost = chi2_model(Model=Minew, Mprior=Mprior, CM_Vp=CM_Vp, CM_Lp=CM_Lp)
                 print_costs(niter+1, data_cost=data_cost, model_cost=model_cost)
 
     if "-show" in argv.keys():
@@ -1498,9 +1535,10 @@ def optimize(argv, verbose, mapkwargs):
 
         Dobs = np.load(DOBSFILE)
         Mprior = np.load(MPRIORFILE)
-        CM = load_CM(CMFILE)
+        CM_Vp, CM_Lp = load_CM(CMVPFILE, CMLPFILE)
         CDinv = sp.load_npz(CDINVFILE)
-        Mpriorunc = CM.diagonal() ** 0.5
+        # Mpriorunc = CM.diagonal() ** 0.5
+        Mpriorunc = (CM_Vp.A ** 2.0 * CM_Lp.diagonal()).sum(axis=1)
 
         # =================== display the data fit
         fig_costs = plt.figure()
@@ -1517,7 +1555,7 @@ def optimize(argv, verbose, mapkwargs):
             Data = np.load(datafile)
 
             data_cost = chi2_data(Data=Data, Dobs=Dobs, CDinv=CDinv)
-            model_cost = chi2_model(Model=Model, Mprior=Mprior, CM=CM)
+            model_cost = chi2_model(Model=Model, Mprior=Mprior, CM_Vp=CM_Vp, CM_Lp=CM_Lp)
 
             if verbose:
                 print_costs(niter, data_cost=data_cost, model_cost=model_cost)
@@ -1587,4 +1625,3 @@ def optimize(argv, verbose, mapkwargs):
 
             with open(s96fileout, 'w') as fid:
                 fid.write(s96string)
-
