@@ -254,7 +254,8 @@ class NodeFileLocal(NodeFile):
         datacoders = [makedatacoder(datacoder_string, which=Datacoder_log) for datacoder_string in datacoder_strings]
         return SuperDatacoder(datacoders)
 
-    def build_or_load_forward_problem(self, verbose, mapkwargs):
+    def build_or_load_forward_problem(
+            self, verbose, mapkwargs):
         """
 
         :param verbose:
@@ -313,16 +314,11 @@ class NodeFileLocal(NodeFile):
         return n_data_points, n_parameters, superdatacoder, superparameterizer, supertheory
 
     def get_CM(
-            self, horizontal_smoothing_distance,
-            vertical_smoothing_distance,
-            trunc_horizontal_smoothing_distance=0.,
-            trunc_vertical_smoothing_distance=0.,
-            lock_half_space=True,
-            lock_half_space_sigma=0.01,
-            scale_uncertainties=1.,
-            add_uncertainty=0.,
-            norm="L1", visual_qc=False,
-            verbose=True, mapkwargs=None):
+            self, horizontal_smoothing_distance, vertical_smoothing_distance,
+            trunc_horizontal_smoothing_distance=0., trunc_vertical_smoothing_distance=0.,
+            lock_half_space=True, lock_half_space_sigma=0.01,
+            scale_uncertainties=1., add_uncertainty=0., norm="L1",
+            visual_qc=False, verbose=True, mapkwargs=None):
 
         if verbose:
             print('compute CM ...')
@@ -371,12 +367,13 @@ class NodeFileLocal(NodeFile):
             CM_triu_rows, CM_triu_cols, CM_triu_data = \
                 self._fill_CM_triu_vsmooth_and_hsmooth(
                 vs_uncertainties, rhod_triu,
-                rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril)
+                rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril,
+                mapkwargs=mapkwargs)
 
         elif vsmooth:
             # vertical smoothing only
             CM_triu_rows, CM_triu_cols, CM_triu_data = \
-                self._fille_CM_triu_vsmooth_only(vs_uncertainties, rhoz_triu)
+                self._fill_CM_triu_vsmooth_only(vs_uncertainties, rhoz_triu)
 
         elif hsmooth:
             # horizontal smoothing only
@@ -407,8 +404,8 @@ class NodeFileLocal(NodeFile):
 
         return CM_Vp, CM_Lp  # to reconstruct CM, use CM_Vp * CM_Lp * CM_Vp.T
 
-    def _get_vs_uncertainties(
-            self, scale_uncertainties, add_uncertainty, lock_half_space, lock_half_space_sigma):
+    def _get_vs_uncertainties(self, scale_uncertainties, add_uncertainty,
+        lock_half_space, lock_half_space_sigma):
         ztop = self.ztop
         zmid = self.zmid
         nnodes = len(self)
@@ -432,7 +429,8 @@ class NodeFileLocal(NodeFile):
             vs_uncertainties[nnode, :] = vs_unc_n
         return vs_uncertainties
 
-    def _prepare_horizontal_smoothing(self, hsd, thsd, norm, mapkwargs, verbose=True):
+    def _prepare_horizontal_smoothing(
+            self, hsd, thsd, norm, mapkwargs, verbose=True):
         if verbose:
             print('    prepare_horizontal_smoothing')
 
@@ -491,7 +489,8 @@ class NodeFileLocal(NodeFile):
 
         return rhod_triu
 
-    def _prepare_vertical_smoothing(self, vsd, tvsd, norm, verbose=True):
+    def _prepare_vertical_smoothing(
+            self, vsd, tvsd, norm, verbose=True):
         if verbose:
             print('    prepare_vertical_smoothing')
 
@@ -518,26 +517,21 @@ class NodeFileLocal(NodeFile):
 
     def _fill_CM_triu_vsmooth_and_hsmooth(
             self, vs_uncertainties, rhod_triu,
-            rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril):
+            rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril,
+            mapkwargs):
 
         nlayer = len(self.ztop)
+        Nnodes = len(self)
 
-        CM_triu_rows = []
-        CM_triu_cols = []
-        CM_triu_data = []
-
-        for nnode in range(len(self)):
+        def job_handler(nnode):
             vs_unc_n = vs_uncertainties[nnode, :]
-
             covnn_triu_row = nnode * nlayer + rhoz_triu.row
             covnn_triu_col = nnode * nlayer + rhoz_triu.col
             covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
-
-            CM_triu_rows.append(covnn_triu_row)
-            CM_triu_cols.append(covnn_triu_col)
-            CM_triu_data.append(covnn_triu_data)
-
-            for mnode in range(nnode + 1, len(self)):
+            rows = [covnn_triu_row]
+            cols = [covnn_triu_col]
+            datas = [covnn_triu_data]
+            for mnode in range(nnode + 1, Nnodes):
                 if rhod_triu[nnode, mnode] == 0.:
                     continue
 
@@ -563,16 +557,31 @@ class NodeFileLocal(NodeFile):
                     rhoz_tril.data * \
                     rhod_triu[nnode, mnode]
 
-                CM_triu_rows.append(covnm_row)
-                CM_triu_cols.append(covnm_col)
-                CM_triu_data.append(covnm_data)
+                rows.append(covnm_row)
+                cols.append(covnm_col)
+                datas.append(covnm_data)
+
+            return rows, cols, datas
+
+        def job_generator():
+            for nnode in range(Nnodes):
+                yield Job(nnode)
+
+        CM_triu_rows = []
+        CM_triu_cols = []
+        CM_triu_data = []
+        with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
+            for jobid, (rows, cols, datas), _, _ in ma:
+                CM_triu_rows += rows
+                CM_triu_cols += cols
+                CM_triu_data += datas
 
         CM_triu_rows = np.hstack(CM_triu_rows)
         CM_triu_cols = np.hstack(CM_triu_cols)
         CM_triu_data = np.hstack(CM_triu_data)
         return CM_triu_rows, CM_triu_cols, CM_triu_data
 
-    def _fille_CM_triu_vsmooth_only(self, vs_uncertainties, rhoz_triu):
+    def _fill_CM_triu_vsmooth_only(self, vs_uncertainties, rhoz_triu):
         nlayer = len(self.ztop)
         CM_triu_rows = []
         CM_triu_cols = []
