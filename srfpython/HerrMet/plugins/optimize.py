@@ -531,13 +531,12 @@ class NodeFileLocal(NodeFile):
                     rhod_cols.append(mnodes)
                     rhod_datas.append(datas)
 
+            rhod_rows = np.hstack(rhod_rows)
+            rhod_cols = np.hstack(rhod_cols)
+            rhod_datas = np.hstack(rhod_datas)
 
-        rhod_rows = np.hstack(rhod_rows)
-        rhod_cols = np.hstack(rhod_cols)
-        rhod_datas = np.hstack(rhod_datas)
-
-        rhod_triu = sp.csc_matrix((rhod_datas, (rhod_rows, rhod_cols)),
-                                  shape=(Nnodes, Nnodes), dtype=float)
+            rhod_triu = sp.csc_matrix((rhod_datas, (rhod_rows, rhod_cols)),
+                                      shape=(Nnodes, Nnodes), dtype=float)
         return rhod_triu
 
     def prepare_vertical_smoothing(self, vsd, tvsd, norm):
