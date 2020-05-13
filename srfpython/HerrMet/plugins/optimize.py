@@ -321,10 +321,8 @@ class NodeFileLocal(NodeFile):
             lock_half_space_sigma=0.01,
             scale_uncertainties=1.,
             add_uncertainty=0.,
-            norm="L1",
-            visual_qc=False,
-            verbose=True,
-            mapkwargs=None):
+            norm="L1", visual_qc=False,
+            verbose=True, mapkwargs=None):
 
         if verbose:
             print('compute CM ...')
@@ -368,17 +366,20 @@ class NodeFileLocal(NodeFile):
                 verbose=verbose)
 
         # =========== fill CM_triu
-        if vsmooth and hsmooth:  # both
+        if vsmooth and hsmooth:
+            # both vertical and horizontal smoothing
             CM_triu_rows, CM_triu_cols, CM_triu_data = \
                 self._fill_CM_triu_vsmooth_and_hsmooth(
                 vs_uncertainties, rhod_triu,
                 rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril)
 
-        elif vsmooth:  # only
+        elif vsmooth:
+            # vertical smoothing only
             CM_triu_rows, CM_triu_cols, CM_triu_data = \
                 self._fille_CM_triu_vsmooth_only(vs_uncertainties, rhoz_triu)
 
-        elif hsmooth:  # only
+        elif hsmooth:
+            # horizontal smoothing only
             CM_triu_rows, CM_triu_cols, CM_triu_data = \
                 self._fill_CM_triu_hsmooth_only(vs_uncertainties, rhod_triu)
 
@@ -391,7 +392,7 @@ class NodeFileLocal(NodeFile):
                        shape=(n_parameters, n_parameters), dtype=float)
 
         # =========== factorize CM
-        CM_Vp, CM_Lp = self.factorize_CM_triu(CM_triu, verbose=verbose)
+        CM_Vp, CM_Lp = self._factorize_CM_triu(CM_triu, verbose=verbose)
 
         if visual_qc:
             CM = CM_Vp * CM_Lp * CM_Vp.T
@@ -406,31 +407,114 @@ class NodeFileLocal(NodeFile):
 
         return CM_Vp, CM_Lp  # to reconstruct CM, use CM_Vp * CM_Lp * CM_Vp.T
 
-    def factorize_CM_triu(self, CM_triu, verbose):
-        """
-        approximate CM = Vp * Lp * Vp.T
-        where Vp are the first eigenvectors
-              Lp is strictly diagonal and positive
-              Vp.T * Vp = Id
-              Vp * Vp.T != Id
-        """
+    def _get_vs_uncertainties(
+            self, scale_uncertainties, add_uncertainty, lock_half_space, lock_half_space_sigma):
+        ztop = self.ztop
+        zmid = self.zmid
+        nnodes = len(self)
+        nlayer = len(ztop)
+
+        vs_uncertainties = np.zeros((nnodes, nlayer), float)  # one row per node, one col per layer
+
+        for nnode in range(nnodes):
+            vs84_n = depthmodel_from_mod96(self.p84files[nnode]).vs
+            vs16_n = depthmodel_from_mod96(self.p16files[nnode]).vs
+            vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
+            vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
+            vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
+            vs_unc_n = scale_uncertainties * vs_unc_n + add_uncertainty
+
+            if lock_half_space:
+                vs_unc_n[-1] = lock_half_space_sigma
+
+            # make sure all uncertainties are positive
+            vs_unc_n = np.clip(vs_unc_n, lock_half_space_sigma, np.inf)
+            vs_uncertainties[nnode, :] = vs_unc_n
+        return vs_uncertainties
+
+    def _prepare_horizontal_smoothing(self, hsd, thsd, norm, mapkwargs, verbose=True):
+        if verbose:
+            print('    prepare_horizontal_smoothing')
+
+        if hsd == 0 and thsd == 0:
+            rhod_triu = None
+
+        else:
+            Nnodes = len(self)
+
+            # warning : I do not fill the lower triangle and diagonal !!!
+            rhod_rows = [np.arange(Nnodes)]
+            rhod_cols = [np.arange(Nnodes)]
+            rhod_datas = [np.ones(Nnodes)]
+
+            # fill non-diagonal terms
+            def job_generator():
+                for nnode in range(Nnodes - 1):
+                    yield Job(nnode,
+                              loni=self.lons[nnode],
+                              lati=self.lats[nnode],
+                              lonj=self.lons[nnode + 1:],
+                              latj=self.lats[nnode + 1:])
+
+            def job_handler(nnode, **kwargs):
+                horizontal_distances = haversine(**kwargs)
+                mnodes = np.arange(nnode+1, Nnodes)
+
+                I = horizontal_distances < thsd
+                nnodes = nnode * np.ones(I.sum())
+                mnodes = mnodes[I]
+                horizontal_distances = horizontal_distances[I]
+                if norm == "L1":
+                    datas = np.exp(-horizontal_distances / hsd)
+                elif norm == "L2":
+                    datas = np.exp(-horizontal_distances / hsd)
+                else:
+                    raise NotImplementedError
+
+                return nnodes, mnodes, datas
+
+            with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
+                for jobid, (nnodes, mnodes, datas), _, _ in ma:
+                    rhod_rows.append(nnodes)
+                    rhod_cols.append(mnodes)
+                    rhod_datas.append(datas)
+
+            rhod_rows = np.hstack(rhod_rows)
+            rhod_cols = np.hstack(rhod_cols)
+            rhod_datas = np.hstack(rhod_datas)
+
+            rhod_triu = sp.csc_matrix((rhod_datas, (rhod_rows, rhod_cols)),
+                                      shape=(Nnodes, Nnodes), dtype=float)
 
         if verbose:
-            print('    factorize CM = Vp * Lp * Vp.T')
+            print('    done')
 
-        CM = CM_triu + sp.tril(CM_triu.T, k=-1, format="csc")  # add lower triangle without diag (already in triu)
-        del CM_triu
+        return rhod_triu
 
-        CM_first_eigenvalues, CM_first_eigenvectors = \
-            eigsh(CM, k=CM.shape[0] // 2, which="LM")
-        del CM
+    def _prepare_vertical_smoothing(self, vsd, tvsd, norm, verbose=True):
+        if verbose:
+            print('    prepare_vertical_smoothing')
 
-        I = CM_first_eigenvalues > 0.
-        CM_Vp = sp.csc_matrix(CM_first_eigenvectors[:, I])
-        CM_Lp = sp.diags(CM_first_eigenvalues[I], format="csc")
-        CM_Vp.prune()
+        if vsd == 0 and tvsd == 0:
+            rhoz_nupper = rhoz_nlower = rhoz_triu = rhoz_tril = None
+        else:
+            zmid = self.zmid
+            dz = np.abs(zmid - zmid[:, np.newaxis])
+            if norm == "L1":
+                rhoz = np.exp(-dz / vsd)
+            elif norm == "L2":
+                rhoz = np.exp(-(dz / vsd) ** 2.0)
+            else:
+                raise NotImplementedError
+            rhoz[dz > tvsd] = 0.
+            rhoz_triu = sp.triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
+            rhoz_tril = sp.tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
+            rhoz_nupper, rhoz_nlower = len(rhoz_triu.data), len(rhoz_tril.data)
 
-        return CM_Vp, CM_Lp
+        if verbose:
+            print('    done')
+
+        return rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril
 
     def _fill_CM_triu_hsmooth_only(self, vs_uncertainties, rhod_triu):
         nlayer = len(self.ztop)
@@ -540,113 +624,32 @@ class NodeFileLocal(NodeFile):
         CM_triu_data = np.hstack(CM_triu_data)
         return CM_triu_rows, CM_triu_cols, CM_triu_data
 
-    def _prepare_horizontal_smoothing(self, hsd, thsd, norm, mapkwargs, verbose=True):
-        if verbose:
-            print('    prepare_horizontal_smoothing')
-
-        if hsd == 0 and thsd == 0:
-            rhod_triu = None
-
-        else:
-            Nnodes = len(self)
-
-            # warning : I do not fill the lower triangle and diagonal !!!
-            rhod_rows = [np.arange(Nnodes)]
-            rhod_cols = [np.arange(Nnodes)]
-            rhod_datas = [np.ones(Nnodes)]
-
-            # fill non-diagonal terms
-            def job_generator():
-                for nnode in range(Nnodes - 1):
-                    yield Job(nnode,
-                              loni=self.lons[nnode],
-                              lati=self.lats[nnode],
-                              lonj=self.lons[nnode + 1:],
-                              latj=self.lats[nnode + 1:])
-
-            def job_handler(nnode, **kwargs):
-                horizontal_distances = haversine(**kwargs)
-                mnodes = np.arange(nnode+1, Nnodes)
-
-                I = horizontal_distances < thsd
-                nnodes = nnode * np.ones(I.sum())
-                mnodes = mnodes[I]
-                horizontal_distances = horizontal_distances[I]
-                if norm == "L1":
-                    datas = np.exp(-horizontal_distances / hsd)
-                elif norm == "L2":
-                    datas = np.exp(-horizontal_distances / hsd)
-                else:
-                    raise NotImplementedError
-
-                return nnodes, mnodes, datas
-
-            with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
-                for jobid, (nnodes, mnodes, datas), _, _ in ma:
-                    rhod_rows.append(nnodes)
-                    rhod_cols.append(mnodes)
-                    rhod_datas.append(datas)
-
-            rhod_rows = np.hstack(rhod_rows)
-            rhod_cols = np.hstack(rhod_cols)
-            rhod_datas = np.hstack(rhod_datas)
-
-            rhod_triu = sp.csc_matrix((rhod_datas, (rhod_rows, rhod_cols)),
-                                      shape=(Nnodes, Nnodes), dtype=float)
+    def _factorize_CM_triu(self, CM_triu, verbose):
+        """
+        approximate CM = Vp * Lp * Vp.T
+        where Vp are the first eigenvectors
+              Lp is strictly diagonal and positive
+              Vp.T * Vp = Id
+              Vp * Vp.T != Id
+        """
 
         if verbose:
-            print('    done')
+            print('    factorize CM = Vp * Lp * Vp.T')
 
-        return rhod_triu
+        CM = CM_triu + sp.tril(CM_triu.T, k=-1, format="csc")  # add lower triangle without diag (already in triu)
+        del CM_triu
 
-    def _prepare_vertical_smoothing(self, vsd, tvsd, norm, verbose=True):
-        if verbose:
-            print('    prepare_vertical_smoothing')
+        # TODO do something appropriate to keep the right number of dimensions
+        CM_first_eigenvalues, CM_first_eigenvectors = \
+            eigsh(CM, k=CM.shape[0] // 4, which="LM")
+        del CM
 
-        if vsd == 0 and tvsd == 0:
-            rhoz_nupper = rhoz_nlower = rhoz_triu = rhoz_tril = None
-        else:
-            zmid = self.zmid
-            dz = np.abs(zmid - zmid[:, np.newaxis])
-            if norm == "L1":
-                rhoz = np.exp(-dz / vsd)
-            elif norm == "L2":
-                rhoz = np.exp(-(dz / vsd) ** 2.0)
-            else:
-                raise NotImplementedError
-            rhoz[dz > tvsd] = 0.
-            rhoz_triu = sp.triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
-            rhoz_tril = sp.tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
-            rhoz_nupper, rhoz_nlower = len(rhoz_triu.data), len(rhoz_tril.data)
+        I = CM_first_eigenvalues > 0.
+        CM_Vp = sp.csc_matrix(CM_first_eigenvectors[:, I])
+        CM_Lp = sp.diags(CM_first_eigenvalues[I], format="csc")
+        CM_Vp.prune()
 
-        if verbose:
-            print('    done')
-
-        return rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril
-
-    def _get_vs_uncertainties(self, scale_uncertainties, add_uncertainty, lock_half_space, lock_half_space_sigma):
-        ztop = self.ztop
-        zmid = self.zmid
-        nnodes = len(self)
-        nlayer = len(ztop)
-
-        vs_uncertainties = np.zeros((nnodes, nlayer), float)  # one row per node, one col per layer
-
-        for nnode in range(nnodes):
-            vs84_n = depthmodel_from_mod96(self.p84files[nnode]).vs
-            vs16_n = depthmodel_from_mod96(self.p16files[nnode]).vs
-            vs84_n = depthmodel1D(ztop, vs84_n.interp(zmid))
-            vs16_n = depthmodel1D(ztop, vs16_n.interp(zmid))
-            vs_unc_n = 0.5 * (vs84_n.values - vs16_n.values)
-            vs_unc_n = scale_uncertainties * vs_unc_n + add_uncertainty
-
-            if lock_half_space:
-                vs_unc_n[-1] = lock_half_space_sigma
-
-            # make sure all uncertainties are positive
-            vs_unc_n = np.clip(vs_unc_n, lock_half_space_sigma, np.inf)
-            vs_uncertainties[nnode, :] = vs_unc_n
-        return vs_uncertainties
+        return CM_Vp, CM_Lp
 
 
 class SuperParameterizer(object):
