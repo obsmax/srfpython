@@ -359,11 +359,11 @@ class NodeFileLocal(NodeFile):
         # =========== prepare smoothing
         print('    prepare_vertical_smoothing')
         rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril = \
-            self.prepare_vertical_smoothing(vsd, tvsd)
+            self.prepare_vertical_smoothing(vsd, tvsd, norm=norm)
         print('    done')
 
         print('    prepare_horizontal_smoothing')
-        rhod_triu = self.prepare_horizontal_smoothing(hsd, thsd, mapkwargs)
+        rhod_triu = self.prepare_horizontal_smoothing(hsd, thsd, norm=norm, mapkwargs=mapkwargs)
         print('    done')
 
         # ===========
@@ -455,36 +455,42 @@ class NodeFileLocal(NodeFile):
         CM_triu = sp.csc_matrix((CM_triu_data, (CM_triu_rows, CM_triu_cols)),
                        shape=(n_parameters, n_parameters), dtype=float)
 
+        if True:
+            CM = CM_triu + CM_triu.T - sp.diags(CM_triu.diagonal(), format="csc")
+            if CM.shape[0] > 2000: raise Exception('CM is too large')
+            from scipy.sparse.linalg import eigs
+            #w, _ = eigs(CM, k=CM.shape[0]-1)
+            w, v = np.linalg.eigh(CM.toarray())
+            if not np.all(w > 0):
+                print('\n***** warning ******\n'
+                      'CM is not positive definite\n'
+                      '\n********************\n')
+                # retain only the positive eigen values of CM
+                I = w > 0
+                CMfix = np.dot(np.dot(v[:, I], np.diag(w[I])), v[:, I].T)
+                # w[w <= 0.] = np.min(w[w > 0.]) / 10.
+                # CMfix = np.dot(np.dot(v, np.diag(w)), v.T)
+
+                # plt.figure()
+                # plt.imshow(v)
+                # plt.show()
+
+                CM = sp.csc_matrix(CMfix)
+                CM.prune()
+                CM_triu = sp.triu(CM, format="csc")
+
         if 1 or visual_qc:
-            plt.figure()
-            plt.plot(self.lons, self.lats, 'ko')
-            for lon, lat, node in zip(self.lons, self.lats, self.nodes):
-                plt.text(lon, lat, node)
-            for i in range(len(self)-1):
-                for j in range(i+1, len(self)):
-                    dij = haversine(
-                        loni=self.lons[i],
-                        lati=self.lats[i],
-                        lonj=self.lons[j],
-                        latj=self.lats[j])
-                    from srfpython.standalone.display import value2color
-                    plt.plot([self.lons[i], self.lons[j]],
-                             [self.lats[i], self.lats[j]])
-                    plt.text(np.mean([self.lons[i], self.lons[j]]),
-                             np.mean([self.lats[i], self.lats[j]]), round(dij))
-
-
             if input('are you sure you want to display this matrix (risk of memory saturation)?') == "y":
                 plt.figure()
-                A = CM_triu.toarray()
+                A = (CM_triu + CM_triu.T - sp.diags(CM_triu.diagonal())).toarray()
+                print(np.linalg.det(A) == 0.)
                 A = np.ma.masked_where(A == 0, A)
                 plt.imshow(A)
             plt.show()
 
-        # CM = CM_triu + CM_triu.T - diags(CM_triu.diagonal())
         return CM_triu
 
-    def prepare_horizontal_smoothing(self, hsd, thsd, mapkwargs):
+    def prepare_horizontal_smoothing(self, hsd, thsd, norm, mapkwargs):
         if hsd == 0 and thsd == 0:
             rhod_triu = None
 
@@ -513,7 +519,12 @@ class NodeFileLocal(NodeFile):
                 nnodes = nnode * np.ones(I.sum())
                 mnodes = mnodes[I]
                 horizontal_distances = horizontal_distances[I]
-                datas = np.exp(-horizontal_distances / hsd)
+                if norm == "L1":
+                    datas = np.exp(-horizontal_distances / hsd)
+                elif norm == "L2":
+                    datas = np.exp(-horizontal_distances / hsd)
+                else:
+                    raise NotImplementedError
 
                 return nnodes, mnodes, datas
 
@@ -532,13 +543,18 @@ class NodeFileLocal(NodeFile):
                                   shape=(Nnodes, Nnodes), dtype=float)
         return rhod_triu
 
-    def prepare_vertical_smoothing(self, vsd, tvsd):
+    def prepare_vertical_smoothing(self, vsd, tvsd, norm):
         if vsd == 0 and tvsd == 0:
             rhoz_nupper = rhoz_nlower = rhoz_triu = rhoz_tril = None
         else:
             zmid = self.zmid
             dz = np.abs(zmid - zmid[:, np.newaxis])
-            rhoz = np.exp(-dz / vsd)
+            if norm == "L1":
+                rhoz = np.exp(-dz / vsd)
+            elif norm == "L2":
+                rhoz = np.exp(-(dz / vsd) ** 2.0)
+            else:
+                raise NotImplementedError
             rhoz[dz > tvsd] = 0.
             rhoz_triu = sp.triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
             rhoz_tril = sp.tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
@@ -1087,12 +1103,69 @@ def chi2_data(Data, Dobs, CDinv):
     return np.dot((Data - Dobs), CDinv * (Data - Dobs))  # only because CDinv is known exactly
 
 
+def sparse_cholesky(A):
+    """The input matrix A must be a sparse symmetric positive-definite.
+    source https://gist.github.com/omitakahiro/c49e5168d04438c5b20c921b928f1f5d
+    """
+
+    n = A.shape[0]
+    LU = splu(A, diag_pivot_thresh=0)  # sparse LU decomposition
+    plt.figure()
+    plt.plot(LU.perm_r)
+    plt.figure()
+    plt.plot(LU.U.diagonal())
+    plt.show()
+    if (LU.perm_r == np.arange(n)).all() and (LU.U.diagonal() > 0).all():
+        # check the matrix A is positive definite.
+        return LU.L.dot(sp.diags(LU.U.diagonal() ** 0.5))
+    else:
+        raise Exception('The matrix is not positive definite')
+
+
 def chi2_model(Model, Mprior, CM):
 
     assert sp.issparse(CM)
     assert not sp.issparse(Model - Mprior)
 
-    return np.dot(Model - Mprior, Ainv_dot_b(A=CM, b=Model - Mprior))
+    cost = np.dot(Model - Mprior, Ainv_dot_b(A=CM, b=Model - Mprior))
+    if cost < 0.:
+        print('\n\n\n')
+        warnings.warn('the model cost was negative (numerical instability?)')
+        print('\n\n\n')
+
+        x = Ainv_dot_b(A=CM, b=Model - Mprior)
+        plt.figure()
+        plt.subplot(211)
+        plt.plot(Model - Mprior)
+        plt.plot(CM * x)
+        plt.subplot(212, sharex=plt.gca())
+        plt.plot((Model - Mprior) - CM * x)
+        plt.show()
+
+
+        lu = splu(CM)
+        b1 = lu.solve(Model - Mprior)
+        b2 = spsolve(CM, Model - Mprior)
+        plt.figure()
+        plt.plot(b1)
+        plt.plot(b2)
+        plt.show()
+
+
+#    L = sparse_cholesky(CM)
+
+    # plt.figure()
+    # plt.subplot(211)
+    # plt.plot(Model - Mprior)
+    # plt.plot(Ainv_dot_b(A=CM, b=Model - Mprior))
+    # plt.subplot(212, sharex=plt.gca())
+    # plt.plot((Model - Mprior) * Ainv_dot_b(A=CM, b=Model - Mprior))
+    # plt.show()
+    #
+
+    # use only the diagonal terms of the covariance matrix
+    # cost = np.dot(Model - Mprior, Ainv_dot_b(A=sp.diags(CM.diagonal()), b=Model - Mprior))
+    return cost
 
 
 def print_costs(niter, data_cost, model_cost):
