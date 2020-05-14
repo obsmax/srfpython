@@ -368,7 +368,7 @@ class NodeFileLocal(NodeFile):
                 self._fill_CM_triu_vsmooth_and_hsmooth(
                 vs_uncertainties, rhod_triu,
                 rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril,
-                mapkwargs=mapkwargs)
+                mapkwargs=mapkwargs, verbose=verbose)
 
         elif vsmooth:
             # vertical smoothing only
@@ -518,7 +518,7 @@ class NodeFileLocal(NodeFile):
     def _fill_CM_triu_vsmooth_and_hsmooth(
             self, vs_uncertainties, rhod_triu,
             rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril,
-            mapkwargs):
+            mapkwargs, verbose):
 
         nlayer = len(self.ztop)
         Nnodes = len(self)
@@ -570,15 +570,24 @@ class NodeFileLocal(NodeFile):
         CM_triu_rows = []
         CM_triu_cols = []
         CM_triu_data = []
+        if verbose:
+            wb = waitbarpipe('    fill CM')
         with MapSync(job_handler, job_generator(), **mapkwargs) as ma:
             for jobid, (rows, cols, datas), _, _ in ma:
                 CM_triu_rows += rows
                 CM_triu_cols += cols
                 CM_triu_data += datas
+                if verbose:
+                    wb.refresh(jobid / float(len(self)))
+
+        if verbose:
+            wb.close()
 
         CM_triu_rows = np.hstack(CM_triu_rows)
         CM_triu_cols = np.hstack(CM_triu_cols)
         CM_triu_data = np.hstack(CM_triu_data)
+
+
         return CM_triu_rows, CM_triu_cols, CM_triu_data
 
     def _fill_CM_triu_vsmooth_only(self, vs_uncertainties, rhoz_triu):
@@ -886,7 +895,7 @@ class SuperTheory(object):
 
         return np.concatenate(Data)
 
-    def get_FD(self, Model, mapkwargs):
+    def get_FD(self, Model, mapkwargs, verbose=True):
 
         # prepare the frechet derivatives matrix
         G_shape = self.shape
@@ -922,12 +931,17 @@ class SuperTheory(object):
         G_row_ind = np.array([], int)
         G_col_ind = np.array([], int)
         G_fd_data = np.array([], float)
+        if verbose:
+            wb = waitbbar('')
         with MapSync(node_calculator, node_generator(), **mapkwargs) as ma:
             for jobid, (node_number, G_rows, G_cols, G_datas), _, _ in ma:
                 G_row_ind = np.concatenate((G_row_ind, G_rows))
                 G_col_ind = np.concatenate((G_col_ind, G_cols))
                 G_fd_data = np.concatenate((G_fd_data, G_datas))
-
+                if verbose:
+                    wb.refresh(jobid/float(len(self.theorys)))
+        if verbose:
+            wb.close()
         G = sp.csc_matrix((G_fd_data, (G_row_ind, G_col_ind)), shape=G_shape)
         return G
 
@@ -1234,7 +1248,7 @@ def update_frechet_derivatives(supertheory, verbose, mapkwargs):
         if verbose:
             print('computing frechet derivatives for iteration {}...'.format(niter))
         Mi = np.load(mfilename)
-        Gi = supertheory.get_FD(Mi, mapkwargs)
+        Gi = supertheory.get_FD(Mi, mapkwargs, verbose=verbose)
         save_matrix(fdfilename, Gi, verbose)
         return Gi
 
