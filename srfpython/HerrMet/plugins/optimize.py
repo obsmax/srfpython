@@ -659,7 +659,8 @@ class NodeFileLocal(NodeFile):
 
         # TODO do something appropriate to keep the right number of dimensions
         CM_first_eigenvalues, CM_first_eigenvectors = \
-            eigsh(CM, k=CM.shape[0] // 4, which="LM")
+            eigsh(CM, k=100, which="LM")
+            # eigsh(CM, k=CM.shape[0] // 4, which="LM")
         del CM
 
         I = CM_first_eigenvalues > 0.
