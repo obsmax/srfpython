@@ -933,7 +933,7 @@ class SuperTheory(object):
         G_col_ind = np.array([], int)
         G_fd_data = np.array([], float)
         if verbose:
-            wb = waitbbar('')
+            wb = waitbarpipe('')
         with MapSync(node_calculator, node_generator(), **mapkwargs) as ma:
             for jobid, (node_number, G_rows, G_cols, G_datas), _, _ in ma:
                 G_row_ind = np.concatenate((G_row_ind, G_rows))
