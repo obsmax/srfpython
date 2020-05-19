@@ -123,10 +123,10 @@ with open('nodes.txt', 'w') as fid:
         fid.write('{} {} node{:03d}\n'.format(lon, lat, n))
 
 # check the inter-node distances
-from srfpython.HerrMet.nodefile import NodeFile
-nf = NodeFile('nodes.txt')
-d = nf.distances()
-print('distance min, max : {} {}km'.format(d[d > 0].min(), d.max()))
+# from srfpython.HerrMet.nodefile import NodeFile
+# nf = NodeFile('nodes.txt')
+# d = nf.distances()
+# print('distance min, max : {} {}km'.format(d[d > 0].min(), d.max()))
 
 fig1.savefig('depth_models.png')
 fig2.savefig('vs_slices.png')
