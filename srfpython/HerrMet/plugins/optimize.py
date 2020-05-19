@@ -657,16 +657,27 @@ class NodeFileLocal(NodeFile):
         CM = CM_triu + sp.tril(CM_triu.T, k=-1, format="csc")  # add lower triangle without diag (already in triu)
         del CM_triu
 
-        # TODO do something appropriate to keep the right number of dimensions
-        CM_first_eigenvalues, CM_first_eigenvectors = \
-            eigsh(CM, k=100, which="LM")
-            # eigsh(CM, k=CM.shape[0] // 4, which="LM")
-        del CM
-
-        I = CM_first_eigenvalues > 0.
-        CM_Vp = sp.csc_matrix(CM_first_eigenvectors[:, I])
-        CM_Lp = sp.diags(CM_first_eigenvalues[I], format="csc")
-        CM_Vp.prune()
+        if 1:
+            # TODO do something appropriate to keep the right number of dimensions
+            # The more you trash positive eigenvalues, the less accurate the result
+            # idealy one should use the dense version below
+            CM_first_eigenvalues, CM_first_eigenvectors = \
+                eigsh(CM, k=CM.shape[1] // 4, which="LA")
+            del CM
+            I = CM_first_eigenvalues > 0.
+            CM_Vp = sp.csc_matrix(CM_first_eigenvectors[:, I])
+            CM_Lp = sp.diags(CM_first_eigenvalues[I], format="csc")
+            CM_Vp.prune()
+        else:
+            warnings.warn('dense version')
+            CM_first_eigenvalues, CM_first_eigenvectors = np.linalg.eigh(CM.A)
+            I = CM_first_eigenvalues > 0
+            CM_Vp = sp.csc_matrix(CM_first_eigenvectors[:, I])
+            CM_Lp = sp.diags(CM_first_eigenvalues[I], format="csc")
+            CM_Vp.prune()
+            plt.figure()
+            plt.imshow(np.ma.masked_where(CM_Vp.A==0, CM_Vp.A))
+            plt.show()
 
         return CM_Vp, CM_Lp
 
@@ -1273,6 +1284,7 @@ def rm_nofail(filepath, verbose=True):
     elif verbose:
         print('could not remove {} (no files)'.format(filepath))
 
+
 from srfpython.standalone.multipro8 import WorkerError
 class TV23_1(object):
     def __init__(self, Dobs, CD, Mprior, CM_Vp, CM_Lp, M0, supertheory, verbose=True):
@@ -1287,7 +1299,6 @@ class TV23_1(object):
 
         self.Gi = None
         self.CMGiT = None
-        self.LUi = None
 
     def update_G(self, Gi):
         self.Gi = Gi
