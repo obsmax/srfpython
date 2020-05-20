@@ -413,9 +413,9 @@ class NodeFileLocal(NodeFile):
         CM_triu = sp.csc_matrix((CM_triu_data, (CM_triu_rows, CM_triu_cols)),
                        shape=(n_parameters, n_parameters), dtype=float)
 
-        plt.figure()
-        plt.imshow(np.ma.masked_where(CM_triu.A == 0, CM_triu.A))
-        plt.show()
+        # plt.figure()
+        # plt.imshow(np.ma.masked_where(CM_triu.A == 0, CM_triu.A))
+        # plt.show()
         # =========== factorize CM
         CM_Vp, CM_Lp = self._factorize_CM_triu(CM_triu, verbose=verbose)
 
