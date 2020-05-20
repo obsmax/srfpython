@@ -170,6 +170,16 @@ def check_keys(argv):
             raise Exception(message)
 
 
+def L2_to_L1(data):
+    """
+    converts np.exp(-0.5 * data**2)
+    into     np.exp(-data)
+    :param data:
+    :return:
+    """
+    return np.exp(-np.sqrt(-2.0 * np.log(data)))
+
+
 class NodeFileLocal(NodeFile):
 
     def get_superparameterizer(self, verbose, mapkwargs):
@@ -347,18 +357,17 @@ class NodeFileLocal(NodeFile):
         hsmooth = hsd > 0 and thsd > 0
 
         # =========== prepare smoothing
-        rhoz_nupper = rhoz_nlower = rhoz_triu = \
-            rhoz_tril = rhod_triu = None  # prevent editor warning
+        rhoz_nupper = rhoz_nlower = rhoz_L2_triu = \
+            rhoz_L2_tril = rhod_L2_triu = None  # prevent editor warning
 
         if vsmooth:
-            rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril = \
+            rhoz_nupper, rhoz_nlower, rhoz_L2_triu, rhoz_L2_tril = \
                 self._prepare_vertical_smoothing(
-                    vsd, tvsd, norm=norm, verbose=verbose)
+                    vsd, tvsd, verbose=verbose)
 
         if hsmooth:
-            rhod_triu = self._prepare_horizontal_smoothing(
-                hsd, thsd, norm=norm,
-                mapkwargs=mapkwargs,
+            rhod_L2_triu = self._prepare_horizontal_smoothing(
+                hsd, thsd, mapkwargs=mapkwargs,
                 verbose=verbose)
 
         # =========== fill CM_triu
@@ -366,16 +375,32 @@ class NodeFileLocal(NodeFile):
             # both vertical and horizontal smoothing
             CM_triu_rows, CM_triu_cols, CM_triu_data = \
                 self._fill_CM_triu_vsmooth_and_hsmooth(
-                vs_uncertainties, rhod_triu,
-                rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril,
+                vs_uncertainties, norm,
+                rhod_L2_triu,
+                rhoz_nupper, rhoz_nlower, rhoz_L2_triu, rhoz_L2_tril,
                 mapkwargs=mapkwargs, verbose=verbose)
 
         elif vsmooth:
             # vertical smoothing only
+            if norm == "L2":
+                rhoz_triu = rhoz_L2_triu  #alias
+            elif norm == "L1":
+                rhoz_triu = rhoz_L2_triu.tocoo()
+                rhoz_triu.data = L2_to_L1(rhoz_triu.data)
+            else:
+                raise ValueError(norm)
             CM_triu_rows, CM_triu_cols, CM_triu_data = \
                 self._fill_CM_triu_vsmooth_only(vs_uncertainties, rhoz_triu)
 
         elif hsmooth:
+            if norm == "L2":
+                rhod_triu = rhod_L2_triu  #alias
+            elif norm == "L1":
+                rhod_triu = rhod_L2_triu.tocoo()
+                rhod_triu.data = L2_to_L1(rhod_triu.data)
+            else:
+                raise ValueError(norm)
+
             # horizontal smoothing only
             CM_triu_rows, CM_triu_cols, CM_triu_data = \
                 self._fill_CM_triu_hsmooth_only(vs_uncertainties, rhod_triu)
@@ -388,6 +413,9 @@ class NodeFileLocal(NodeFile):
         CM_triu = sp.csc_matrix((CM_triu_data, (CM_triu_rows, CM_triu_cols)),
                        shape=(n_parameters, n_parameters), dtype=float)
 
+        plt.figure()
+        plt.imshow(np.ma.masked_where(CM_triu.A == 0, CM_triu.A))
+        plt.show()
         # =========== factorize CM
         CM_Vp, CM_Lp = self._factorize_CM_triu(CM_triu, verbose=verbose)
 
@@ -430,12 +458,12 @@ class NodeFileLocal(NodeFile):
         return vs_uncertainties
 
     def _prepare_horizontal_smoothing(
-            self, hsd, thsd, norm, mapkwargs, verbose=True):
+            self, hsd, thsd, mapkwargs, verbose=True):
         if verbose:
             print('    prepare_horizontal_smoothing')
 
         if hsd == 0 and thsd == 0:
-            rhod_triu = None
+            rhod_L2_triu = None
 
         else:
             Nnodes = len(self)
@@ -462,12 +490,8 @@ class NodeFileLocal(NodeFile):
                 nnodes = nnode * np.ones(I.sum())
                 mnodes = mnodes[I]
                 horizontal_distances = horizontal_distances[I]
-                if norm == "L1":
-                    datas = np.exp(-horizontal_distances / hsd)
-                elif norm == "L2":
-                    datas = np.exp(-horizontal_distances / hsd)
-                else:
-                    raise NotImplementedError
+
+                datas = np.exp(-0.5 * (horizontal_distances / hsd) ** 2.0) # need to compute L2 norm even for L1
 
                 return nnodes, mnodes, datas
 
@@ -481,58 +505,73 @@ class NodeFileLocal(NodeFile):
             rhod_cols = np.hstack(rhod_cols)
             rhod_datas = np.hstack(rhod_datas)
 
-            rhod_triu = sp.csc_matrix((rhod_datas, (rhod_rows, rhod_cols)),
+            rhod_L2_triu = sp.csc_matrix((rhod_datas, (rhod_rows, rhod_cols)),
                                       shape=(Nnodes, Nnodes), dtype=float)
 
         if verbose:
             print('    done')
 
-        return rhod_triu
+        return rhod_L2_triu
 
     def _prepare_vertical_smoothing(
-            self, vsd, tvsd, norm, verbose=True):
+            self, vsd, tvsd, verbose=True):
         if verbose:
             print('    prepare_vertical_smoothing')
 
         if vsd == 0 and tvsd == 0:
-            rhoz_nupper = rhoz_nlower = rhoz_triu = rhoz_tril = None
+            rhoz_nupper = rhoz_nlower = rhoz_L2_triu = rhoz_L2_tril = None
         else:
             zmid = self.zmid
             dz = np.abs(zmid - zmid[:, np.newaxis])
-            if norm == "L1":
-                rhoz = np.exp(-dz / vsd)
-            elif norm == "L2":
-                rhoz = np.exp(-(dz / vsd) ** 2.0)
-            else:
-                raise NotImplementedError
+            rhoz = np.exp(-.5 * (dz / vsd) ** 2.0)  # need to compute the L2 norm even for L1
             rhoz[dz > tvsd] = 0.
-            rhoz_triu = sp.triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
-            rhoz_tril = sp.tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
-            rhoz_nupper, rhoz_nlower = len(rhoz_triu.data), len(rhoz_tril.data)
+            rhoz_L2_triu = sp.triu(rhoz, format="coo", k=0)  # upper triangle with diagonal
+            rhoz_L2_tril = sp.tril(rhoz, format="coo", k=-1)  # lower triangle without diagonal
+            rhoz_nupper, rhoz_nlower = len(rhoz_L2_triu.data), len(rhoz_L2_tril.data)
 
         if verbose:
             print('    done')
 
-        return rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril
+        return rhoz_nupper, rhoz_nlower, rhoz_L2_triu, rhoz_L2_tril
 
     def _fill_CM_triu_vsmooth_and_hsmooth(
-            self, vs_uncertainties, rhod_triu,
-            rhoz_nupper, rhoz_nlower, rhoz_triu, rhoz_tril,
+            self, vs_uncertainties, norm, rhod_L2_triu,
+            rhoz_nupper, rhoz_nlower, rhoz_L2_triu, rhoz_L2_tril,
             mapkwargs, verbose):
+        """
+        Note L2_to_L1(rhod_L2 * rhoz_L2) is not the same as rhod_L1 * rhoz_L1
+        thus I use L2 matrixes and convert it to L1 only if needed
 
+        :param vs_uncertainties:
+        :param norm:
+        :param rhod_L2_triu:
+        :param rhoz_nupper:
+        :param rhoz_nlower:
+        :param rhoz_L2_triu:
+        :param rhoz_L2_tril:
+        :param mapkwargs:
+        :param verbose:
+        :return:
+        """
         nlayer = len(self.ztop)
         Nnodes = len(self)
+        assert norm in ["L1", "L2"]
 
         def job_handler(nnode):
             vs_unc_n = vs_uncertainties[nnode, :]
-            covnn_triu_row = nnode * nlayer + rhoz_triu.row
-            covnn_triu_col = nnode * nlayer + rhoz_triu.col
-            covnn_triu_data = vs_unc_n[rhoz_triu.row] * vs_unc_n[rhoz_triu.col] * rhoz_triu.data
+            covnn_triu_row = nnode * nlayer + rhoz_L2_triu.row
+            covnn_triu_col = nnode * nlayer + rhoz_L2_triu.col
+            covnn_triu_data = vs_unc_n[rhoz_L2_triu.row] * vs_unc_n[rhoz_L2_triu.col]
+            if norm == "L2":
+                covnn_triu_data *= rhoz_L2_triu.data
+            else:
+                covnn_triu_data *= L2_to_L1(rhoz_L2_triu.data)
+
             rows = [covnn_triu_row]
             cols = [covnn_triu_col]
             datas = [covnn_triu_data]
             for mnode in range(nnode + 1, Nnodes):
-                if rhod_triu[nnode, mnode] == 0.:
+                if rhod_L2_triu[nnode, mnode] == 0.:
                     continue
 
                 vs_unc_m = vs_uncertainties[mnode, :]
@@ -541,21 +580,25 @@ class NodeFileLocal(NodeFile):
                 covnm_col = np.zeros(rhoz_nupper + rhoz_nlower, int)
                 covnm_data = np.zeros(rhoz_nupper + rhoz_nlower, float)
 
-                covnm_row[:rhoz_nupper] = nnode * nlayer + rhoz_triu.row
-                covnm_col[:rhoz_nupper] = mnode * nlayer + rhoz_triu.col
+                covnm_row[:rhoz_nupper] = nnode * nlayer + rhoz_L2_triu.row
+                covnm_col[:rhoz_nupper] = mnode * nlayer + rhoz_L2_triu.col
                 covnm_data[:rhoz_nupper] = \
-                    vs_unc_n[rhoz_triu.row] * \
-                    vs_unc_m[rhoz_triu.col] * \
-                    rhoz_triu.data * \
-                    rhod_triu[nnode, mnode]
+                    vs_unc_n[rhoz_L2_triu.row] * \
+                    vs_unc_m[rhoz_L2_triu.col]
+                if norm == "L2":
+                    covnm_data[:rhoz_nupper] *= rhoz_L2_triu.data * rhod_L2_triu[nnode, mnode]
+                else:
+                    covnm_data[:rhoz_nupper] *= L2_to_L1(rhoz_L2_triu.data * rhod_L2_triu[nnode, mnode])
 
-                covnm_row[rhoz_nupper:] = nnode * nlayer + rhoz_tril.row
-                covnm_col[rhoz_nupper:] = mnode * nlayer + rhoz_tril.col
+                covnm_row[rhoz_nupper:] = nnode * nlayer + rhoz_L2_tril.row
+                covnm_col[rhoz_nupper:] = mnode * nlayer + rhoz_L2_tril.col
                 covnm_data[rhoz_nupper:] = \
-                    vs_unc_n[rhoz_tril.row] * \
-                    vs_unc_m[rhoz_tril.col] * \
-                    rhoz_tril.data * \
-                    rhod_triu[nnode, mnode]
+                    vs_unc_n[rhoz_L2_tril.row] * \
+                    vs_unc_m[rhoz_L2_tril.col]
+                if norm == "L2":
+                    covnm_data[rhoz_nupper:] *= rhoz_L2_tril.data * rhod_L2_triu[nnode, mnode]
+                else:
+                    covnm_data[rhoz_nupper:] *= L2_to_L1(rhoz_L2_tril.data * rhod_L2_triu[nnode, mnode])
 
                 rows.append(covnm_row)
                 cols.append(covnm_col)
@@ -657,6 +700,13 @@ class NodeFileLocal(NodeFile):
         CM = CM_triu + sp.tril(CM_triu.T, k=-1, format="csc")  # add lower triangle without diag (already in triu)
         del CM_triu
 
+        # plt.figure()
+        # plt.subplot(121)
+        # plt.imshow(CM.A)
+        # plt.subplot(122)
+        # CMinv = sp.linalg.inv(CM)
+        # plt.colorbar(plt.imshow(np.ma.masked_where(np.abs(CMinv.A) <= 1.e-1, CMinv.A)))
+        # plt.show()
         if 1:
             # TODO do something appropriate to keep the right number of dimensions
             # The more you trash positive eigenvalues, the less accurate the result
@@ -671,7 +721,11 @@ class NodeFileLocal(NodeFile):
         else:
             warnings.warn('dense version')
             CM_first_eigenvalues, CM_first_eigenvectors = np.linalg.eigh(CM.A)
+            plt.plot(CM_first_eigenvalues)
+
             I = CM_first_eigenvalues > 0
+            plt.plot(np.arange(len(CM_first_eigenvalues))[I], CM_first_eigenvalues[I], "r.")
+            plt.show()
             CM_Vp = sp.csc_matrix(CM_first_eigenvectors[:, I])
             CM_Lp = sp.diags(CM_first_eigenvalues[I], format="csc")
             CM_Vp.prune()
