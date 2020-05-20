@@ -19,3 +19,4 @@ srfpython/Herrmann/bin/max_srfpre96
 /tutorials/02_cube_inversion_example/data/
 /tutorials/02_cube_inversion_example/models/
 /tutorials/02_cube_inversion_example/optimize/
+!/maupasacq/maupasacq_swavevelocity_cube.npz
