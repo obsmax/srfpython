@@ -1,6 +1,6 @@
 import warnings
 import numpy as np
-from srfpython.Herrmann.Herrmann import HerrmannCallerFromLists
+from srfpython.Herrmann.Herrmann import HerrmannCallerBasis
 from srfpython.HerrMet.parameterizers import Parameterizer
 from srfpython.HerrMet.datacoders import Datacoder
 
@@ -41,10 +41,16 @@ class Theory(object):
             raise TypeError(type(datacoder))
         self.parameterizer, self.datacoder = parameterizer, datacoder
 
-        self.herrmanncaller = HerrmannCallerFromLists(
+        self.herrmanncaller = HerrmannCallerBasis(
             waves=datacoder.waves, types=datacoder.types,
             modes=datacoder.modes, freqs=datacoder.freqs,
             h=h, ddc=ddc)
+
+        # the output of self.herrmanncaller.disperse must match excatcly the datacoder order
+        assert self.herrmanncaller.waves is datacoder.waves
+        assert self.herrmanncaller.types is datacoder.types
+        assert self.herrmanncaller.modes is datacoder.modes
+        assert self.herrmanncaller.freqs is datacoder.freqs
 
     def __call__(self, m):
         """solves the forward problem"""

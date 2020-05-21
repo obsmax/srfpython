@@ -1,5 +1,6 @@
 #!/usr/bin/python2.7
-from __future__ import print_function
+from __future__ import print_function   # python 2/3
+from builtins import input   # python 2/3
 import os
 import signal
 import warnings
@@ -22,8 +23,8 @@ _pathfile = os.path.realpath(__file__)  # .../srfpyhon/HerrMann/dispersion.py
 _file = _pathfile.split('/')[-1]
 _src = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src90/"
 
-SRFPRE96_EXE = _pathfile.replace(_file, 'bin/max_srfpre96')
-SRFDIS96_EXE = _pathfile.replace(_file, 'bin/max_srfdis96')
+SRFPRE96_EXE = _pathfile.replace(_file, os.path.join('bin', 'max_srfpre96'))
+SRFDIS96_EXE = _pathfile.replace(_file, os.path.join('bin', 'max_srfdis96'))
 HERRMANN_TIMEOUT = 5
 
 
@@ -183,36 +184,34 @@ def readsrfdis96(srfdis96stdout, waves, types, modes, freqs):
     return values
 
 
-class HerrmannCaller(object):
-    @staticmethod
-    def curves2srfpre96input(curves):
+class HerrmannCallerBasis(object):
 
+    @staticmethod
+    def wtmf2srfpre96input(waves, types, modes, freqs):
+        assert len(waves) == len(types) == len(modes) == len(freqs)
         fmt = "\nSURF96 {wave:1s} {type:1s} X {mode:d} {period} 1. 1."
         surf96_txt = ""
 
         nrc = nlc = nru = nlu = 0
-        for curve in curves:
-            assert isinstance(curve, Curve)
-            for period in 1. / curve.freqs:
+        for wave, type, mode, freq in zip(waves, types, modes, freqs):
+            surf96_txt += fmt.format(
+                wave=wave,
+                type=type,
+                mode=mode,
+                period=1./freq)
 
-                surf96_txt += fmt.format(
-                    wave=curve.wave,
-                    type=curve.type,
-                    mode=curve.mode,
-                    period=period)
+            if wave == "R":
+                if type == "C":
+                    nrc = max([nrc, mode + 1])
+                elif type == "U":
+                    nru = max([nru, mode + 1])
 
-                if curve.wave == "R":
-                    if curve.type == "C":
-                        nrc = max([nrc, curve.mode + 1])
-                    elif curve.type == "U":
-                        nru = max([nru, curve.mode + 1])
+            elif wave == "L":
+                if type == "C":
+                    nlc = max([nlc, mode + 1])
 
-                elif curve.wave == "L":
-                    if curve.type == "C":
-                        nlc = max([nlc, curve.mode + 1])
-
-                    elif curve.type == "U":
-                        nlu = max([nlu, curve.mode + 1])
+                elif type == "U":
+                    nlu = max([nlu, mode + 1])
 
         srfpre96input = """{:d} {:d} {:d} {:d}""".format(nlc, nlu, nrc, nru) \
                         + surf96_txt
@@ -302,27 +301,33 @@ class HerrmannCaller(object):
               ("%f " * n) % tuple(rh)
         return out
 
-    def __init__(self, curves, h=0.005, ddc=0.005):
+    def __init__(self, waves, types, modes, freqs, h=0.005, ddc=0.005):
         """
-        :param curves: a list of Curve objects with the data points at which to compute dispersion
-        :param h: factor to convert phase to group see CPS
-        :param ddc:
+        initiate HerrmannCaller with 4 zippable arrays with same length
+        :param waves: 1d array with the wave type letter 'R' for Rayleigh, 'L' for Love
+        :param types: 1d array with the wave type letter 'C' for phase vel, 'U' from group vel
+        :param modes: 1d array with mode numbers 0=fundamental mode, 1=1st overtone, ...
+        :param freqs: 1d array with frequency values, in Hz
+        e.g.
+        waves = ['R', 'R', 'R', 'L', 'L', 'L']
+        types = ['C', 'C', 'C', 'C', 'C', 'C']
+        modes = [  0,   0,   0,   0,   0,   0]
+        freqs = [ 1.,  2.,  3.,  1.,  2.,  3.]
+        :param h: see HerrmannCaller
+        :param ddc: see HerrmannCaller
         """
-        self.curves = curves
 
-        srfpre96input = self.curves2srfpre96input(curves=curves)
+        self.waves = np.asarray(waves, '|S1')
+        self.types = np.asarray(types, '|S1')
+        self.modes = np.asarray(modes, int)
+        self.freqs = np.asarray(freqs, float)
+
+        srfpre96input = self.wtmf2srfpre96input(waves=self.waves, types=self.types, modes=self.modes, freqs=self.freqs)
         self.srfpre96output, stderr = self.callherrmann(stdin=srfpre96input, exe=SRFPRE96_EXE)
         self.srfpre96output = "{:f} {:f}\n".format(h, ddc) + self.srfpre96output
 
         if len(stderr):
             raise CPiSError('srfpre96 failed with error {}'.format(stderr))
-
-        self.waves = np.concatenate([curve.waves for curve in curves])
-        self.types = np.concatenate([curve.types for curve in curves])
-        self.modes = np.concatenate([curve.modes for curve in curves])
-        self.freqs = np.concatenate([curve.freqs for curve in curves])
-        self.curve_end_index = np.cumsum([curve.nfreqs for curve in curves])
-        self.curve_begin_index = np.concatenate(([0], self.curve_end_index[:-1]))
 
     def disperse(self, ztop, vp, vs, rh):
         """
@@ -349,6 +354,26 @@ class HerrmannCaller(object):
             modes=self.modes,
             freqs=self.freqs)
         return values
+
+
+class HerrmannCaller(HerrmannCallerBasis):
+    def __init__(self, curves, h=0.005, ddc=0.005):
+        """
+        :param curves: a list of Curve objects with the data points at which to compute dispersion
+        :param h: factor to convert phase to group see CPS
+        :param ddc:
+        """
+
+        waves = np.hstack([curve.waves for curve in curves])
+        types = np.hstack([curve.types for curve in curves])
+        modes = np.hstack([curve.modes for curve in curves])
+        freqs = np.hstack([curve.freqs for curve in curves])
+
+        HerrmannCallerBasis.__init__(self, waves=waves, types=types, modes=modes, freqs=freqs, h=h, ddc=ddc)
+
+        self.curves = curves
+        self.curve_end_index = np.cumsum([curve.nfreqs for curve in curves])
+        self.curve_begin_index = np.concatenate(([0], self.curve_end_index[:-1]))
 
     def __call__(self, ztop, vp, vs, rh, keepnans=False):
         """
@@ -386,38 +411,6 @@ class HerrmannCaller(object):
         return curves_out
 
 
-class HerrmannCallerFromLists(HerrmannCaller):
-    def __init__(self, waves, types, modes, freqs, h=0.005, ddc=0.005):
-        """
-        initiate HerrmannCaller with 4 zippable arrays with same length
-        :param waves: 1d array with the wave type letter 'R' for Rayleigh, 'L' for Love
-        :param types: 1d array with the wave type letter 'C' for phase vel, 'U' from group vel
-        :param modes: 1d array with mode numbers 0=fundamental mode, 1=1st overtone, ...
-        :param freqs: 1d array with frequency values, in Hz
-        e.g.
-        waves = ['R', 'R', 'R', 'L', 'L', 'L']
-        types = ['C', 'C', 'C', 'C', 'C', 'C']
-        modes = [  0,   0,   0,   0,   0,   0]
-        freqs = [ 1.,  2.,  3.,  1.,  2.,  3.]
-        :param h: see HerrmannCaller
-        :param ddc: see HerrmannCaller
-        """
-
-        curves = []
-        for w, t, m, freqs, _ in groupbywtm(
-                waves=waves, types=types,
-                modes=modes, freqs=freqs,
-                values=np.ones_like(freqs)):
-            curve = Curve(
-                wave=w, type=t,
-                mode=m, freqs=freqs,
-                values=None, dvalues=None)
-
-            curves.append(curve)
-
-        HerrmannCaller.__init__(self, curves=curves, h=h, ddc=ddc)
-
-
 class HerrmannCallerFromGroupedLists(HerrmannCaller):
     def __init__(self, Waves, Types, Modes, Freqs, h=0.005, ddc=0.005):
         """
@@ -434,6 +427,7 @@ class HerrmannCallerFromGroupedLists(HerrmannCaller):
         :param h: see HerrmannCaller
         :param ddc: see HerrmannCaller
         """
+
         curves = []
         for w, t, m, freqs in zip(Waves, Types, Modes, Freqs):
             curve = Curve(
@@ -497,7 +491,7 @@ cd {_src}
         os.system(script)
     else:
         print(script)
-        if raw_input('run command?').lower() in ["y", "yes"]:
+        if input('run command?').lower() in ["y", "yes"]:
             os.system(script)
 
 
