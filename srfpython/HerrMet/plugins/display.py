@@ -39,7 +39,7 @@ default_dpi = 100
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-m96", "-cmap", "-compact", "-ftsz", "-inline", "-h", "-help"]
+authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-svg", "-m96", "-cmap", "-compact", "-ftsz", "-inline", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
@@ -57,7 +57,7 @@ long_help = """\
     -pdf   [s i f i] compute and show the statistics for the selected models, see -plot for arguments
                      default {default_pdf_mode} {default_pdf_limit} {default_pdf_llkmin} {default_pdf_step} 
                      use --extract to save pdf outputs
-    -png   [i]       save figure as pngfile instead of displaying it on screen, requires dpi, default {default_dpi} 
+    -png/-svg [i]    save figure instead of displaying it on screen, requires dpi, default {default_dpi} 
     -m96    s [s...] append depth model(s) to the plot from mod96 file(s)
     -cmap            colormap, default {default_cmap}
     -compact         display only vs and the dispersion curves, default False
@@ -392,8 +392,13 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
         chftsz(rd.fig, argv["-ftsz"][0])
     else:
         chftsz(rd.fig, default_fontsize)
-    if "-png" in argv.keys():
-        dpi = argv['-png'][0] if len(argv['-png']) else default_dpi
+    if "-png" in argv.keys() or "-svg" in argv.keys():
+        if "-png" in argv.keys():
+            dpi = argv['-png'][0] if len(argv['-png']) else default_dpi
+            displayfile = displayfile.replace('.svg', ".png")
+        elif "-svg" in argv.keys():
+            dpi = argv['-svg'][0] if len(argv['-svg']) else default_dpi
+            displayfile = displayfile.replace('.png', ".svg")
         if verbose:
             print("writing %s" % displayfile)
         rd.fig.savefig(displayfile, dpi=dpi)
