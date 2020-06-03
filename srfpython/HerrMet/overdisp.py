@@ -1,5 +1,5 @@
 import numpy as np
-from srfpython.Herrmann.Herrmann import HerrmannCallerFromLists
+from srfpython.Herrmann.Herrmann import HerrmannCallerBasis
 from srfpython.standalone.multipro8 import Job, MapSync
 from srfpython.standalone.stdout import waitbar
 
@@ -34,7 +34,7 @@ class _OverdispCore(object):
 def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **mapkwargs):
     """extrapolate dispersion curves"""
 
-    herrmanncaller = HerrmannCallerFromLists(
+    herrmanncaller = HerrmannCallerBasis(
         waves=overwaves, types=overtypes,
         modes=overmodes, freqs=overfreqs,
         h=0.005, ddc=0.005)
