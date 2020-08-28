@@ -135,20 +135,20 @@ if __name__ == "__main__":
                 s96out = ".".join(m.split('/')[-1].split('.')[:-1]) + sfx + ".surf96"
                 while os.path.exists(s96out):
                     s96out = s96out.split(sfx + '.surf96')[0]
-                    if sfx == "": sfx = "_1"
-                    else: sfx = "_%d" % (int(sfx.strip("_")) + 1)
+                    if sfx == "":
+                        sfx = "_1"
+                    else:
+                        sfx = "_%d" % (int(sfx.strip("_")) + 1)
                     s96out = s96out + sfx + ".surf96"
+
                 print "%s => %s" % (m, s96out)
 
                 assert s96out.endswith('.surf96') or s96out.endswith('.s96')
 
                 with open(s96out, 'w') as fid:
                     for curve in curves:
-                        for FF, VV in zip(curve.freqs, curve.values):
-                            fid.write('SURF96 %s %s T %d %f %f 0.1\n' % (curve.wave, curve.type, curve.mode, 1. / FF, VV))
-                    # for w, t, mm, F, V in dispersion_1(ztop, vp, vs, rh, Waves, Types, Modes, Freqs):
-                    #     for FF, VV in zip(F, V):
-                    #         fid.write('SURF96 %s %s T %d %f %f 0.1\n' % (w, t, mm, 1. / FF, VV))
+                        fid.write(str(curve))
+
             else:
                 axvp = gcf().add_subplot(1, 5, 1)
                 axvs = gcf().add_subplot(1, 5, 2, sharey=axvp)
