@@ -12,9 +12,9 @@ freqs = np.logspace(np.log10(0.1), np.log10(1.), 10)
 
 hc = HerrmannCaller(curves=[
         Curve(wave="R", type="U", mode=0, freqs=freqs),
-        Curve(wave="R", type="C", mode=0, freqs=freqs),
-        Curve(wave="R", type="U", mode=1, freqs=freqs),
-        Curve(wave="R", type="C", mode=1, freqs=freqs)])
+        Curve(wave="R", type="C", mode=0, freqs=freqs)])
+        # Curve(wave="R", type="U", mode=1, freqs=freqs),    overtones not handled yet in optimize
+        # Curve(wave="R", type="C", mode=1, freqs=freqs)])   overtones not handled yet in optimize
 
 for fin in glob.glob('./model/nodes/*mod96'):
     dm = depthmodel_from_mod96(fin)
