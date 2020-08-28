@@ -51,28 +51,22 @@ class Curve(object):
         self.freqs = freqs
         self.values = values
         self.dvalues = dvalues
-        self.nfreqs = len(self.freqs)
-        self._waves = None  # attribute set only on first demand and kept afterwards
-        self._types = None
-        self._modes = None
+
+    @property
+    def nfreqs(self):
+        return len(self.freqs)
 
     @property
     def waves(self):
-        if self._waves is None:
-            self._waves = np.asarray([self.wave for _ in range(self.nfreqs)], '|S1')
-        return self._waves
+        return np.asarray([self.wave for _ in range(self.nfreqs)], '|S1')
 
     @property
     def types(self):
-        if self._types is None:
-            self._types = np.asarray([self.type for _ in range(self.nfreqs)], '|S1')
-        return self._types
+        return np.asarray([self.type for _ in range(self.nfreqs)], '|S1')
 
     @property
     def modes(self):
-        if self._modes is None:
-            self._modes = np.asarray([self.mode for _ in range(self.nfreqs)], int)
-        return self._modes
+        return np.asarray([self.mode for _ in range(self.nfreqs)], int)
 
     def label(self):
         return '{}{}{}'.format(self.wave, self.type, self.mode)

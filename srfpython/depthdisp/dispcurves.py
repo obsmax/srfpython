@@ -406,6 +406,18 @@ class surf96reader_from_arrays(surf96reader_from_surf96string):
             waves, types, flags, modes, 1. / freqs, values, dvalues
 
 
+class surf96reader_from_curves(surf96reader_from_arrays):
+    def __init__(self, curves):
+        surf96reader_from_arrays.__init__(
+            self,
+            waves=np.hstack([curve.waves for curve in curves]),
+            types=np.hstack([curve.types for curve in curves]),
+            modes=np.hstack([curve.modes for curve in curves]),
+            freqs=np.hstack([curve.freqs for curve in curves]),
+            values=np.hstack([curve.values for curve in curves]),
+            dvalues=None, flags=None)
+
+
 def groupbywtm(waves, types, modes, freqs, values, dvalues=None, keepnans=True):
     """group outputs from dispersion by wave, type, modes
 
