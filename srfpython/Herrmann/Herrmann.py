@@ -80,6 +80,17 @@ class Curve(object):
         ax.grid(True, which="major")
         ax.grid(True, which="minor")
 
+    def __str__(self):
+        fmt = 'SURF96 {wave:1s} {type:1s} T {mode:d} {period:f} {value:f} 0.1\n'
+        s = ""
+        for ff, vv in zip(self.freqs, self.values):
+            s += fmt.format(
+                wave=self.wave,
+                type=self.type,
+                mode=self.mode,
+                period=1. / ff,
+                value=vv)
+        return s
 
 def argcrossfind(X, Y):
 
