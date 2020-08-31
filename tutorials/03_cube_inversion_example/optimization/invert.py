@@ -13,71 +13,21 @@ from srfpython.utils import Timer
 import scipy.sparse as sp
 from scipy.sparse import linalg as splinalg
 
-# ========== global
-with np.load('mprior.npz') as loader:
-    x = loader['x']
-    y = loader['y']
-    zmid = loader['zmid']
-    xflat = loader['xflat']
-    yflat = loader['yflat']
-    zflat = zmidflat = loader['zmidflat']
-    Lh = loader['Lh']
-    Lv = loader['Lv']
-    Mprior = loader['Mprior']
-    Munc = loader['Munc']
-    damping = loader['damping']
-    parameterizer_strings = loader['parameterizer_strings']
-
-with np.load('dobs.npz') as loader:
-    Nobs = loader['Nobs']
-    Waves = loader['Waves']
-    Types = loader['Types']
-    Modes = loader['Modes']
-    Freqs = loader['Freqs']
-    Dobs = loader['Dobs']
-    Dunc = loader['Dunc']
-    datacoder_strings = loader['datacoder_strings']
-
-
-nx, ny, nz = len(x), len(y), len(zmid)
-nobs = len(Dobs)
-
-
-
-# nz, ny, nx = np.load("nznynx.npy")
-# nper, __ny, __nx = np.load("npernynx.npy")
-# assert nx == __nx and ny == __ny
-# del __nx, __ny
-# x = np.load('x.npy')
-# y = np.load('y.npy')
-# zmid = np.load('zmid.npy')
-# xflat = np.load('xflat.npy')
-# yflat = np.load('yflat.npy')
-# zflat = np.load('zmidflat.npy')
-# Mprior = np.load('Mprior.npy')
-# Munc = np.load('Munc.npy')
-# Dobs = np.load('Dobs.npy')
-# Dunc = np.load('Dunc.npy')
-# damping = np.load('damping.npy')[0]
-
-Munc *= np.sqrt(float(len(Mprior)) / float(len(Dobs))) / damping  # equilibrate the costs, apply damping here
-
-CD = sp.diags(Dunc ** 2., format="csc", shape=(len(Dobs), len(Dobs)))
-CDinvdiag = Dunc ** -2.
-
-
-# CD = sp.load_npz('CD.npz')
-# CDinvdiag = (CD.diagonal()) ** -1.0
 
 # ========== g
 class ForwardOperator(object):
 
-    def __init__(self, verbose=True, **mapkwargs):
+    def __init__(self,
+                 parameterizer_strings, datacoder_strings,
+                 nx, ny, nz,
+                 verbose=True, **mapkwargs):
         self.mapkwargs = mapkwargs
+        self.nx, self.ny, self.nz = nx, ny, nz
+
         def job_generator():
-            for nnode, (parameterizer_string, datacoder_string) in enumerate(zip(
-                    parameterizer_strings, datacoder_strings)):
-                yield Job(nnode, parameterizer_string, datacoder_string)
+            ls = zip(parameterizer_strings, datacoder_strings)
+            for nnode, (ps, ds) in enumerate(ls):
+                yield Job(nnode, parameterizer_string=ps, datacoder_string=ds)
 
         def job_handler(nnode, parameterizer_string, datacoder_string):
             parameterizer = load_paramfile(parameterizer_string, verbose=False)[0]
@@ -87,6 +37,7 @@ class ForwardOperator(object):
 
             return nnode, theory
 
+        wb = None
         if verbose:
             wb = waitbarpipe('build g')
 
@@ -117,9 +68,11 @@ class ForwardOperator(object):
             data = theory(m=m)
             return nnode, data
 
+        wb = None
         if verbose:
             wb = waitbarpipe('g(m)')
-        Data = np.zeros_like(Dobs)  #np.zeros(ny * nx * nper, float)
+
+        Data = np.zeros_like(Dobs)
         with MapAsync(job_handler, job_generator(), **self.mapkwargs) as ma:
 
             for nnode, (nnode, data), _, _ in ma:
@@ -151,6 +104,7 @@ class ForwardOperator(object):
             fd = theory.frechet_derivatives(m=m)
             return nnode, fd
 
+        wb = None
         if verbose:
             wb = waitbarpipe('dg/dm(m)')
 
@@ -184,21 +138,35 @@ class ForwardOperator(object):
             wb.close()
 
         G = sp.csc_matrix((dats, (rows, cols)), shape=(len(Dobs), len(Mprior)), dtype=float)
-        plt.figure()
-        plt.imshow(G.A)
-        plt.show()
+        # plt.figure()
+        # plt.imshow(G.A)
+        # plt.show()
         return G
 
 
 # ========== CM
 class ModelSmoother(object):
-    shape = (len(Mprior), len(Mprior))
+    def __init__(self,
+                 x, y, zmid,
+                 xflat, yflat, zmidflat,
+                 Lh, Lv):
+        self.Lh = Lh
+        self.Lv = Lv
+        self.x, self.y, self.zmid = x, y, zmid
+        self.xflat = xflat
+        self.yflat = yflat
+        self.zmidflat = zmidflat
+
+        self.nx, self.ny, self.nz = len(x), len(y), len(zmid)
+        self.shape = (self.nx * self.ny * self.nz, self.nx * self.ny * self.nz)
 
     def row(self, i, columns=slice(None, None, None)):
+        Lh, Lv = self.Lh, self.Lv
+        xflat, yflat, zflat = self.xflat, self.yflat, self.zmidflat
 
         d2norm = ((xflat[columns] - xflat[i]) / Lh) ** 2.0 \
-                +((yflat[columns] - yflat[i]) / Lh) ** 2.0 \
-                +((zflat[columns] - zflat[i]) / Lv) ** 2.0
+               + ((yflat[columns] - yflat[i]) / Lh) ** 2.0 \
+               + ((zflat[columns] - zflat[i]) / Lv) ** 2.0
         s_line = np.exp(-0.5 * d2norm)
         return s_line / s_line.sum()
 
@@ -207,6 +175,11 @@ class ModelSmoother(object):
         return self.row(i=j, columns=rows)
 
     def sparse_row(self, i, trunc=2.):
+        x, y, z = self.x, self.y, self.zmid
+        nx, ny, nz = self.nx, self.ny, self.nz
+        Lh, Lv = self.Lh, self.Lv
+        xflat, yflat, zflat = self.xflat, self.yflat, self.zmidflat
+
         ix = np.abs(x - xflat[i]) < trunc * Lh
         iy = np.abs(y - yflat[i]) < trunc * Lh
         iz = np.abs(zmid - zflat[i]) < trunc * Lv
@@ -260,7 +233,7 @@ class ModelSmoother(object):
 
 
 class ModelCovarianceMatrix(ModelSmoother):
-    shape = (len(Mprior), len(Mprior))
+    # shape = (len(Mprior), len(Mprior))
 
     def diagonal(self, offset=0):
         if offset == 0:
@@ -273,6 +246,8 @@ class ModelCovarianceMatrix(ModelSmoother):
             raise ValueError(offset)
 
     def row(self, i, columns=slice(None, None, None)):
+        Lh, Lv = self.Lh, self.Lv
+        xflat, yflat, zflat = self.xflat, self.yflat, self.zmidflat
 
         d2norm = ((xflat[columns] - xflat[i]) / Lh) ** 2.0 \
                 +((yflat[columns] - yflat[i]) / Lh) ** 2.0 \
@@ -281,6 +256,10 @@ class ModelCovarianceMatrix(ModelSmoother):
         return Munc[columns] * Munc[i] * np.exp(-0.5 * d2norm)
 
     def sparse_row(self, i, trunc=2.):
+        x, y, z = self.x, self.y, self.zmid
+        nx, ny, nz = self.nx, self.ny, self.nz
+        Lh, Lv = self.Lh, self.Lv
+        xflat, yflat, zflat = self.xflat, self.yflat, self.zmidflat
 
         ix = np.abs(x - xflat[i]) < trunc * Lh
         iy = np.abs(y - yflat[i]) < trunc * Lh
@@ -325,9 +304,53 @@ class ModelCovarianceMatrix(ModelSmoother):
 
 
 if __name__ == '__main__':
-    smoother = ModelSmoother()
-    CM = ModelCovarianceMatrix()
-    g = ForwardOperator(Nworkers=8)
+
+    # ========== Load inputs
+    with np.load('mprior.npz') as loader:
+        x = loader['x']
+        y = loader['y']
+        zmid = loader['zmid']
+        xflat = loader['xflat']
+        yflat = loader['yflat']
+        zflat = zmidflat = loader['zmidflat']
+        Lh = loader['Lh']
+        Lv = loader['Lv']
+        Mprior = loader['Mprior']
+        Munc = loader['Munc']
+        damping = loader['damping']
+        parameterizer_strings = loader['parameterizer_strings']
+
+    with np.load('dobs.npz') as loader:
+        Nobs = loader['Nobs']
+        Waves = loader['Waves']
+        Types = loader['Types']
+        Modes = loader['Modes']
+        Freqs = loader['Freqs']
+        Dobs = loader['Dobs']
+        Dunc = loader['Dunc']
+        datacoder_strings = loader['datacoder_strings']
+
+    nx, ny, nz = len(x), len(y), len(zmid)
+    nobs = len(Dobs)
+
+    Munc *= np.sqrt(float(len(Mprior)) / float(len(Dobs))) / damping  # equilibrate the costs, apply damping here
+
+    CD = sp.diags(Dunc ** 2., format="csc", shape=(len(Dobs), len(Dobs)))
+    CDinvdiag = Dunc ** -2.
+
+    smoother = ModelSmoother(
+        x=x, y=y, zmid=zmid,
+        xflat=xflat, yflat=yflat, zmidflat=zflat,
+        Lh=Lh, Lv=Lv)
+    CM = ModelCovarianceMatrix(
+        x=x, y=y, zmid=zmid,
+        xflat=xflat, yflat=yflat, zmidflat=zflat,
+        Lh=Lh, Lv=Lv)
+    g = ForwardOperator(
+        parameterizer_strings=parameterizer_strings,
+        datacoder_strings=datacoder_strings,
+        nx=nx, ny=ny, nz=nz,
+        Nworkers=8)
 
     Dprior = g(Mprior)
     np.save('Dprior.npy', Dprior)  # before smoothing
@@ -342,7 +365,6 @@ if __name__ == '__main__':
     D0 = g(M0)
     np.save('M0.npy', M0)
     np.save('D0.npy', D0)
-
 
     MI = M0.copy()
     DI = D0.copy()

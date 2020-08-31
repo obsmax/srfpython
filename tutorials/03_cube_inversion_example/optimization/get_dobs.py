@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 from srfpython.depthdisp.dispcurves import surf96reader
 from srfpython.HerrMet.datacoders import Datacoder_log, makedatacoder
 from srfpython.standalone.stdout import waitbarpipe
-
 import scipy.sparse as sp
 
 # ==================== read the parameter file
@@ -97,14 +96,3 @@ np.savez('dobs.npz',
 plt.figure()
 plt.plot(Dobs)
 plt.show()
-
-# assert len(Dobs) == nx * ny * nper
-# # CD = sp.diags(Dunc ** 2.0, shape=(len(Dobs), len(Dobs)), format="csc")
-# # sp.save_npz('CD.npz', CD)
-#
-# np.save('datacoder_strings.npy', datacoder_strings)
-# np.save('npernynx.npy', np.array([nper, ny, nx]))  # warning Dobs in a flat version of (ny, nx, nper)
-# np.save('periods.npy', periods)
-# np.save('pflat.npy', pflat)
-# np.save('Dobs.npy', Dobs)
-# np.save('Dunc.npy', Dunc)

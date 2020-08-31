@@ -13,3 +13,27 @@ Worker Worker-0001 failed during job 0
     CPiSDomainError: vs value error [nan nan nan nan nan nan nan nan nan nan nan nan nan nan nan nan nan nan
  nan nan]
 
+Worker Worker-0001 failed during job 0
+    Traceback (most recent call last):
+      File "/home/max/prog/git/srfpython/srfpython/standalone/multipro8.py", line 942, in run
+    answer = self.target(*job.args, **job.kwargs)  # call the target function here!!!
+      File "/home/max/prog/git/srfpython/srfpython/standalone/multipro8.py", line 842, in __call__
+    return self.core(*args, **kwargs)
+      File "invert.py", line 215, in job_handler
+    rows, cols, vals = self.sparse_row(i, trunc=trunc)
+      File "invert.py", line 178, in sparse_row
+    x, y, z = self.x, self.y, self.z
+    AttributeError: 'ModelSmoother' object has no attribute 'z'
+
+Worker Worker-0001 failed during job 0
+    Traceback (most recent call last):
+      File "/home/max/prog/git/srfpython/srfpython/standalone/multipro8.py", line 942, in run
+    answer = self.target(*job.args, **job.kwargs)  # call the target function here!!!
+      File "/home/max/prog/git/srfpython/srfpython/standalone/multipro8.py", line 842, in __call__
+    return self.core(*args, **kwargs)
+      File "invert.py", line 287, in job_handler
+    _rows, _cols, _vals = self.sparse_row(i, trunc=trunc)
+      File "invert.py", line 259, in sparse_row
+    x, y, z = self.x, self.y, self.z
+    AttributeError: 'ModelCovarianceMatrix' object has no attribute 'z'
+
