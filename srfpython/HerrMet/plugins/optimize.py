@@ -150,7 +150,9 @@ def optimize(argv, verbose, mapkwargs):
               targetfiles="./path/to/inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.target",
               extractfiles="./path/to/inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.best_1000_0_1.p0.50.mod96",
               ndecim=1, Lh=1.0, Lv=0.5, vsunc=0.1, damping=1.0)
-          print(template)
+
+          if verbose:
+            print(template)
 
           if os.path.isfile(HERRMETOPTIMIZEPARAMFILE):
               raise IOError(HERRMETOPTIMIZEPARAMFILE, ' exists already')
@@ -433,8 +435,8 @@ def optimize(argv, verbose, mapkwargs):
             CM_sparse_lu = splinalg.splu(CM_sparse)
 
         G = None
-        data_costs = []
-        model_costs = []
+        data_costs = [0.5 * (CDinvdiag * (Dobs - DI) ** 2.0).sum()]
+        model_costs = [0.]  #0.5 * (CM_sparse_lu.solve(MI - M0) * (MI - M0)).sum()
         for i in range(20):
             if G is None or True:
                 G = g.frechet_derivatives(MI)
@@ -496,6 +498,19 @@ def optimize(argv, verbose, mapkwargs):
         with np.load(HERRMETOPTIMIZEINVFILE) as loader:
             vs_0 = loader['M0']
             vs_sol = loader['Msol']
+            data_costs = loader['data_costs']
+            model_costs = loader['model_costs']
+            total_costs = loader['total_costs']
+
+        plt.figure()
+
+        plt.plot(data_costs, 'bs-', label="$ \chi_D^2 $") #0.5 * (CDinvdiag * (Dobs - DI) ** 2.0).sum()
+        plt.semilogy(model_costs, 'gs-', label="$ \chi_M^2 $")   ##0.5 * (CM_sparse_lu.solve(MI - M0) * (MI - M0)).sum()  # fails if I use Mprior instead of M0
+        plt.plot(total_costs, 'ro-', label="$ \chi_D^2 + chi_M^2 $")
+        plt.gca().set_xlabel('iteration number')
+        plt.gca().grid(True, linestyle=":")
+        plt.gca().set_ylabel(r'$ \chi $')
+        plt.gca().legend()
 
         if argv['-show'][0] == "z":
             zslice = argv['-show'][1]
