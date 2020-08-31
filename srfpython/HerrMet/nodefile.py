@@ -4,7 +4,7 @@ from srfpython.HerrMet.files import ROOTNAME, HERRMETPARAMFILE, HERRMETTARGETFIL
 from srfpython.standalone.asciifile import AsciiFile_fromstring
 # from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthspace
 from srfpython.coordinates import haversine
-
+raise Exception('obsolet')
 
 NODEFILE_HEADER = """# Nodefile for HerrMet
 

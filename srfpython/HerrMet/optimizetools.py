@@ -19,10 +19,12 @@ class ForwardOperator(object):
 
     def __init__(self,
                  parameterizer_strings, datacoder_strings,
-                 nx, ny, nz,
+                 nx, ny, nz, Nobs,
                  verbose=True, **mapkwargs):
+
         self.mapkwargs = mapkwargs
         self.nx, self.ny, self.nz = nx, ny, nz
+        self.Nobs = Nobs  # number of dispersion point per node of the grid
 
         def job_generator():
             ls = zip(parameterizer_strings, datacoder_strings)
@@ -55,6 +57,9 @@ class ForwardOperator(object):
         self.theorys = np.array(theorys, dtype=object).reshape((ny, nx))
 
     def __call__(self, M, verbose=True):
+        nx, ny, nz = self.nx, self.ny, self.nz
+        Nobs = self.Nobs
+
         M = M.reshape((nz, ny, nx))
         theorys = self.theorys
 
@@ -72,7 +77,7 @@ class ForwardOperator(object):
         if verbose:
             wb = waitbarpipe('g(m)')
 
-        Data = np.zeros_like(Dobs)
+        Data = np.zeros(Nobs.sum(), float)
         with MapAsync(job_handler, job_generator(), **self.mapkwargs) as ma:
 
             for nnode, (nnode, data), _, _ in ma:
@@ -90,6 +95,8 @@ class ForwardOperator(object):
         return Data  # warning : Data means encoded data
 
     def frechet_derivatives(self, M, verbose=True):
+        nx, ny, nz = self.nx, self.ny, self.nz
+        Nobs = self.Nobs
 
         M = M.reshape((nz, ny, nx))
         theorys = self.theorys
@@ -137,7 +144,7 @@ class ForwardOperator(object):
         if verbose:
             wb.close()
 
-        G = sp.csc_matrix((dats, (rows, cols)), shape=(len(Dobs), len(Mprior)), dtype=float)
+        G = sp.csc_matrix((dats, (rows, cols)), shape=(Nobs.sum(), nz * ny * nx), dtype=float)
         # plt.figure()
         # plt.imshow(G.A)
         # plt.show()
@@ -175,7 +182,7 @@ class ModelSmoother(object):
         return self.row(i=j, columns=rows)
 
     def sparse_row(self, i, trunc=2.):
-        x, y, z = self.x, self.y, self.zmid
+        x, y, zmid = self.x, self.y, self.zmid
         nx, ny, nz = self.nx, self.ny, self.nz
         Lh, Lv = self.Lh, self.Lv
         xflat, yflat, zflat = self.xflat, self.yflat, self.zmidflat
@@ -233,9 +240,12 @@ class ModelSmoother(object):
 
 
 class ModelCovarianceMatrix(ModelSmoother):
-    # shape = (len(Mprior), len(Mprior))
+    def __init__(self, Munc, **kwargs):
+        ModelSmoother.__init__(self, **kwargs)
+        self.Munc = Munc
 
     def diagonal(self, offset=0):
+        Munc = self.Munc
         if offset == 0:
             return Munc ** 2.0
         elif 0 < offset < self.shape[1]:
@@ -246,6 +256,8 @@ class ModelCovarianceMatrix(ModelSmoother):
             raise ValueError(offset)
 
     def row(self, i, columns=slice(None, None, None)):
+        Munc = self.Munc
+
         Lh, Lv = self.Lh, self.Lv
         xflat, yflat, zflat = self.xflat, self.yflat, self.zmidflat
 
@@ -256,7 +268,9 @@ class ModelCovarianceMatrix(ModelSmoother):
         return Munc[columns] * Munc[i] * np.exp(-0.5 * d2norm)
 
     def sparse_row(self, i, trunc=2.):
-        x, y, z = self.x, self.y, self.zmid
+        Munc = self.Munc
+
+        x, y, zmid = self.x, self.y, self.zmid
         nx, ny, nz = self.nx, self.ny, self.nz
         Lh, Lv = self.Lh, self.Lv
         xflat, yflat, zflat = self.xflat, self.yflat, self.zmidflat
@@ -301,128 +315,3 @@ class ModelCovarianceMatrix(ModelSmoother):
         vals = np.hstack(vals)
 
         return sp.csc_matrix((vals, (rows, cols)))
-
-
-if __name__ == '__main__':
-
-    from srfpython.HerrMet.files import HERRMETOPTIMIZEPARAMFILE, HERRMETOPTIMIZEDOBSFILE, HERRMETOPTIMIZEPRIORFILE
-    # ========== Load inputs
-    with np.load(HERRMETOPTIMIZEPRIORFILE) as loader:
-        x = loader['x']
-        y = loader['y']
-        zmid = loader['zmid']
-        xflat = loader['xflat']
-        yflat = loader['yflat']
-        zflat = zmidflat = loader['zmidflat']
-        Lh = loader['Lh']
-        Lv = loader['Lv']
-        Mprior = loader['Mprior']
-        Munc = loader['Munc']
-        damping = loader['damping']
-        parameterizer_strings = loader['parameterizer_strings']
-
-    with np.load(HERRMETOPTIMIZEDOBSFILE) as loader:
-        Nobs = loader['Nobs']
-        Waves = loader['Waves']
-        Types = loader['Types']
-        Modes = loader['Modes']
-        Freqs = loader['Freqs']
-        Dobs = loader['Dobs']
-        Dunc = loader['Dunc']
-        datacoder_strings = loader['datacoder_strings']
-
-    nx, ny, nz = len(x), len(y), len(zmid)
-    nobs = len(Dobs)
-
-    Munc *= np.sqrt(float(len(Mprior)) / float(len(Dobs))) / damping  # equilibrate the costs, apply damping here
-
-    CD = sp.diags(Dunc ** 2., format="csc", shape=(len(Dobs), len(Dobs)))
-    CDinvdiag = Dunc ** -2.
-
-    smoother = ModelSmoother(
-        x=x, y=y, zmid=zmid,
-        xflat=xflat, yflat=yflat, zmidflat=zflat,
-        Lh=Lh, Lv=Lv)
-    CM = ModelCovarianceMatrix(
-        x=x, y=y, zmid=zmid,
-        xflat=xflat, yflat=yflat, zmidflat=zflat,
-        Lh=Lh, Lv=Lv)
-    g = ForwardOperator(
-        parameterizer_strings=parameterizer_strings,
-        datacoder_strings=datacoder_strings,
-        nx=nx, ny=ny, nz=nz,
-        Nworkers=8)
-
-    Dprior = g(Mprior)
-    np.save('Dprior.npy', Dprior)  # before smoothing
-
-    plt.figure()
-    plt.plot(Dobs)
-    plt.plot(Dprior)
-    plt.show()
-
-    M0 = smoother.dot(Mprior, trunc=4.)
-
-    D0 = g(M0)
-    np.save('M0.npy', M0)
-    np.save('D0.npy', D0)
-
-    MI = M0.copy()
-    DI = D0.copy()
-
-    with Timer('CM_sparse'):
-        CM_sparse = CM.sparse(trunc=4.)
-    with Timer('CM_lu'):
-        CM_sparse_lu = splinalg.splu(CM_sparse)
-
-    # plt.figure()
-    # plt.imshow(CM_sparse.A)
-    # plt.show()
-    # exit()
-
-    G = None
-    data_costs = []
-    model_costs = []
-    for i in range(20):
-        if G is None or True:
-            G = g.frechet_derivatives(MI)
-            with Timer('G * CM * GT + CD'):
-                Ksparse = G * CM_sparse * G.T + CD
-
-            with Timer('splu(G * CM * GT + CD)'):
-                Klu = splinalg.splu(Ksparse)
-
-        XI = Dobs - DI + G * (MI - M0)
-        DM = CM.dot(G.T * Klu.solve(XI))
-        DM = (M0 - MI + DM)
-
-        if np.abs(DM).max() > 0.25:
-             warnings.warn(str(np.abs(DM).max()))
-             DM *= 0.25 / np.abs(DM).max()
-
-        print("max correction:", np.abs(DM).max())
-        MI = MI + DM
-        DI = g(MI)
-
-        # ============== costs
-        chi2_data = 0.5 * (CDinvdiag * (Dobs - DI) ** 2.0).sum()
-        chi2_model = 0.5 * (CM_sparse_lu.solve(MI - M0) * (MI - M0)).sum()  # fails if I use Mprior instead of M0
-        if chi2_model < 0 or chi2_data < 0:
-            raise ValueError(chi2_model, chi2_data)  # may happen after numerical instability
-
-        print('data cost: ', chi2_data)
-        print('model cost: ', chi2_model)
-        print('total cost: ', chi2_data + chi2_model)
-
-        data_costs.append(chi2_data)
-        model_costs.append(chi2_model)
-
-        np.save('data_costs.npy', np.asarray(data_costs))
-        np.save('model_costs.npy', np.asarray(model_costs))
-        np.save('total_costs.npy', np.asarray(model_costs) + np.asarray(data_costs))
-        np.save('Msol.npy', MI)
-        np.save('Dsol.npy', DI)
-
-        if np.abs(DM).max() <= 0.01:
-            print('convergence achieved')
-            break

@@ -32,7 +32,7 @@ def check_keys(argv):
         if k not in authorized_keys:
             print('option {} is not recognized'.format(k))  # only for the default plugin
 
-            # raise Exception('option {} is not recognized'.format(k))  # please use this line in other plugins
+            raise Exception('option {} is not recognized'.format(k))  # please use this line in other plugins
 
 
 def default(argv, verbose, mapkwargs):

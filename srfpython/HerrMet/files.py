@@ -35,6 +35,11 @@ HERRMETEXTRACTBESTMODELFILE = os.path.join(
     '{rootname}',
     '_HerrMet.rank{rank:d}.modelid{modelid:d}.chainid{chainid:d}.llk{llk:f}.mod96')
 
+HERRMETOPTIMIZEPARAMFILE = '_HerrMet.optimize.param'
+HERRMETOPTIMIZEPRIORFILE = '_HerrMet.mprior.npz'
+HERRMETOPTIMIZEDOBSFILE = '_HerrMet.dobs.npz'
+HERRMETOPTIMIZEINVFILE = '_HerrMet.inv.npz'
+
 # the rootnames to use as default in several plugins
 DEFAULTROOTNAMES = os.path.dirname(HERRMETTARGETFILE.format(rootname=ROOTNAME.format(node="*")))
 
