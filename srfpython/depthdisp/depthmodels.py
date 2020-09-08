@@ -108,7 +108,8 @@ class depthmodel1D(object):
     def show(self, ax, marker="-", **kwargs): #halfspacemarker="-",
 
         zz, vv = self.stairs()
-        zz[-1] = np.max([1.5 * self.z[-1], 3.0]) #cannot plot np.inf...
+        # zz[-1] = np.max([1.5 * self.z[-1], 3.0]) #cannot plot np.inf...
+        zz[-1] = 1.1 * self.z[-1]
 
         hdl, = ax.plot(vv, zz, marker, **kwargs)
 

@@ -92,6 +92,7 @@ class Curve(object):
                 value=vv)
         return s
 
+
 def argcrossfind(X, Y):
 
     """X and Y are unique and sorted"""
@@ -254,11 +255,17 @@ class HerrmannCallerBasis(object):
     @staticmethod
     def depthmodel_arrays_to_string(ztop, vp, vs, rh):
         """prepare input for modified srfpre96 (max_srfpre96)
-           z   = depth in km, z[0] must be 0
-           vp  = vp in km/s
-           vs  = vs in km/s
-           rh  = density in g/cm3
+        :param z: array, depth in km, z[0] must be 0
+        :param vp: array, vp in km/s
+        :param vs: array, vs in km/s
+        :param rh: array, density in g/cm3
         """
+
+        # assume input are np.ndarrays
+        # ztop = np.asarray(ztop, float)
+        # vs = np.asarray(vs, float)
+        # vp = np.asarray(vp, float)
+        # rh = np.asarray(rh, float)
 
         if ztop[0]:
             raise CPiSDomainError('Z0 must be 0')  # assert z[0] == 0.
@@ -267,7 +274,6 @@ class HerrmannCallerBasis(object):
         if not (n == len(vp) == len(vs) == len(rh)):
             raise CPiSDomainError('Z VP, VS, RH must be the same length')  # assert n == len(vp) == len(vs) == len(rh)
 
-        ztop = np.asarray(ztop, float)
         if (np.isinf(ztop) | np.isnan(ztop)).any():
             raise CPiSDomainError('got inapropriate values for Z (%s)' % str(ztop))
 
@@ -276,23 +282,21 @@ class HerrmannCallerBasis(object):
             H = ztop[1:] - ztop[:-1]
             raise CPiSDomainError(
                 'Z must be growing, layers must be at least '
-                '0.001km thick, got %s (%s)' % (str(ztop), str(H[Ibad])))
+                '0.001km thick, got %s (%s), '
+                'please consider scaling your model' % (str(ztop), str(H[Ibad])))
 
-        vs = np.asarray(vs, float)
         if (np.isinf(vs) | np.isnan(vs)).any():
             raise CPiSDomainError('vs value error %s' % str(vs))
 
         if not (vs > 0.08).all():
             raise CPiSDomainError('vs domain error %s' % str(vs))
 
-        vp = np.asarray(vp, float)
         if (np.isinf(vp) | np.isnan(vp)).any():
             raise CPiSDomainError('vp value error %s' % str(vp))
 
         if not (vp > vs * (4. / 3.) ** 0.5).all():
             raise CPiSDomainError('vp over vs domain error %s' % str(vp / vs))
 
-        rh = np.asarray(rh, float)
         if (np.isinf(rh) | np.isnan(rh)).any():
             raise CPiSDomainError('rh value error %s' % str(rh))
 
@@ -306,13 +310,22 @@ class HerrmannCallerBasis(object):
               ("%f " * n) % tuple(rh)
         return out
 
-    def __init__(self, waves, types, modes, freqs, h=0.005, ddc=0.005):
+    def __init__(self, waves, types, modes, freqs,
+                 h=0.005, ddc=0.005, superscaling=1.0):
         """
         initiate HerrmannCaller with 4 zippable arrays with same length
         :param waves: 1d array with the wave type letter 'R' for Rayleigh, 'L' for Love
         :param types: 1d array with the wave type letter 'C' for phase vel, 'U' from group vel
         :param modes: 1d array with mode numbers 0=fundamental mode, 1=1st overtone, ...
         :param freqs: 1d array with frequency values, in Hz
+        :param superscaling: float, scale the model by superscaling (constant)
+             this scaling mode uses a density invariant mode.
+             scaling should be used for reduced size applications (e.g. cm or less)
+             this is the scaling mode that allows the largest scaling values
+             but it must be defined at the initiation of the HerrmannCallerBasis instance
+             and cannot be changed afterwards (because it would need re-call srfprep96)
+             see also the scaling parameter in self.disperse
+             which can be changed without re-initiating the instance
         e.g.
         waves = ['R', 'R', 'R', 'L', 'L', 'L']
         types = ['C', 'C', 'C', 'C', 'C', 'C']
@@ -321,48 +334,78 @@ class HerrmannCallerBasis(object):
         :param h: see HerrmannCaller
         :param ddc: see HerrmannCaller
         """
+        if superscaling <= 0.:
+            raise ValueError(superscaling)
+        self.superscaling = superscaling
 
         self.waves = np.asarray(waves, '|S1')
         self.types = np.asarray(types, '|S1')
         self.modes = np.asarray(modes, int)
         self.freqs = np.asarray(freqs, float)
 
-        srfpre96input = self.wtmf2srfpre96input(waves=self.waves, types=self.types, modes=self.modes, freqs=self.freqs)
-        self.srfpre96output, stderr = self.callherrmann(stdin=srfpre96input, exe=SRFPRE96_EXE)
+        srfpre96input = self.wtmf2srfpre96input(
+            waves=self.waves,
+            types=self.types,
+            modes=self.modes,
+            freqs=self.freqs / np.sqrt(self.superscaling))
+
+        self.srfpre96output, stderr = self.callherrmann(
+            stdin=srfpre96input, exe=SRFPRE96_EXE)
+
         self.srfpre96output = "{:f} {:f}\n".format(h, ddc) + self.srfpre96output
 
         if len(stderr):
             raise CPiSError('srfpre96 failed with error {}'.format(stderr))
 
-    def disperse(self, ztop, vp, vs, rh):
+    def disperse(self, ztop, vp, vs, rh, scaling=1.):
         """
         :param ztop: top layer depth array, km, first = 0
         :param vp: in km/s, array 1d
         :param vs: in km/s, array 1d
         :param rh: density in g/cm3, array 1d
+        :param scaling: scaling factor to apply to the model
+            i.e. call Herrmann's routines with a scaled version
+                 of the model so that the output is the same
+                 the scaling used in this method
+                 is frequency invariant, otherwise srfprep96 should be re-called
+                 this scaling mode can only be used with reduced scaling values (around 1)
+                 see also superscaling in the __init__ method
         :return values: dispersion values in km/s, or nan
         """
+
+        if scaling <= 0.:
+            raise ValueError(scaling)
+        sqrt_superscaling = np.sqrt(self.superscaling)
+        depthmodel_string = self.depthmodel_arrays_to_string(
+            ztop=np.asarray(ztop, float) * scaling * self.superscaling,
+            vp=np.asarray(vp, float) * scaling * sqrt_superscaling,
+            vs=np.asarray(vs, float) * scaling * sqrt_superscaling,
+            rh=np.asarray(rh, float) / scaling)
+
         srfdis96input = \
             "{depthmodel_string:s}\n".format(
-                depthmodel_string=self.depthmodel_arrays_to_string(ztop, vp, vs, rh)) \
+                depthmodel_string=depthmodel_string) \
             + self.srfpre96output
 
-        srfdis96output, stderr = self.callherrmann(stdin=srfdis96input, exe=SRFDIS96_EXE)
+        srfdis96output, stderr = self.callherrmann(
+            stdin=srfdis96input, exe=SRFDIS96_EXE)
 
         if len(stderr):
-            raise CPiSError('srfdis96 failed with error : {}'.format(stderr))
+            raise CPiSError(
+                'srfdis96 failed with error : {}'.format(stderr))
 
         values = readsrfdis96(
             srfdis96stdout=srfdis96output,
             waves=self.waves,
             types=self.types,
             modes=self.modes,
-            freqs=self.freqs)
-        return values
+            freqs=self.freqs / np.sqrt(self.superscaling))  # no scaling to freqs because the chosen scaling scheme is freq indep
+
+        return values / scaling / sqrt_superscaling
 
 
 class HerrmannCaller(HerrmannCallerBasis):
-    def __init__(self, curves, h=0.005, ddc=0.005):
+    def __init__(self, curves, h=0.005, ddc=0.005, superscaling=1.0):
         """
         :param curves: a list of Curve objects with the data points at which to compute dispersion
         :param h: factor to convert phase to group see CPS
@@ -374,13 +417,16 @@ class HerrmannCaller(HerrmannCallerBasis):
         modes = np.hstack([curve.modes for curve in curves])
         freqs = np.hstack([curve.freqs for curve in curves])
 
-        HerrmannCallerBasis.__init__(self, waves=waves, types=types, modes=modes, freqs=freqs, h=h, ddc=ddc)
+        HerrmannCallerBasis.__init__(
+            self, waves=waves, types=types,
+            modes=modes, freqs=freqs,
+            h=h, ddc=ddc, superscaling=superscaling)
 
         self.curves = curves
         self.curve_end_index = np.cumsum([curve.nfreqs for curve in curves])
         self.curve_begin_index = np.concatenate(([0], self.curve_end_index[:-1]))
 
-    def __call__(self, ztop, vp, vs, rh, keepnans=False):
+    def __call__(self, ztop, vp, vs, rh, keepnans=False, scaling=1.0):
         """
         call Herrmann codes for a depth model
         :param ztop: top layer depth array, km, first = 0
@@ -391,7 +437,9 @@ class HerrmannCaller(HerrmannCallerBasis):
         :return curves: a list of curves object with the computed values
         """
 
-        values = self.disperse(ztop, vp, vs, rh)
+        values = self.disperse(
+            ztop=ztop, vp=vp, vs=vs, rh=rh,
+            scaling=scaling)
 
         curves = []
         for b, e in zip(self.curve_begin_index, self.curve_end_index):
@@ -541,10 +589,11 @@ if __name__ == "__main__":
     hc = HerrmannCaller(curves=curves, h=0.005, ddc=0.005)
 
     start = time.time()
-    curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh)
+    curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh, scaling=1.0)
     print(time.time() - start)
 
     # display results
+    plt.figure()
     ax = plt.gca()
     for curve in curves:
         ax.loglog(1. / curve.freqs, curve.values, '+-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
@@ -554,4 +603,23 @@ if __name__ == "__main__":
     ax.grid(True, which="minor")
     logtick(ax, "xy")
     plt.legend()
+    plt.show()
+
+
+    # test the scaling modes
+    plt.figure()
+    ax = plt.gca()
+
+    for superscaling in [0.1, 0.5, 1.0, 2.0, 10.]:
+        hc = HerrmannCaller(
+            curves=curves,
+            h=0.005, ddc=0.005,
+            superscaling=superscaling)
+
+        for scaling in [0.5, 1.0, 2.]:
+            curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh, scaling=scaling)
+            for curve in curves:
+                ax.loglog(1. / curve.freqs,
+                          curve.values,
+                          '+-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
     plt.show()
