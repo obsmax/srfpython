@@ -4,7 +4,7 @@ from builtins import input
 
 import numpy as np
 from srfpython.Herrmann.Herrmann import Timer, groupbywtm, igroupbywtm, CPiSDomainError
-from srfpython.Herrmann.Herrmann import HerrmannCallerFromLists, HerrmannCallerFromGroupedLists
+from srfpython.Herrmann.Herrmann import HerrmannCallerBasis, HerrmannCallerFromGroupedLists
 from srfpython.utils import minmax
 from srfpython.standalone.cmaps import cccfcmap3, tomocmap1
 from srfpython.standalone.multipro8 import MapSync, Job
@@ -75,7 +75,7 @@ def sker17(ztop, vp, vs, rh,
 
     waves, types, modes, freqs = [np.asarray(_) for _ in [waves, types, modes, freqs]]
 
-    herrmanncaller = HerrmannCallerFromLists(waves, types, modes, freqs, h=h, ddc=ddc)
+    herrmanncaller = HerrmannCallerBasis(waves, types, modes, freqs, h=h, ddc=ddc)
 
     nlayer = len(ztop)
     H = np.array(ztop) # NOT ASARRAY
@@ -103,6 +103,7 @@ def sker17(ztop, vp, vs, rh,
             modeli[IZ], modeli[IVS], modeli[IPR], modeli[IRH]
         n = len(ztopi)
         ilayer = i % n
+        H = ztop[-1] - ztop[0]
         if ilayer == n-1:
             Hi = 1.e50  # thickness of the half-space
         else:
@@ -119,7 +120,7 @@ def sker17(ztop, vp, vs, rh,
             raise
         if norm:
             # sensitivity corrected from the layer thicknesses
-            DVAVPi = (logvaluesi - logvalues0) / (modeli[i] - model0[i]) / Hi
+            DVAVPi = (logvaluesi - logvalues0) / (modeli[i] - model0[i]) * H / Hi
         else:
             # absolute sensitivity regardless the thickness differences
             DVAVPi = (logvaluesi - logvalues0) / (modeli[i] - model0[i])
@@ -246,15 +247,12 @@ if __name__ == "__main__":
                      h=0.005, ddc=0.005):
 
         # ------
-        _depth_ = np.concatenate((ztop, [1.1 * ztop[-1]]))
-        _F_ = np.concatenate(([F[0] * 0.95], F * 1.05))
+        z_edges = np.hstack((ztop, [1.1 * ztop[-1]]))
+        z_mid = np.hstack((0.5 * (ztop[1:] + ztop[:-1]), [1.05 * ztop[-1]]))
+        F_edges = np.hstack((F[0] * 0.95, np.sqrt(F[1:] * F[:-1]), F[-1] * 1.05))
 
         # ------
-        vmax = abs(DLOGVADLOGVS).max()#np.max([abs(DLOGVADZ).max(), abs(DLOGVADLOGVS).max(), abs(DLOGVADLOGPR).max(), abs(DLOGVADLOGRH).max()])
-        if norm:
-            vmax = np.min([vmax, 10.])
-        else:
-            vmax = np.min([vmax, 0.33])
+        #vmax = abs(DLOGVADLOGVS).max()#np.max([abs(DLOGVADZ).max(), abs(DLOGVADLOGVS).max(), abs(DLOGVADLOGPR).max(), abs(DLOGVADLOGRH).max()])
 
         if not norm:
             # mask half space because it integrates the sensitivity over very thick layer => overestimated sensitivity
@@ -264,27 +262,36 @@ if __name__ == "__main__":
                 [np.ma.masked_where(np.isnan(_), _) \
                  for _ in [DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH]]
 
-        vmin, vmax, cmap = -vmax, vmax, tomocmap1(W=.25)  #cccfcmap3() #plt.cm.RdBu
+        cmap = tomocmap1(w=0.01, W=0.2)  # cccfcmap3() #plt.cm.RdBu
         for M, p, q in zip([DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH],
                            ["Z^{top}_i", "ln Vs_i", "ln (Vp/Vs)_i", r"ln \rho _i"],
                            ["Ztop", "lnVs", "lnVpaVs", "lnrho"]):
             ax3 = fig1.add_subplot(224, sharex=ax2, sharey=ax1)
             ax3.set_title('%s%s%d' % (w, t, m))
 
-            # M = np.sign(M) * np.abs(M) ** 0.6
-            coll = plt.pcolormesh(1. / _F_, _depth_, M,
-                           vmin=vmin, vmax=vmax, cmap=cmap)
+            vmax = abs(M).max()
+            vmin = -vmax
+
+            coll = plt.pcolormesh(1. / F_edges, z_edges, M,
+                                  vmin=vmin, vmax=vmax, cmap=cmap)
+
+            if M.max() - M.min():
+                levels = np.logspace(-1., 2, 10)
+                levels = np.hstack((-levels[::-1], [0], levels))
+                plt.contour(1. / F, z_mid, M,
+                            levels=levels,
+                            colors="k")
 
             cax = fig1.add_axes((.91, .2, .01, .2))
             plt.colorbar(coll, cax=cax)
 
             ax3.set_xlabel('period (s)')
-            ax3.set_xlim(minmax(1. / _F_))
-            ax3.set_ylim(minmax(_depth_))
+            ax3.set_xlim(minmax(1. / F_edges))
+            ax3.set_ylim(minmax(z_edges))
             ax3.set_xscale('log')
 
             if norm:
-                textonly(ax3, txt=r'$ \frac{1}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p), loc=3, fontsize=16)
+                textonly(ax3, txt=r'$ \frac{H}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p), loc=3, fontsize=16)
             else:
                 textonly(ax3, txt=r'$ \frac{d ln%s_j}{d %s} $' % (t, p), loc=3, fontsize=16)
 
