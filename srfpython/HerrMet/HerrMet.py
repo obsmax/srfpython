@@ -19,7 +19,7 @@ from srfpython.HerrMet.files import DEFAULTROOTNAMES
 check_herrmann_codes()
 
 # -------------------------------------
-version = "7.0"
+from srfpython.version import __version__ as version
 default_verbose = 1
 default_rootnames = DEFAULTROOTNAMES
 default_nworkers = None
@@ -46,7 +46,7 @@ authorized_keys = \
      "--default"]
 
 # -------------------------------------
-help = '''HerrMet V{version}
+help = '''HerrMet {version}
 
 # ------- main options (s=string, i=int, f=float)
 -version, -v          version number, quit
