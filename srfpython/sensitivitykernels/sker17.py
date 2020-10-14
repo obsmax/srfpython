@@ -203,6 +203,8 @@ if __name__ == "__main__":
     vs = dm.vs.values
     rh = dm.rh.values
 
+    norm = "norm" in argv.keys()
+    png = "png" in argv.keys()
     # -----------------------------------
     Waves, Types, Modes, Freqs = [], [], [], []
     for k in argv.keys():
@@ -214,20 +216,25 @@ if __name__ == "__main__":
             Modes.append(int(k[2:]))
             Freqs.append(freq)
 
-    # -----------------------------------
-    # ##compute dispersion curves
-    fig1 = plt.figure(figsize=(8,8))
-    fig1.subplots_adjust(wspace=0.3)
+    # ==== compute the dispersion curves
     hc = HerrmannCallerFromGroupedLists(Waves, Types, Modes, Freqs, h=0.005, ddc=0.005)
     with Timer('dispersion'):
         curves_out = hc(ztop, vp, vs, rh)
+
+    # ==== display
+    fig1 = plt.figure(figsize=(8,8))
+    fig1.subplots_adjust(wspace=0.3)
+
+    # depth model
     ax1 = fig1.add_subplot(223)
     dm.show(ax1)
     ax1.grid(True, linestyle=":", color="k")
     plt.legend()
+
+    # disp curve
     ax2 = fig1.add_subplot(222)
     for curve in curves_out:
-        #ax2.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
+        # ax2.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
         curve.plot(ax2, "+-")
     ax2.set_ylabel('velocity (km/s)')
     ax2.grid(True, which="major")
@@ -236,14 +243,14 @@ if __name__ == "__main__":
     plt.legend()
 
     # ## sensitivity kernels
-    norm = "norm" in argv.keys()
-    if "png" not in argv.keys():
+    if not png:
         fig1.show()
 
     for w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH in \
             sker17_1(ztop, vp, vs, rh,
                      Waves, Types, Modes, Freqs,
-                     dz=0.001, dlogvs=.01, dlogpr=.01, dlogrh=.01, norm=norm,
+                     dz=0.001, dlogvs=.01,
+                     dlogpr=.01, dlogrh=.01, norm=norm,
                      h=0.005, ddc=0.005):
 
         # ------
@@ -252,7 +259,9 @@ if __name__ == "__main__":
         F_edges = np.hstack((F[0] * 0.95, np.sqrt(F[1:] * F[:-1]), F[-1] * 1.05))
 
         # ------
-        #vmax = abs(DLOGVADLOGVS).max()#np.max([abs(DLOGVADZ).max(), abs(DLOGVADLOGVS).max(), abs(DLOGVADLOGPR).max(), abs(DLOGVADLOGRH).max()])
+        #vmax = abs(DLOGVADLOGVS).max()
+        # #np.max([abs(DLOGVADZ).max(), abs(DLOGVADLOGVS).max(),
+        # abs(DLOGVADLOGPR).max(), abs(DLOGVADLOGRH).max()])
 
         if not norm:
             # mask half space because it integrates the sensitivity over very thick layer => overestimated sensitivity
@@ -315,6 +324,7 @@ if __name__ == "__main__":
                 input('pause : press enter to plot the next wave type and mode')
             cax.cla()
             ax3.cla()
+
     # --------------------
     if "png" not in argv.keys():
         input('bye')
