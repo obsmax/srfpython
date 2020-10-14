@@ -11,4 +11,4 @@
 HerrMet -w 8 --run _HerrMet_data010 \
     -mode append \
     -nchain 8 \
-    -nkeep 2000
+    -nkeep 20000
