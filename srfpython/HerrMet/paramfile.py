@@ -270,7 +270,7 @@ def load_paramfile(paramfile, verbose=True):
     elif "#fld" in paramfile:
         A = AsciiFile_fromstring(paramfile)
     else:
-        raise ValueError
+        raise ValueError('paramfile must be either a file name or a string with the file content')
 
     # ==========================
     if A.metadata['TYPE'] == "mZVSVPRH":

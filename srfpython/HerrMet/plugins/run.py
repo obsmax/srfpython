@@ -10,6 +10,8 @@ from srfpython.HerrMet.theory import Theory
 from srfpython.HerrMet.files import DEFAULTROOTNAMES, \
     HERRMETTARGETFILE, HERRMETRUNFILE, HERRMETPARAMFILE, rootname_to_nodename
 
+SURFVELOMIN = 0.1
+SURFVELOMAX = 4.8
 # ------------------------------ defaults
 default_rootnames = DEFAULTROOTNAMES
 default_nchain = 12
@@ -97,8 +99,8 @@ def run(argv, verbose, mapkwargs):
             dobs, CDinv = d.target()
             duncs = CDinv ** -.5
             ND = len(dobs)
-            dinfs = d(0.1 * np.ones_like(d.values))
-            dsups = d(3.8 * np.ones_like(d.values))
+            dinfs = d(SURFVELOMIN * np.ones_like(d.values))
+            dsups = d(SURFVELOMAX * np.ones_like(d.values))
             logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
             # ------
             G = Theory(parameterizer=p, datacoder=d)
