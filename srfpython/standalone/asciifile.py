@@ -75,7 +75,7 @@ class AsciiFile_fromstring(object):
                 assert self.fields is not None
                 assert self.formats is not None
                 dtype = [_ for _ in zip(self.fields, self.types)]
-                values = tuple(l.split())
+                values = tuple(l.split('#')[0].split())
                 assert len(values) == self.M
                 if self.data is None:
                     self.data = [values]

@@ -76,7 +76,12 @@ class Parameterizer(object):
             raise ValueError('there are repeated entries in column KEYS')
 
         if np.any(ascii_file.data['VINF'] > ascii_file.data['VSUP']):
-            raise ValueError('VSUP cannot be lower than VINF')
+            I = ascii_file.data['VINF'] > ascii_file.data['VSUP']
+            error_message = ' VSUP cannot be lower than VINF\n'
+            error_message += "KEY: "  + str(ascii_file.data['KEY'][I]) + "\n"
+            error_message += "VINF: " + str(ascii_file.data['VINF'][I]) + "\n"
+            error_message += "VSUP: " + str(ascii_file.data['VSUP'][I]) + "\n"
+            raise ValueError(error_message)
 
     def meanmodel(self):
         Ztopmean, VPmean, VSmean, RHmean = self.inv(self.MMEAN)
