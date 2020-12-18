@@ -7,6 +7,7 @@ setup.py
 ./srfpython/bin/s96
 ./srfpython/bin/sker17
 srfpython/__init__.py
+srfpython/coordinates.py
 srfpython/utils.py
 srfpython/version.py
 srfpython.egg-info/PKG-INFO
@@ -17,8 +18,13 @@ srfpython/HerrMet/HerrMet.py
 srfpython/HerrMet/__init__.py
 srfpython/HerrMet/datacoders.py
 srfpython/HerrMet/files.py
+srfpython/HerrMet/optimizetools.py
+srfpython/HerrMet/overdisp.py
 srfpython/HerrMet/parameterizers.py
+srfpython/HerrMet/paramfile.py
 srfpython/HerrMet/priorpdf.py
+srfpython/HerrMet/relation.py
+srfpython/HerrMet/runfile.py
 srfpython/HerrMet/theory.py
 srfpython/HerrMet/plugins/__init__.py
 srfpython/HerrMet/plugins/default.py
@@ -31,6 +37,7 @@ srfpython/HerrMet/plugins/run.py
 srfpython/HerrMet/plugins/send.py
 srfpython/HerrMet/plugins/target.py
 srfpython/Herrmann/Herrmann.py
+srfpython/Herrmann/Herrmann_old.py
 srfpython/Herrmann/__init__.py
 srfpython/Herrmann/bin/.!58839!max_srfdis96
 srfpython/Herrmann/src90/clean.sh
@@ -61,8 +68,14 @@ srfpython/depthdisp/parametricdispcurves1.py
 srfpython/depthdisp/s96.py
 srfpython/depthdisp/surf96.py
 srfpython/inversion/__init__.py
+srfpython/inversion/concurenteigsearch.py
+srfpython/inversion/covmat.py
+srfpython/inversion/inviter.py
+srfpython/inversion/invsmooth.py
+srfpython/inversion/matinvissue.py
 srfpython/inversion/metropolis2.py
 srfpython/inversion/neldermead2.py
+srfpython/inversion/quasi_newton.py
 srfpython/inversion/tester1.py
 srfpython/inversion/tester2.py
 srfpython/inversion/tester30.py
@@ -75,6 +88,3 @@ srfpython/inversion/tester50.py
 srfpython/sensitivitykernels/__init__.py
 srfpython/sensitivitykernels/sker17.py
 srfpython/testbox/tester.py
-tutorials/tutorial0/readme.txt
-tutorials/tutorial0/tutorial.ipynb
-tutorials/tutorial1/tutorial1.ipynb
