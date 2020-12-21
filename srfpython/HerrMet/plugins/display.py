@@ -101,13 +101,15 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
     targetfile = HERRMETTARGETFILE.format(rootname=rootname)
     paramfile = HERRMETPARAMFILE.format(rootname=rootname)
     runfile = HERRMETRUNFILE.format(rootname=rootname)
-    displayfile = HERRMETDISPLAYFILE.format(rootname=rootname)
+
 
     # ------ Initiate the displayer using the target data if exists
     if "-compact" in argv.keys():  # compact mode
         which_displayer = DepthDispDisplayCompact
+        displayfile = HERRMETDISPLAYFILE.format(rootname=rootname, options="_compact")
     else:
         which_displayer = DepthDispDisplay
+        displayfile = HERRMETDISPLAYFILE.format(rootname=rootname, options="")
 
     if os.path.exists(targetfile):
         rd = which_displayer(targetfile=targetfile, fig=fig)
@@ -265,7 +267,7 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
                     for p, (wpc, tpc, mpc, fpc, vpc) in \
                             dispstats(ds,
                                       percentiles=[0.01, 0.16, 0.5, 0.84, 0.99],
-                                      Ndisp=100,
+                                      Ndisp=200,
                                       weights=weights,
                                       **mapkwargs):
                         try:
@@ -393,6 +395,7 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
     else:
         chftsz(rd.fig, default_fontsize)
     if "-png" in argv.keys() or "-svg" in argv.keys():
+
         if "-png" in argv.keys():
             dpi = argv['-png'][0] if len(argv['-png']) else default_dpi
             displayfile = displayfile.replace('.svg', ".png")

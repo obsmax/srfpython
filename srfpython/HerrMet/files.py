@@ -17,7 +17,7 @@ HERRMETPARAMFILE = os.path.join("{rootname}", HERRMETPARAMFILELOCAL)
 HERRMETRUNFILE = os.path.join("{rootname}", "_HerrMet.run")
 
 # the name of the display file in each temporary directory
-HERRMETDISPLAYFILE = os.path.join("{rootname}", "_HerrMet.png")
+HERRMETDISPLAYFILE = os.path.join("{rootname}", "_HerrMet{options}.png")
 
 # the name of the display file in each temporary directory
 HERRMETSTATSFILE = os.path.join("{rootname}", "_HerrMet.stats.png")

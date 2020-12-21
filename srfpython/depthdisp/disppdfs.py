@@ -94,7 +94,7 @@ class disppdf(object):
         return self.f[I], v_percentile[I]
 
 # ------------------------------------------------
-def dispstats(ds, percentiles=[0.16, 0.5, 0.84], Ndisp=100, weights=None, **mapkwargs):
+def dispstats(ds, percentiles=[0.16, 0.5, 0.84], Ndisp=200, weights=None, **mapkwargs):
     """
     compute statistics on a set of dispersion curves
     :param ds:
@@ -116,7 +116,7 @@ def dispstats(ds, percentiles=[0.16, 0.5, 0.84], Ndisp=100, weights=None, **mapk
 
     dpdfs = {}
     for w, t, m, f, _ in groupbywtm(waves, types, modes, freqs, values):
-        dpdfs["%s%s%d" % (w, t, m)] = disppdf(f, np.logspace(np.log10(0.08), np.log10(4.0), Ndisp))
+        dpdfs["%s%s%d" % (w, t, m)] = disppdf(f, np.logspace(np.log10(0.08), np.log10(6.0), Ndisp))
 
     for weight, (waves, types, modes, freqs, values) in zip(weights, ds):
         for w, t, m, f, v in groupbywtm(waves, types, modes, freqs, values):
