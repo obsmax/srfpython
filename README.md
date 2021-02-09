@@ -36,6 +36,7 @@ cd ~/git/srfpython
 python -m pip install -e .
 
 # test the compilation using 
+# (must work anywhere, no need to custom path or anything)
 srfpython_tester.py
 ```
 
