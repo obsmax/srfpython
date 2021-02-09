@@ -5,6 +5,7 @@
 
 rm -f in.txt out1.txt out2.txt
 
+# write input arguments to pass to srf_pre96 through stdin
 cat << END > in1.txt
 2 2 2 2
 SURF96 L C T 0 7.692308 3.152852 0.1
@@ -39,9 +40,10 @@ SURF96 R U T 1 1.304237 0.696091 0.1
 SURF96 R U T 1 0.833333 0.708612 0.1
 END
 
+# call max_srfpre96, save outputs to be compared with expected ones
 ../bin/max_srfpre96 < in1.txt > out1.txt
 
-
+# write input arguments to be passed to max_srfdis96, save outputs ...
 cat << END > in2.txt
   8
    0.250   0.200   0.200   0.200   0.200   0.480   0.270
@@ -54,7 +56,15 @@ cat out1.txt >> in2.txt
 
 ../bin/max_srfdis96 < in2.txt > out2.txt
 
-cmp --silent out1.txt expected1.txt || echo "error : the output from max_srfpre96 (out1.txt) differs from expected1.txt"
-cmp --silent out2.txt expected2.txt || echo "error : the output from max_srfdis96 (out2.txt) differs from expected2.txt"
+# compare output with expectations
+cmp --silent out1.txt expected1.txt || \
+  echo "error : the output from max_srfpre96 (out1.txt) differs from expected1.txt";
+  exit 1;
 
-# rm -f in.txt out1.txt out2.txt
+cmp --silent out2.txt expected2.txt || \
+  echo "error : the output from max_srfdis96 (out2.txt) differs from expected2.txt";
+  exit 1;
+
+
+rm -f in.txt out1.txt out2.txt
+exit 0;
