@@ -1,4 +1,4 @@
-from srfpython.Herrmann.Herrmann import check_herrmann_codes, recompile_src90, HerrmannCaller, Curve
+from srfpython.Herrmann.Herrmann import check_herrmann_codes, recompile_src, HerrmannCaller, Curve
 from srfpython.depthdisp.depthmodels import depthmodel1D, depthmodel, depthmodel_from_mod96string, \
     depthmodel_from_mod96, depthmodel_from_arrays, depthspace, gardner74, brocher2005
 from srfpython.depthdisp.dispcurves import Claw, Ulaw, freqspace, \

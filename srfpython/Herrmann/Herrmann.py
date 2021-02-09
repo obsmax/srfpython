@@ -21,7 +21,7 @@ WARNING : This module calls fortran programs, make sure they are compiled correc
 
 _pathfile = os.path.realpath(__file__)  # .../srfpyhon/HerrMann/dispersion.py
 _file = _pathfile.split('/')[-1]
-_src = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src90/"
+_src = _pathfile.rstrip('Herrmann.pyc').rstrip('Herrmann.py') + "src/"
 
 SRFPRE96_EXE = _pathfile.replace(_file, os.path.join('bin', 'max_srfpre96'))
 SRFDIS96_EXE = _pathfile.replace(_file, os.path.join('bin', 'max_srfdis96'))
@@ -496,7 +496,7 @@ class HerrmannCallerFromGroupedLists(HerrmannCaller):
 def check_herrmann_codes():
     """check successful compilation"""
 
-    solution = "please recompile fortran codes using recompile_src90"
+    solution = "please recompile fortran codes using recompile_src"
 
     if not os.path.isdir(_src):
         raise Exception('directory %s not found' % _src)
@@ -535,7 +535,7 @@ def check_herrmann_codes():
         raise Exception('could not execute fortran codes\n%s' % solution)
 
 
-def recompile_src90(yes=False):
+def recompile_src(yes=False):
     script = """
 cd {_src}
 ./clean.sh && ./compile.sh
