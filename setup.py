@@ -76,8 +76,8 @@ setuptools.setup(
         "Operating System :: Linux"],
     cmdclass={"build_py": CustomBuilder,
               "develop": CustomDevelop},
-    scripts=['srfpython/bin/m96',
+    scripts=['srfpython/bin/srfpython_tester.py',
+             'srfpython/bin/m96',
              'srfpython/bin/s96',
              'srfpython/bin/HerrMet',
-             'srfpython/bin/sker17',
-             'srfpython/bin/Herrmann.py'])
+             'srfpython/bin/sker17'])

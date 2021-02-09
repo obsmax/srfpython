@@ -34,6 +34,9 @@ python --version  # must be 2.7.X, or conda failed, retry in new tty
 # i.e. changes in python programs do not require re-installing the package
 cd ~/git/srfpython
 python -m pip install -e .
+
+# test the compilation using 
+srfpython_tester.py
 ```
 
 - If you wish to use the jupyter notebooks with python2 (optional):
