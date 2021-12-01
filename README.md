@@ -72,6 +72,6 @@ jupyter notebook
 ```
 
 ## Related references
-
+* Lehujeur, M., Chevrot, S., Villaseñor, A., Masini, E., Saspiturry, N., Lescoutre, R., Sylvander, M., 2021. Three-dimensional shear velocity structure of the Mauléon and Arzacq Basins (Western Pyrenees). BSGF - Earth Sci. Bull. 192, 47. https://doi.org/10.1051/bsgf/2021039
 * Lehujeur, M., Vergne, J., Schmittbuhl, J., Zigone, D., Le Chenadec, A., & EstOF Team (2018). Reservoir imaging using ambient noise correlation from a dense seismic network. Journal of Geophysical Research: Solid Earth, 123. https://doi.org/10.1029/2018JB015440
-* ...
+
