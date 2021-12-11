@@ -25,11 +25,11 @@ HERRMETSTATSFILE = os.path.join("{rootname}", "_HerrMet.stats.png")
 # the name of the extraction files in each temporary directory
 HERRMETEXTRACTPDFMODELFILE = os.path.join(
     '{rootname}',
-    '_HerrMet.{extract_mode:s}_{extract_limit:d}_{extract_llkmin:d}_{extract_step:d}.p{percentile:.2f}.mod96')
+    '_HerrMet.{extract_mode:s}_{extract_limit:d}_{extract_llkmin:.2f}_{extract_step:d}.p{percentile:.2f}.mod96')
 
 HERRMETEXTRACTPDFDISPFILE = os.path.join(
     '{rootname}',
-    '_HerrMet.{extract_mode:s}_{extract_limit:d}_{extract_llkmin:d}_{extract_step:d}.p{percentile:.2f}.surf96')
+    '_HerrMet.{extract_mode:s}_{extract_limit:d}_{extract_llkmin:.2f}_{extract_step:d}.p{percentile:.2f}.surf96')
 
 HERRMETEXTRACTBESTMODELFILE = os.path.join(
     '{rootname}',

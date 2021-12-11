@@ -108,7 +108,7 @@ def _extract_pdf(rootname, extract_mode, extract_limit, extract_llkmin, extract_
         return
 
     with RunFile(runfile, verbose=verbose) as rundb:
-        print("extract : llkmin %f, limit %d, step %d" % (extract_llkmin, extract_limit, extract_step))
+        print("extract : llkmin %f, limit %f, step %d" % (extract_llkmin, extract_limit, extract_step))
         if extract_mode == "best":
             chainids, weights, llks, ms, ds = \
                 rundb.getzip(limit=extract_limit,
