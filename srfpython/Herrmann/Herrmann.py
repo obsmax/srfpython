@@ -585,7 +585,7 @@ if __name__ == "__main__":
     hc = HerrmannCaller(curves=curves, h=0.005, ddc=0.005)
 
     start = time.time()
-    curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh, scaling=1.0)
+    curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh)
     print(time.time() - start)
 
     # display results
@@ -606,14 +606,23 @@ if __name__ == "__main__":
     plt.figure()
     ax = plt.gca()
 
-    for superscaling in [0.1, 0.5, 1.0, 2.0, 10.]:
+    for freq_scaling_coeff in [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]:
+
         hc = HerrmannCaller(
             curves=curves,
             h=0.005, ddc=0.005,
-            superscaling=superscaling)
+            freq_scaling_coeff=freq_scaling_coeff)
 
-        for scaling in [0.5, 1.0, 2.]:
-            curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh, scaling=scaling)
+        for depth_scaling_coeff in [1., 2., 5., 10.0]:
+            print("beta", freq_scaling_coeff, "eps", depth_scaling_coeff)
+
+            try:
+                curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh, depth_scaling_coeff=depth_scaling_coeff)
+                print('ok')
+            except CPiSDomainError as err:
+                print(err)
+                continue
+
             for curve in curves:
                 ax.loglog(1. / curve.freqs,
                           curve.values,
