@@ -370,7 +370,7 @@ class HerrmannCallerBasis(object):
         """
 
         if not 1.0 <= depth_scaling_coeff:
-            raise ValueError(scaling)
+            raise ValueError(depth_scaling_coeff)
 
         depthmodel_string = self.depthmodel_arrays_to_string(
             ztop=np.asarray(ztop, float) * depth_scaling_coeff,
