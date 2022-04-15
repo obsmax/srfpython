@@ -318,7 +318,12 @@ class HerrmannCallerBasis(object):
         :param types: 1d array with the wave type letter 'C' for phase vel, 'U' from group vel
         :param modes: 1d array with mode numbers 0=fundamental mode, 1=1st overtone, ...
         :param freqs: 1d array with frequency values, in Hz
-
+        :param freq_scaling_coeff:
+            scale the frequencies by this factor (< 1.0)
+            to reduce the frequencies at which computations will
+            be done. => This will have no impact on the output disp. curves.
+            consider using a depth_scaling_coeff to the order of 1. / freq_scaling_coeff
+            in self.disperse
         e.g.
         waves = ['R', 'R', 'R', 'L', 'L', 'L']
         types = ['C', 'C', 'C', 'C', 'C', 'C']
@@ -356,13 +361,11 @@ class HerrmannCallerBasis(object):
         :param vp: in km/s, array 1d
         :param vs: in km/s, array 1d
         :param rh: density in g/cm3, array 1d
-        :param scaling: scaling factor to apply to the model
+        :param depth_scaling_coeff: scaling factor to apply to the model dimensions
             i.e. call Herrmann's routines with a scaled version
-                 of the model so that the output is the same
-                 the scaling used in this method
-                 is frequency invariant, otherwise srfprep96 should be re-called
-                 this scaling mode can only be used with reduced scaling values (around 1)
-                 see also superscaling in the __init__ method
+                 of the model so that the output is the same.
+                 consider using a depth_scaling_coeff to the order of 1. / freq_scaling_coeff
+                 in self.__init__
         :return values: dispersion values in km/s, or nan
         """
 
