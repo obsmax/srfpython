@@ -311,21 +311,14 @@ class HerrmannCallerBasis(object):
         return out
 
     def __init__(self, waves, types, modes, freqs,
-                 h=0.005, ddc=0.005, superscaling=1.0):
+                 h=0.005, ddc=0.005, freq_scaling_coeff=1.0):
         """
         initiate HerrmannCaller with 4 zippable arrays with same length
         :param waves: 1d array with the wave type letter 'R' for Rayleigh, 'L' for Love
         :param types: 1d array with the wave type letter 'C' for phase vel, 'U' from group vel
         :param modes: 1d array with mode numbers 0=fundamental mode, 1=1st overtone, ...
         :param freqs: 1d array with frequency values, in Hz
-        :param superscaling: float, scale the model by superscaling (constant)
-             this scaling mode uses a density invariant mode.
-             scaling should be used for reduced size applications (e.g. cm or less)
-             this is the scaling mode that allows the largest scaling values
-             but it must be defined at the initiation of the HerrmannCallerBasis instance
-             and cannot be changed afterwards (because it would need re-call srfprep96)
-             see also the scaling parameter in self.disperse
-             which can be changed without re-initiating the instance
+
         e.g.
         waves = ['R', 'R', 'R', 'L', 'L', 'L']
         types = ['C', 'C', 'C', 'C', 'C', 'C']
@@ -334,9 +327,9 @@ class HerrmannCallerBasis(object):
         :param h: see HerrmannCaller
         :param ddc: see HerrmannCaller
         """
-        if superscaling <= 0.:
-            raise ValueError(superscaling)
-        self.superscaling = superscaling
+        if not 0 <= freq_scaling_coeff <= 1.:
+            raise ValueError(freq_scaling_coeff)
+        self.freq_scaling_coeff = freq_scaling_coeff
 
         self.waves = np.asarray(waves, '|S1')
         self.types = np.asarray(types, '|S1')
@@ -347,7 +340,7 @@ class HerrmannCallerBasis(object):
             waves=self.waves,
             types=self.types,
             modes=self.modes,
-            freqs=self.freqs / np.sqrt(self.superscaling))
+            freqs=self.freqs * self.freq_scaling_coeff)
 
         self.srfpre96output, stderr = self.callherrmann(
             stdin=srfpre96input, exe=SRFPRE96_EXE)
@@ -357,7 +350,7 @@ class HerrmannCallerBasis(object):
         if len(stderr):
             raise CPiSError('srfpre96 failed with error {}'.format(stderr))
 
-    def disperse(self, ztop, vp, vs, rh, scaling=1.):
+    def disperse(self, ztop, vp, vs, rh, depth_scaling_coeff=1.):
         """
         :param ztop: top layer depth array, km, first = 0
         :param vp: in km/s, array 1d
@@ -373,14 +366,14 @@ class HerrmannCallerBasis(object):
         :return values: dispersion values in km/s, or nan
         """
 
-        if scaling <= 0.:
+        if not 1.0 <= depth_scaling_coeff:
             raise ValueError(scaling)
-        sqrt_superscaling = np.sqrt(self.superscaling)
+
         depthmodel_string = self.depthmodel_arrays_to_string(
-            ztop=np.asarray(ztop, float) * scaling * self.superscaling,
-            vp=np.asarray(vp, float) * scaling * sqrt_superscaling,
-            vs=np.asarray(vs, float) * scaling * sqrt_superscaling,
-            rh=np.asarray(rh, float) / scaling)
+            ztop=np.asarray(ztop, float) * depth_scaling_coeff,
+            vp=np.asarray(vp, float) * self.freq_scaling_coeff * depth_scaling_coeff,
+            vs=np.asarray(vs, float) * self.freq_scaling_coeff * depth_scaling_coeff,
+            rh=np.asarray(rh, float) / (self.freq_scaling_coeff ** 2. * depth_scaling_coeff))
 
         srfdis96input = \
             "{depthmodel_string:s}\n".format(
@@ -399,13 +392,13 @@ class HerrmannCallerBasis(object):
             waves=self.waves,
             types=self.types,
             modes=self.modes,
-            freqs=self.freqs / np.sqrt(self.superscaling))  # no scaling to freqs because the chosen scaling scheme is freq indep
+            freqs=self.freqs * self.freq_scaling_coeff)  # no scaling to freqs because the chosen scaling scheme is freq indep
 
-        return values / scaling / sqrt_superscaling
+        return values / (self.freq_scaling_coeff * depth_scaling_coeff)
 
 
 class HerrmannCaller(HerrmannCallerBasis):
-    def __init__(self, curves, h=0.005, ddc=0.005, superscaling=1.0):
+    def __init__(self, curves, h=0.005, ddc=0.005, freq_scaling_coeff=1.0):
         """
         :param curves: a list of Curve objects with the data points at which to compute dispersion
         :param h: factor to convert phase to group see CPS
@@ -420,13 +413,13 @@ class HerrmannCaller(HerrmannCallerBasis):
         HerrmannCallerBasis.__init__(
             self, waves=waves, types=types,
             modes=modes, freqs=freqs,
-            h=h, ddc=ddc, superscaling=superscaling)
+            h=h, ddc=ddc, freq_scaling_coeff=freq_scaling_coeff)
 
         self.curves = curves
         self.curve_end_index = np.cumsum([curve.nfreqs for curve in curves])
         self.curve_begin_index = np.concatenate(([0], self.curve_end_index[:-1]))
 
-    def __call__(self, ztop, vp, vs, rh, keepnans=False, scaling=1.0):
+    def __call__(self, ztop, vp, vs, rh, keepnans=False, depth_scaling_coeff=1.0):
         """
         call Herrmann codes for a depth model
         :param ztop: top layer depth array, km, first = 0
@@ -439,7 +432,7 @@ class HerrmannCaller(HerrmannCallerBasis):
 
         values = self.disperse(
             ztop=ztop, vp=vp, vs=vs, rh=rh,
-            scaling=scaling)
+            depth_scaling_coeff=depth_scaling_coeff)
 
         curves = []
         for b, e in zip(self.curve_begin_index, self.curve_end_index):
@@ -465,7 +458,7 @@ class HerrmannCaller(HerrmannCallerBasis):
 
 
 class HerrmannCallerFromGroupedLists(HerrmannCaller):
-    def __init__(self, Waves, Types, Modes, Freqs, h=0.005, ddc=0.005):
+    def __init__(self, Waves, Types, Modes, Freqs, h=0.005, ddc=0.005, freq_scaling_coeff=1.0):
         """
         initiate HerrmannCaller with curves data grouped by dispersion curves into arrays
         :param Waves: list of wave letters (one per dispersion curve) ('R' or 'L')
@@ -490,7 +483,7 @@ class HerrmannCallerFromGroupedLists(HerrmannCaller):
 
             curves.append(curve)
 
-        HerrmannCaller.__init__(self, curves=curves, h=h, ddc=ddc)
+        HerrmannCaller.__init__(self, curves=curves, h=h, ddc=ddc, freq_scaling_coeff=freq_scaling_coeff)
 
 
 def check_herrmann_codes():
