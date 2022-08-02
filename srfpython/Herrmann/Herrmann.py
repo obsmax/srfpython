@@ -332,7 +332,7 @@ class HerrmannCallerBasis(object):
         :param h: see HerrmannCaller
         :param ddc: see HerrmannCaller
         """
-        if not 0 <= freq_scaling_coeff <= 1.:
+        if not 0 <= freq_scaling_coeff:
             raise ValueError(freq_scaling_coeff)
         self.freq_scaling_coeff = freq_scaling_coeff
 
@@ -369,7 +369,7 @@ class HerrmannCallerBasis(object):
         :return values: dispersion values in km/s, or nan
         """
 
-        if not 1.0 <= depth_scaling_coeff:
+        if not 0 < depth_scaling_coeff:
             raise ValueError(depth_scaling_coeff)
 
         depthmodel_string = self.depthmodel_arrays_to_string(
