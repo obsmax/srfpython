@@ -288,8 +288,8 @@ class HerrmannCallerBasis(object):
         if (np.isinf(vs) | np.isnan(vs)).any():
             raise CPiSDomainError('vs value error %s' % str(vs))
 
-        if not (vs > 0.08).all():
-            raise CPiSDomainError('vs domain error %s' % str(vs))
+        # if not (vs > 0.08).all():  
+        #     raise CPiSDomainError('vs domain error %s' % str(vs))  # => issue for low scaling factors
 
         if (np.isinf(vp) | np.isnan(vp)).any():
             raise CPiSDomainError('vp value error %s' % str(vp))
