@@ -57,14 +57,19 @@ cat out1.txt >> in2.txt
 ../bin/max_srfdis96 < in2.txt > out2.txt
 
 # compare output with expectations
-cmp --silent out1.txt expected1.txt || \
-  echo "error : the output from max_srfpre96 (out1.txt) differs from expected1.txt";
+if cmp --silent out1.txt expected1.txt; then
+    echo "test1 ok"
+else
+  echo "error : the output from max_srfpre96 (out1.txt) differs from expected1.txt" \
   exit 1;
+fi
 
-cmp --silent out2.txt expected2.txt || \
-  echo "error : the output from max_srfdis96 (out2.txt) differs from expected2.txt";
+if cmp --silent out2.txt expected2.txt; then
+    echo "test2 ok"
+else
+  echo "error : the output from max_srfdis96 (out2.txt) differs from expected2.txt"; \
   exit 1;
-
+fi
 
 rm -f in.txt out1.txt out2.txt
 exit 0;

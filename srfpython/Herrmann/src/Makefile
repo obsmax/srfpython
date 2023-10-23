@@ -10,6 +10,6 @@ compile:
 	bash compile.sh;
 
 test:
-	bash ./test.sh
+	bash ./test.sh;
 
 all: clean compile test
