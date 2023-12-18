@@ -10,7 +10,7 @@ from srfpython.HerrMet.theory import Theory
 from srfpython.HerrMet.files import DEFAULTROOTNAMES, \
     HERRMETTARGETFILE, HERRMETRUNFILE, HERRMETPARAMFILE, rootname_to_nodename
 
-SURFVELOMIN = 0.1
+SURFVELOMIN = 0.025
 SURFVELOMAX = 4.8
 # ------------------------------ defaults
 default_rootnames = DEFAULTROOTNAMES
