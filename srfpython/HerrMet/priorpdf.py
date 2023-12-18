@@ -143,7 +143,7 @@ class LogRhoM_DVPDVSDRHDPR(DefaultLogRhoM):
     @staticmethod
     def header(dvp=None, dvs=None, drh=None, dpr=None):
 
-        header  = '#met PRIORTYPE = "DVPDVSDRH"\n'
+        header  = '#met PRIORTYPE = "DVPDVSDRHDPR"\n'
         header += '#met DVPMIN = {}\n'.format(dvp[0])
         header += '#met DVPMAX = {}\n'.format(dvp[1])
         header += '#met DVSMIN = {}\n'.format(dvs[0])
