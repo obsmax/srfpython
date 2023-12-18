@@ -228,7 +228,10 @@ def dmstats1(dms, percentiles=None, Ndepth=100, Nvalue=100, weights=None, **mapk
     vpmin, vpmax = np.inf, -np.inf
     rhmin, rhmax = np.inf, -np.inf
     prmin, prmax = np.inf, -np.inf
-    for dm in dms[:10]:
+    for i in np.unique(np.round(np.linspace(0, len(dms)-1, 10))):
+        # estimate the range of values for the pdf automatically using a subset 
+        # of models (10 models linearly picked among all)
+        dm = dms[int(i)] #for dm in dms[:10]:
         zmax = np.max([zmax, 1.1 * dm.vs.z[-1]])
         vsmin = np.min([vsmin, dm.vs.values.min()])
         vsmax = np.max([vsmax, dm.vs.values.max()])
