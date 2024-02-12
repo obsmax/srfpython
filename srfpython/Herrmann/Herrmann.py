@@ -602,29 +602,29 @@ if __name__ == "__main__":
     plt.show()
 
 
-    # test the scaling modes
-    plt.figure()
-    ax = plt.gca()
+#    # test the scaling modes
+#    plt.figure()
+#    ax = plt.gca()
 
-    for freq_scaling_coeff in [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]:
+#    for freq_scaling_coeff in [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]:
 
-        hc = HerrmannCaller(
-            curves=curves,
-            h=0.005, ddc=0.005,
-            freq_scaling_coeff=freq_scaling_coeff)
+#        hc = HerrmannCaller(
+#            curves=curves,
+#            h=0.005, ddc=0.005,
+#            freq_scaling_coeff=freq_scaling_coeff)
 
-        for depth_scaling_coeff in [1., 2., 5., 10.0]:
-            print("beta", freq_scaling_coeff, "eps", depth_scaling_coeff)
+#        for depth_scaling_coeff in [1., 2., 5., 10.0]:
+#            print("beta", freq_scaling_coeff, "eps", depth_scaling_coeff)
 
-            try:
-                curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh, depth_scaling_coeff=depth_scaling_coeff)
-                print('ok')
-            except CPiSDomainError as err:
-                print(err)
-                continue
+#            try:
+#                curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh, depth_scaling_coeff=depth_scaling_coeff)
+#                print('ok')
+#            except CPiSDomainError as err:
+#                print(err)
+#                continue
 
-            for curve in curves:
-                ax.loglog(1. / curve.freqs,
-                          curve.values,
-                          '+-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
-    plt.show()
+#            for curve in curves:
+#                ax.loglog(1. / curve.freqs,
+#                          curve.values,
+#                          '+-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
+#    plt.show()

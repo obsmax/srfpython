@@ -48,8 +48,7 @@ srfpython_tester.py
 conda activate py27-srfpython
 
 # install with
-conda install --yes notebook ipykernel
-ipython kernel install --user
+conda install decorator=4.4.1 jupyter --yes
 ```
 
 ## Tutorials
