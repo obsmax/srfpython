@@ -7,6 +7,7 @@ from setuptools.command.develop import develop
 # ================ paths and files
 version_file = os.path.join('srfpython', 'version.py')
 fortran_src_path = os.path.join('srfpython', 'Herrmann', 'src')
+fortran_bin_path = os.path.join('srfpython', 'Herrmann', 'bin')
 packages = setuptools.find_packages()
 
 # checks
@@ -35,6 +36,9 @@ with open("README.md", "r") as fh:
 # ============= Custom build_py
 def make():
     # run command "make all" in ./srfpython/Herrmann/src
+    if not os.path.isdir(fortran_bin_path):
+        os.makedirs(fortran_bin_path)
+        
     proc = subprocess.Popen(
         ['/usr/bin/make', 'all'],
         shell=True, cwd=fortran_src_path)
