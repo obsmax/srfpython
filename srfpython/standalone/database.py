@@ -50,7 +50,7 @@ class SqliteStdevFunc:
             message  = "ERROR : user defined aggregate function (%s) failed\n" % self.__class__.__name__
             message += "          "
             message += "          ".join(traceback.format_exception(type, value, trace, limit=5))
-            print message
+            print(message)
             raise
         return None
 ########################################################################
@@ -79,7 +79,7 @@ class SqliteMedFunc:
             message  = "ERROR : user defined aggregate function (%s) failed\n" % self.__class__.__name__
             message += "          "
             message += "          ".join(traceback.format_exception(type, value, trace, limit=5))
-            print message
+            print(message)
             raise
 class SqliteP01Func(SqliteMedFunc):
     def __init__(self):
@@ -178,8 +178,8 @@ class Database(object):
         """display the database structure"""
         for w in self.select('select * from sqlite_master'):
             if w[4] is None: continue
-            print "#---------------------------"
-            print w[4]
+            print("#---------------------------")
+            print(w[4])
     #----------------------------------------------------------------
     def detach(self, alias):
         """detach all attached databases"""
@@ -360,10 +360,10 @@ class Database(object):
         example :
             s = mydatabase.select('''select CUSTOMERID, NAME from CUSTOMERS where (NAME = ?)''', ("DUPOND", ))
             if s is None: 
-                print "empty selection"
+                print("empty selection")
             else: 
                 for CUSTOMERID, NAME in s:
-                    print CUSTOMERID, NAME
+                    print(CUSTOMERID, NAME)
         """
         if explainquery:
             if cmd.split()[0].strip().lower().startswith('select'):
@@ -447,7 +447,7 @@ if __name__ == "__main__":
     #-----------------
     with Database('toto.bdd') as bdd:
         toto = bdd.getmeta('TOTO')
-        print toto, type(toto)
+        print(toto, type(toto))
 
 
 

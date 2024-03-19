@@ -22,3 +22,5 @@ srfpython/Herrmann/bin/max_srfpre96
 !/maupasacq/*npy
 !/maupasacq/*npz
 /srfpython.egg-info/
+srfpython/Herrmann/src/in1.txt
+srfpython/Herrmann/src/in2.txt

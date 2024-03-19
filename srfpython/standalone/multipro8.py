@@ -300,7 +300,7 @@ class InteractiveStdOut(Process):
         # recall what was printed
         for l in lines:
             if len(l):
-                print l
+                print(l)
 
 
 # def multiprint(gen, maxlines = 10000):
@@ -335,7 +335,7 @@ class NoPrinter(object):
         return
 
     def communicate(self, message):
-        print message
+        print(message)
 
 
 class BasicPrinter(Process):
@@ -346,7 +346,7 @@ class BasicPrinter(Process):
         self.messagequeue = messagequeue
 
     def communicate(self, message):
-        print message
+        print(message)
 
     def run(self):
         while True:
@@ -355,7 +355,7 @@ class BasicPrinter(Process):
             sender, tim, mess, jobid = packet
             message = "%s at %s : %s " % (sender + " " * (20 - len(sender)), str(ut(tim)), mess)
             if jobid is not None: message += str(jobid)
-            print message
+            print(message)
         return
 
 
@@ -433,7 +433,7 @@ class JobPrinter(InteractiveStdOut):
 
 class FakePrinter(object):
     def communicate(self, message):
-        print message
+        print(message)
 
 
 # ----------------
@@ -561,7 +561,7 @@ class WaitQueue_old:
 
         if len(self):
             # may append if some processes have failed
-            # print "warning : job %s never showed up" % self.currentjob
+            # print("warning : job %s never showed up" % self.currentjob)
             self.currentjob += 1
             return self.currentjob - 1, MissingJob()
         raise StopIteration
@@ -645,7 +645,7 @@ class WaitQueue(object):
 
         if len(self):
             # may append if some processes have failed
-            # print "warning : job %s never showed up" % self.currentjob
+            # print("warning : job %s never showed up" % self.currentjob)
             self.currentjob += 1
             return self.currentjob - 1, MissingJob()
         raise StopIteration
@@ -715,8 +715,8 @@ class WaitQueueGen(WaitQueue):
 
     def pop(self):
         "extract the packet in self.l[index], remove it from self.l"
-        # print ">>>", self.jobids
-        # print ">>>", self.nitems
+        # print(">>>", self.jobids)
+        # print(">>>", self.nitems)
         if len(self.nitems[0]) == 1 and self.nitems[0][0] == -1:
             # only one item with nitem==-1 remaining, remove this jobid from the store
             jobid = self.jobids.pop(0)  # e.g. 3
@@ -788,13 +788,13 @@ class WaitQueueGen(WaitQueue):
                 if debug:
                     printblue("return directly", jobid, nitem, packet)
                 return packet
-                # print "append", jobid, nitem, packet
+                # print("append", jobid, nitem, packet)
                 # self.append(jobid, nitem, packet)
 
         if len(self):
             raise Exception('missing jobs')
             # may append if some processes have failed
-            # print "warning : job %s never showed up" % self.currentjob
+            # print("warning : job %s never showed up" % self.currentjob)
             self.currentjob += 1
             return self.currentjob - 1, MissingJob()
         raise StopIteration
@@ -1243,7 +1243,7 @@ class MapAsync(object):
 
         else:
             # either an error has occured or the user leaves too soon
-            # if self.verbose:print "killing workers and queues"
+            # if self.verbose:print("killing workers and queues")
 
             queues.Queue.close(self.In)
             if self.verbose: queues.Queue.close(self.Mes)
@@ -1335,10 +1335,10 @@ class StackAsync(MapAsync):
     with StackAsync(s, JobGen(), Verbose = False) as sa:
         S = None
         for jobids, (s, wname), Tgen, Tpro in sa: #receive partial stacks
-            print "%s stacked %6d jobs in %.6fs, result %f" % (wname, len(jobids), Tgen + Tpro, s.v)
+            print("%s stacked %6d jobs in %.6fs, result %f" % (wname, len(jobids), Tgen + Tpro, s.v))
             if S is None: S = s
             else: S = S + s #merge all partial stacks using method __add__
-    print "Final sum %f" % S.v
+    print("Final sum %f" % S.v)
     """
 
 
@@ -1360,7 +1360,7 @@ class GenAsync(MapAsync):
         for (jobid, nitem), answer, _, _ in ga:
             # jobid is the number of the job
             # nitem is the number of the item yielded by the target function that processed job jobid
-            print jobid, nitem, answer
+            print(jobid, nitem, answer)
 
     """
 
@@ -1429,7 +1429,7 @@ class FakeMapAsync(object):
             jobtime = (start, time.time())
             return self.jobid, answer, gentime, jobtime
         except Exception as e:
-            print e
+            print(e)
             if self.raiseiferror: raise
 
 
@@ -1516,11 +1516,11 @@ if __name__ == "__main__":
         --- --- MapSync       ------ -- --- --- ------- in correct order
         --- --- FakeMapAsync  ------ -- switch parallel computing off
         """
-        print ma
+        print(ma)
         randomseries = []
         for jobid, (workerid, x), (genstart, genend), (jobstart, jobend) in ma:
             """iterate over the mapper to get the results"""
-            # print "jobid%d adv%d" % (jobid, int(round((jobend - jobstart) / (genend - genstart))) + 1) #advised worker number
+            # print("jobid%d adv%d" % (jobid, int(round((jobend - jobstart) / (genend - genstart))) + 1) #advised worker number)
             ma.printer.communicate("jobid-%d adviced-worker-number-%d" % (
             jobid, int(round((jobend - jobstart) / (genend - genstart))) + 1))
 

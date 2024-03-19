@@ -41,7 +41,7 @@ def chftsz(obj, fontsize):
 # ################################################ tickers
 def logtick(ax, axis='x', grid = True, color = "k", subs = [1., 2., 5.]):
     if matplotlibversion < "1.2":
-        print "ERROR : logtick doesn't work with maptplotlib < 1.2"
+        print("ERROR : logtick doesn't work with maptplotlib < 1.2")
         return
 
     def myfuncformatter(tick, tickposition=None):

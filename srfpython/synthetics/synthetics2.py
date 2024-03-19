@@ -1,6 +1,6 @@
 from srfpython.depthdisp.dispcurves import Claw, freqspace
 from scipy.fftpack import fftfreq, fft, ifft
-from signalfuncs import detrend, taperwidth, gaussbandpass, bandpass
+from .signalfuncs import detrend, taperwidth, gaussbandpass, bandpass
 import numpy as np
 """
 compute synthetic seismograms or correlation functions
@@ -51,7 +51,7 @@ class Green(object):
         assert isfloat(self.umax)
         assert 0. <= self.umin <= self.umax
 
-        print "group velocity range : %f - %fkm/s" % (self.umin, self.umax)
+        print("group velocity range : %f - %fkm/s" % (self.umin, self.umax))
 
     # ---------------------------
     def __call__(self, ts, xs, ys, xr, yr, delta=0.05):
@@ -68,7 +68,7 @@ class Green(object):
         :return dt: sampling interval (s)
         :return y: data array
         """
-        assert np.all([not hasattr(w, "__iter__") for w in ts, xs, ys, xr, yr])
+        assert np.all([not hasattr(w, "__iter__") for w in zip(ts, xs, ys, xr, yr)])
         # ---------------------------- adjust time array to avoid wrapping effects
         distance = ((xs - xr) ** 2. + (ys - yr) ** 2.) ** 0.5
         tmin = distance / (self.umax * (1. + delta)) - 3. / self.fmin  # first arrival
@@ -78,7 +78,7 @@ class Green(object):
 
         npts = int(np.ceil((tmax - tmin) / self.dt))
         if npts >= 360000:
-            print tmin, tmax, npts
+            print(tmin, tmax, npts)
             raise Exception('npts > 360000')
 
         # ----------------------------
@@ -93,7 +93,7 @@ class Green(object):
             if I.any():
                 Y[I] += np.exp(-2.j * np.pi * nu[I] * (distance / c[I] - tmin))
             else:
-                print "warning", claw
+                print("warning", claw)
         # ----------------------------
         if distance: Y /= np.sqrt(distance)  # geometrical spreading
 
@@ -130,7 +130,7 @@ class Green(object):
         :return y: data array
         """
 
-        assert np.all([not hasattr(w, "__iter__") for w in xS, yS, xA, yA, xB, yB])
+        assert np.all([not hasattr(w, "__iter__") for w in zip(xS, yS, xA, yA, xB, yB)])
         # if switch(lon1=xA, lat1=yA, lon2=xB, lat2=yB, chnl1=None, chnl2=None):
         #     return self.ccf(xS, yS,
         #                     xA=xB, yA=yB, zA=zB,

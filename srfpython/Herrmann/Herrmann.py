@@ -41,7 +41,7 @@ class Curve(object):
         if checks:
             assert wave in ['R', 'L']
             assert type in ['C', 'U']
-            assert isinstance(mode, int) and mode >= 0
+            assert isinstance(mode, (int, np.int_)) and mode >= 0
             assert isinstance(freqs, np.ndarray)
             assert freqs.ndim == 1
             assert np.all(freqs[1:] > freqs[:-1])
@@ -58,11 +58,11 @@ class Curve(object):
 
     @property
     def waves(self):
-        return np.asarray([self.wave for _ in range(self.nfreqs)], '|S1')
+        return np.asarray([self.wave for _ in range(self.nfreqs)], '|U1')
 
     @property
     def types(self):
-        return np.asarray([self.type for _ in range(self.nfreqs)], '|S1')
+        return np.asarray([self.type for _ in range(self.nfreqs)], '|U1')
 
     @property
     def modes(self):
@@ -231,7 +231,9 @@ class HerrmannCallerBasis(object):
             stdout=PIPE,
             stderr=PIPE,
             shell=False,
-            preexec_fn=os.setsid)
+            preexec_fn=os.setsid,
+            encoding='utf8',
+            text=True)
 
         try:
             with Timeout(HERRMANN_TIMEOUT):
@@ -336,8 +338,8 @@ class HerrmannCallerBasis(object):
             raise ValueError(freq_scaling_coeff)
         self.freq_scaling_coeff = freq_scaling_coeff
 
-        self.waves = np.asarray(waves, '|S1')
-        self.types = np.asarray(types, '|S1')
+        self.waves = np.asarray(waves, '|U1')
+        self.types = np.asarray(types, '|U1')
         self.modes = np.asarray(modes, int)
         self.freqs = np.asarray(freqs, float)
 
