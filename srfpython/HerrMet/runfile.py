@@ -103,7 +103,7 @@ class RunFile(Database):
             return
 
         # give a number to this insertion
-        s = self.select('select max(CHAINID) from CHAINS').next()[0]
+        s = next(self.select('select max(CHAINID) from CHAINS'))[0]
         if s is None:
             chainid = 0
         else:
@@ -240,7 +240,7 @@ class RunFile(Database):
         for n, (MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT,PL, PV, W, T, M, F, DV) in enumerate(s):
             if n % step: continue
 
-            PT = np.asarray(PT.split(','), '|S2')  # parameter type
+            PT = np.asarray(PT.split(','), '|U2')  # parameter type
             PL = np.asarray(PL.split(','), int)    # parameter layer
             PV = np.asarray(PV.split(','), float)  # parameter value
             Z, VP, VS, RH = [np.zeros(NLAYER, float) for _ in range(4)]  # do not rename variables!!
@@ -249,8 +249,8 @@ class RunFile(Database):
                 #_[pl] = pv
                 eval(pt)[pl] = pv
 
-            W = np.asarray(W.split(','), '|S1')  # waves
-            T = np.asarray(T.split(','), '|S1')  # types
+            W = np.asarray(W.split(','), '|U1')  # waves
+            T = np.asarray(T.split(','), '|U1')  # types
             M = np.asarray(M.split(','), int)    # modes
             F = np.asarray(F.split(','), float)  # frequency
             DV = np.asarray(DV.split(','), float)  # dispersion value
@@ -352,7 +352,7 @@ class RunFile(Database):
         for n, (MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT, PL, PV, W, T, M, F, DV) in enumerate(s):
             if n % step: continue
 
-            PT = np.asarray(PT.split(','), '|S2')  # parameter type
+            PT = np.asarray(PT.split(','), '|U2')  # parameter type
             PL = np.asarray(PL.split(','), int)  # parameter layer
             PV = np.asarray(PV.split(','), float)  # parameter value
             Z, VP, VS, RH = [np.zeros(NLAYER, float) for _ in range(4)]  # do not rename variables!!
@@ -361,8 +361,8 @@ class RunFile(Database):
                 # _[pl] = pv
                 eval(pt)[pl] = pv
 
-            W = np.asarray(W.split(','), '|S1')  # waves
-            T = np.asarray(T.split(','), '|S1')  # types
+            W = np.asarray(W.split(','), '|U1')  # waves
+            T = np.asarray(T.split(','), '|U1')  # types
             M = np.asarray(M.split(','), int)  # modes
             F = np.asarray(F.split(','), float)  # frequency
             DV = np.asarray(DV.split(','), float)  # dispersion value
@@ -396,7 +396,7 @@ class RunFile(Database):
         if s is None:
             return
         filesize = os.stat(self.sqlitefile).st_size
-        NCHAIN, NMODEL, LLKMIN, LLKMAX = s.next()
+        NCHAIN, NMODEL, LLKMIN, LLKMAX = next(s)
         if NCHAIN:
             print ("%s%6d chains, %6d models, worst %10f, best %10f, filesize %dM" %
                    (head, NCHAIN, NMODEL, LLKMIN, LLKMAX, filesize / 1024 / 1024))

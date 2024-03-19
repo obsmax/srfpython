@@ -10,7 +10,7 @@ gca = plt.gca
 
 # ______________________________________________
 def pause(message="pause : press enter"):
-    raw_input(message)
+    input(message)
 
 
 # ______________________________________________
@@ -25,7 +25,8 @@ def showme(block=True):
     for figure in figures:
         figure.canvas.draw()
         figure.show()
-    if block: pause()
+    # if block: pause()
+    if block: plt.show()
 
 
 # ______________________________________________

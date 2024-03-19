@@ -125,8 +125,8 @@ def dispstats(ds, percentiles=[0.16, 0.5, 0.84], Ndisp=200, weights=None, **mapk
     for w, t, m, _, _ in groupbywtm(waves, types, modes, freqs, values):
         for p in percentiles:
             fpc, vpc = dpdfs["%s%s%d" % (w, t, m)].purcentile(p)
-            wavespc = np.array([w for _ in xrange(len(fpc))], "|S1")
-            typespc = np.array([t for _ in xrange(len(fpc))], "|S1")
+            wavespc = np.array([w for _ in xrange(len(fpc))], "|U1")
+            typespc = np.array([t for _ in xrange(len(fpc))], "|U1")
             modespc = np.array([m for _ in xrange(len(fpc))], int)
             yield p, (wavespc, typespc, modespc, fpc, vpc)
 

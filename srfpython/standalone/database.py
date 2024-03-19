@@ -283,9 +283,9 @@ class Database(object):
                 3   : rollback since begin transaction and close''' % self.sqlitefile
             msg = "\n".join([s.strip() for s in msg.split('\n')])
             #choice = generic_nobspy.readinput(msg, timeout = 60., defaultanswer = "2", expectedanswers = ["1", "2", "3"])
-            choice = raw_input('%s\n' % msg)
+            choice = input('%s\n' % msg)
             while not choice in "123":
-                choice = raw_input('?')
+                choice = input('?')
             if choice == "1":
                 self.commit()
             elif choice == "2":

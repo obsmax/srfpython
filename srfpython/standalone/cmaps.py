@@ -179,7 +179,7 @@ def linecmap(N=12):
     X = []
     gen = linecolors()
     for i in xrange(N):
-        X.append(gen.next())
+        X.append(next(gen))
 
     X = np.array(X)
     return array2cmap(X)

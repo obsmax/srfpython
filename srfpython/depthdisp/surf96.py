@@ -8,12 +8,12 @@ def unpacksurf96(string):
         string.remove('')
     npoints = len(string)
 
-    datatypes = ['|S1', '|S1', '|S1', int, float, float, float]
+    datatypes = ['|U1', '|U1', '|U1', int, float, float, float]
     WAVE, TYPE, FLAG, MODE, PERIOD, VALUE, DVALUE = [np.empty(npoints, dtype=d) for d in datatypes]
     NLC, NLU, NRC, NRU = 0, 0, 0, 0
     for n in range(npoints):
         l = string[n].split()
-        WAVE[n], TYPE[n], FLAG[n] = np.asarray(l[1:4], "|S1")
+        WAVE[n], TYPE[n], FLAG[n] = np.asarray(l[1:4], "|U1")
         MODE[n] = int(l[4])
         PERIOD[n], VALUE[n], DVALUE[n] = np.asarray(l[5:], float)
         if WAVE[n] == "L":

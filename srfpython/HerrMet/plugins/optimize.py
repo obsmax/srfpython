@@ -536,9 +536,9 @@ def optimize(argv, verbose, mapkwargs):
                               cmap=plt.get_cmap('jet_r'))
 
             plt.colorbar(coll, cax=cax)
-            plt.ion()
+            # plt.ion()
             plt.show()
-            input('pause')
+            # input('pause')
 
         elif argv['-show'][0] == "x":
             xslice = argv['-show'][1]
@@ -566,9 +566,9 @@ def optimize(argv, verbose, mapkwargs):
                                      cmap=plt.get_cmap('jet_r'))
 
             plt.colorbar(coll, cax=cax)
-            plt.ion()
+            # plt.ion()
             plt.show()
-            input('pause')
+            # input('pause')
 
         elif argv['-show'][0] == "y":
             yslice = argv['-show'][1]
@@ -596,6 +596,6 @@ def optimize(argv, verbose, mapkwargs):
                                      cmap=plt.get_cmap('jet_r'))
 
             plt.colorbar(coll, cax=cax)
-            plt.ion()
+            # plt.ion()
             plt.show()
-            input('pause')
+            # input('pause')

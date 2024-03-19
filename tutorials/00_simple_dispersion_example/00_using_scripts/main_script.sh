@@ -4,7 +4,7 @@
 # run the following command in a terminal (under the right env)
 
 # python script to generate a 1d depth model
-python 000_create_model.py
+python3 000_create_model.py
 
 # display
 bash 001_show.sh
