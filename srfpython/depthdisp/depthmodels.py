@@ -417,7 +417,7 @@ class depthmodel_from_arrays(depthmodel):
     def __init__(self, z, vp, vs, rh):
         """initiate with arrays, skip verification for same depth array"""
         assert len(z) == len(vp) == len(vs) == len(rh)
-        z, vp, vs, rh = [np.asarray(_, float) for _ in zip(z, vp, vs, rh)]
+        z, vp, vs, rh = [np.asarray(_, float) for _ in (z, vp, vs, rh)]
         if not z[0] == 0:
             raise ValueError('z[0] must be 0 ({})'.format(z[0]))
         if not np.all(z[1:] > z[:-1]):
@@ -429,7 +429,7 @@ class depthmodel_from_arrays(depthmodel):
         if not np.all(vp / vs >= np.sqrt(4 / 3.)):
             raise ValueError('vp/vs must be larger than sqrt(4/3.)')
 
-        self.vp, self.vs, self.rh = [depthmodel1D(z, _) for _ in zip(vp, vs, rh)]
+        self.vp, self.vs, self.rh = [depthmodel1D(z, _) for _ in (vp, vs, rh)]
 
 
 # -------------------------------------------------

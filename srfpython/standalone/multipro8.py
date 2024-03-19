@@ -1,4 +1,4 @@
-from multiprocessing import queues, Process, Queue, Array, Value, sharedctypes, Lock, RLock
+from multiprocessing import queues, Process, Queue, Array, Value, sharedctypes, Lock, RLock, get_context
 import sys, os
 import traceback, inspect, random, time, types, copy, signal
 import curses
@@ -449,7 +449,7 @@ def feed(q, g, m, verbose=False):
     while True:
         try:
             start = time.time()
-            job = g.next()
+            job = next(g)
             gentime = (start, time.time())
 
         except StopIteration:
@@ -474,7 +474,7 @@ def feed(q, g, m, verbose=False):
 # ########################## Exchanging Queues
 class InputQueue(queues.Queue):
     def __init__(self, maxsize, generator, messagequeue):
-        queues.Queue.__init__(self, maxsize=maxsize)
+        queues.Queue.__init__(self, maxsize=maxsize, ctx=get_context())
         self.p = Process(target=feed, args=(self, generator, messagequeue, messagequeue is not None))
         self.p.start()
 
@@ -533,7 +533,7 @@ class WaitQueue_old:
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if len(self) and self.l[0][0] == self.currentjob:
             # the first item in self.l is the expected packet,
             # remove it from self.l and return it
@@ -544,7 +544,7 @@ class WaitQueue_old:
         while True:
             try:
                 # get the next packet from the generator (i.e. the outputqueue)
-                packet = self.generator.next()
+                packet = next(self.generator)
                 # the first item of the packet must be the jobid
                 jobid = packet[0]
             except StopIteration:
@@ -617,7 +617,7 @@ class WaitQueue(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if len(self) and self.jobids[0] == self.currentjob:
             # the first item in self.l is the expected packet,
             # remove it from self.l and return it
@@ -628,7 +628,7 @@ class WaitQueue(object):
         while True:
             try:
                 # get the next packet from the generator (i.e. the outputqueue)
-                packet = self.generator.next()
+                packet = next(self.generator)
                 # the first item of the packet must be the jobid
                 jobid = packet[0]
             except StopIteration:
@@ -731,7 +731,7 @@ class WaitQueueGen(WaitQueue):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if len(self.jobids) and self.jobids[0] == self.currentjob and len(
                 self.nitems[0]):  # and self.nitems[0] == self.currentitem:
             # the first item in self.l is the expected packet,
@@ -751,7 +751,7 @@ class WaitQueueGen(WaitQueue):
         while True:
             try:
                 # get the next packet from the generator (i.e. the outputqueue)
-                packet = self.generator.next()
+                packet = next(self.generator)
                 if debug:
                     printgreen("$", packet)
 
@@ -1281,7 +1281,7 @@ class MapAsync(object):
     def communicate(self, *args, **kwargs):
         self.printer.communicate(*args, **kwargs)
 
-    def next(self):
+    def __next__(self):
         if not self.Nactive:
             raise StopIteration
         while self.Nactive:
@@ -1409,10 +1409,10 @@ class FakeMapAsync(object):
     def communicate(self, message):
         self.printer.communicate(message)
 
-    def next(self):
+    def __next__(self):
         try:
             start = time.time()
-            job = self.generator.next()
+            job = next(self.generator)
             gentime = (start, time.time())
             self.jobid += 1
         except StopIteration:

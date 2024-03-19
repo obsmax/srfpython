@@ -1,4 +1,7 @@
-from srfpython import *
+import numpy as np
+import matplotlib.pyplot as plt
+
+from srfpython.depthdisp.depthmodels import depthmodel_from_arrays
 from srfpython.sensitivitykernels.sker17 import sker17_1
 
 """
@@ -22,12 +25,11 @@ generator = sker17_1(ztop, vp, vs, rh,
     norm=norm)
 
 # only one item here
-wave, type, mode, freqs, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH = \
-    generator.next()
+wave, type_, mode, freqs, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH = \
+    next(generator)
 
 # ================== display
 plt.figure()
-
 # depth model
 ax1 = plt.subplot(121)
 dm = depthmodel_from_arrays(ztop, vp, vs, rh)
@@ -37,18 +39,18 @@ plt.legend()
 
 # kernels
 if norm:
-    title = r'$ \frac{H}{H_i} \, \frac{d lnV_{{%s%s%d}}}{d lnVs} $' % (wave, type, mode)
+    title = r'$ \frac{H}{H_i} \, \frac{d lnV_{{%s%s%d}}}{d lnVs} $' % (wave, type_, mode)
 else:
-    title = r'$ \frac{d lnV_{{%s%s%d}}}{d lnVs} $' % (wave, type, mode)
+    title = r'$ \frac{d lnV_{{%s%s%d}}}{d lnVs} $' % (wave, type_, mode)
 
 ax2 = plt.subplot(122, sharey=ax1, title=title, xlabel="sensitivity")
-ax2.plot(DLOGVADLOGVS[:, 0], ztop, label="%s%s%d@%.2fHz" % (wave, type, mode, freqs[0]))
-ax2.plot(DLOGVADLOGVS[:, 1], ztop, label="%s%s%d@%.2fHz" % (wave, type, mode, freqs[1]))
+ax2.plot(DLOGVADLOGVS[:, 0], ztop, label="%s%s%d@%.2fHz" % (wave, type_, mode, freqs[0]))
+ax2.plot(DLOGVADLOGVS[:, 1], ztop, label="%s%s%d@%.2fHz" % (wave, type_, mode, freqs[1]))
 ax2.grid(True)
 plt.legend()
-plt.ion()
+# plt.ion()
 plt.show()
-raw_input('pause')
+# input('pause')
 
 
 
