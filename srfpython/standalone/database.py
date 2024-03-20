@@ -303,6 +303,7 @@ class Database(object):
         returns self for the "to" keyword"""
         if self.verbose:
             printyellow("connecting to        :", os.path.abspath(self.sqlitefile))
+        sqlite3.register_adapter(np.int64, int)  # python3 -> otherwise 'modes' are stored in binary format
         self.cnx = sqlite3.connect(self.sqlitefile, timeout = self.timeout)
         self.cnx.isolation_level = None
         self.cursor = self.cnx.cursor()

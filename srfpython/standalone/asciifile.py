@@ -59,7 +59,7 @@ class AsciiFile_fromstring(object):
                     self.types = np.empty(len(self.formats), object)
                     for n, fmt in enumerate(self.formats):
                         if fmt.endswith('s'):
-                            self.types[n] = "S100"
+                            self.types[n] = "U100"
                         elif fmt.endswith('f'):
                             self.types[n] = float
                         elif fmt.endswith('d'):
