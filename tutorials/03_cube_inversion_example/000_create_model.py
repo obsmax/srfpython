@@ -1,5 +1,3 @@
-from __future__ import print_function
-from builtins import input
 import matplotlib.pyplot as plt
 import numpy as np
 from srfpython.depthdisp.depthmodels import brocher2005
@@ -73,11 +71,6 @@ plt.gca().set_xlabel('x (km)')
 plt.gca().set_ylabel('z (km)')
 plt.gca().invert_yaxis()
 
-plt.ion()
+# plt.ion()
 plt.show()
-input('pause')
-
-
-
-
-
+# input('pause')
