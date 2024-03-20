@@ -16,3 +16,6 @@ for root, dirs, files in os.walk(srfpython_dir):
         print(f'##########\n#####\n# executing {fpath}...')
         r = subprocess.run(('python3', fpath))
         r.check_returncode()
+
+# clear outpus
+subprocess.run(('rm', '-f', '000.mod96', '_HerrMet.param', 'toto.bdd'))
