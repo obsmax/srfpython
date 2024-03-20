@@ -136,7 +136,7 @@ def neldermead(M0, DM, G, ND, logRHOD, logRHOM,
         datas[niter, :] = Dis[:, l]
         llks[niter] = -Lis[l]
         if verbose:
-            print "neldermead : iter %6d llk %f " % (niter, llks[niter])
+            print("neldermead : iter %6d llk %f " % (niter, llks[niter]))
         ###################
 
         ###################

@@ -102,9 +102,9 @@ def test2D():
     ax0.plot(models[:, 0], models[:, 1], 'w')
     ax1.plot(llks, "ks")
     """
-    print models
-    print datas
-    print llks
+    print(models)
+    print(datas)
+    print(llks)
 
     for n, (Mi, llki, (Mis, Dis, llks)) in enumerate(g):
         xtri = np.concatenate((Mis[0, :], [Mis[0, 0]]))
@@ -113,7 +113,7 @@ def test2D():
         ax0.plot(Mi[0], Mi[1], "k.")
         ax1.plot(n, llki, "ko")
 
-    print Mi[0], Mi[1]
+    print(Mi[0], Mi[1])
     ax0.plot(Mi[0], Mi[1], "g*")
     ax1.plot(n, llki, "g*")
     ax1.grid(True)

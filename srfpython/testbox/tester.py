@@ -18,7 +18,7 @@ for i in range(10):
              # ('L', 'U', 0, freqspace(.2, 1., 15, "log")), \
              # ('L', 'U', 1, freqspace(.2, 1., 15, "log"))]
 
-    waves, types, modes, freqs, values = [[] for _ in xrange(5)]
+    waves, types, modes, freqs, values = [[] for _ in range(5)]
     for w, t, m, F, V in dispersion_2(ztop, vp, vs, rh, Curves,
         h=0.005, dcl=0.005, dcr=0.005, keepnans=False):
 

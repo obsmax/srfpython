@@ -826,7 +826,7 @@ class Target(object):
             self.parent = None
             self.passparent = False
             self.passworker = inspect.getargspec(self.core).args[0] == "worker"
-        elif isinstance(smth, types.ObjectType):
+        elif isinstance(smth, object):
             self.core = smth.__call__
             self.parent = smth
             self.passparent = True
@@ -1442,11 +1442,12 @@ class FakeMapSync(FakeMapAsync):
 
 
 if __name__ == "__main__":
-    from obsmax4.graphictools.gutils import *
-    from obsmax4.graphictools.cmaps import *
-    from obsmax4.statstools.pdf import PDF, ccl
+    #from obsmax4.graphictools.gutils import *
+    #from obsmax4.graphictools.cmaps import *
+    #from obsmax4.statstools.pdf import PDF, ccl
     import numpy as np
     import os
+    import matplotlib.pyplot as plt
 
     Njob = 96
     Nworkers = 12
@@ -1503,7 +1504,6 @@ if __name__ == "__main__":
     lgd, pids = [], []
     fig1 = plt.figure()
     fig2 = plt.figure()
-    fig3 = plt.figure()
     ax1 = fig1.add_subplot(111)
     ax2 = fig2.add_subplot(211)
     ax3 = fig2.add_subplot(212, sharex=ax2)
@@ -1538,17 +1538,18 @@ if __name__ == "__main__":
 
     # ----------------------
     ax1.legend(lgd)
-    timetick(ax2, "x")
+    #timetick(ax2, "x")
     ax2.grid()
 
-    timetick(ax3, "x")
+    #timetick(ax3, "x")
     pids = np.sort(np.unique(pids))
     ax3.set_yticks(pids)
     ax3.set_yticklabels(pids)
     ax3.grid()
 
-    ax1.figure.show()
-    ax2.figure.show()
+    #ax1.figure.show()
+    #ax2.figure.show()
+    plt.show()
 
     #    C = np.zeros((len(randomseries), len(randomseries)))
     #    for i in range(len(randomseries)):
@@ -1559,5 +1560,5 @@ if __name__ == "__main__":
     #    gca().pcolormesh1(C, vmin = -1.0, vmax = 1.0)
     #    gcf().show()
 
-    pause()
+    #pause()
 

@@ -1,7 +1,7 @@
 import sqlite3, os, glob, sys, traceback
 import numpy as np
 import pickle
-from .printcolors import printyellow #, printred
+from srfpython.standalone.printcolors import printyellow #, printred
 
 
 def repartition(z):

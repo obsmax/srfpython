@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from matplotlib import _pylab_helpers, ticker, axes, colors, __version__ as matplotlibversion
+from matplotlib import _pylab_helpers, ticker, axes, colors, colormaps, __version__ as matplotlibversion
 from matplotlib.offsetbox import AnchoredText
 import numpy as np
 
@@ -95,7 +95,7 @@ def values2colors(values, vmin=0., vmax=1.0, cmap = plt.cm.jet):
 
 
 # ______________________________________________
-def makecolorbar(vmin, vmax, cmap=plt.cm.get_cmap('jet')):
+def makecolorbar(vmin, vmax, cmap=colormaps['jet']):
     cb = plt.cm.ScalarMappable(norm=None, cmap=cmap)
     cb.set_array([vmin, vmax])
     cb.set_clim((vmin, vmax))
