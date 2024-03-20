@@ -173,13 +173,13 @@ class depthmodel1D(object):
         #     else:
         #         #q, r = diveucl(h, thickness)
         #         q, r = h // thickness, h % thickness
-        #         print q, r
+        #         print(q, r)
         #         if r > 1.e-6:
         #             values.append(v)
         #             thck.append(r)
         #
         #         if q > 0.:
-        #             for j in xrange(int(q)):
+        #             for j in range(int(q)):
         #                 values.append(v)
         #                 thck.append(thickness)
         #
@@ -236,7 +236,7 @@ class depthmodel1D(object):
         #newztop = np.concatenate(([z[0]], 0.5 * (z[1:] + z[:-1]), [z[-1]]))
         #newv    = np.interp(newztop, xp = z, fp = v)
         #newv[1:-2] = v[1:-1]
-        #print newztop[1:] - newztop[:-1]
+        #print(newztop[1:] - newztop[:-1])
         #self.__init__(newztop, newv)
 
     # -------------------------------------------------
@@ -330,7 +330,7 @@ class depthmodel(object):
     def simplify(self):
         # group layers with same values, return it as a new object
         ztop, vp, vs, rh = [self.vp.z[0]], [self.vp.values[0]], [self.vs.values[0]], [self.rh.values[0]]
-        for i in xrange(1, len(self.vp)):
+        for i in range(1, len(self.vp)):
             if self.vp.values[i] != self.vp.values[i - 1] or \
                             self.vs.values[i] != self.vs.values[i - 1] or \
                             self.rh.values[i] != self.rh.values[i - 1]:
@@ -417,7 +417,7 @@ class depthmodel_from_arrays(depthmodel):
     def __init__(self, z, vp, vs, rh):
         """initiate with arrays, skip verification for same depth array"""
         assert len(z) == len(vp) == len(vs) == len(rh)
-        z, vp, vs, rh = [np.asarray(_, float) for _ in z, vp, vs, rh]
+        z, vp, vs, rh = [np.asarray(_, float) for _ in (z, vp, vs, rh)]
         if not z[0] == 0:
             raise ValueError('z[0] must be 0 ({})'.format(z[0]))
         if not np.all(z[1:] > z[:-1]):
@@ -429,7 +429,7 @@ class depthmodel_from_arrays(depthmodel):
         if not np.all(vp / vs >= np.sqrt(4 / 3.)):
             raise ValueError('vp/vs must be larger than sqrt(4/3.)')
 
-        self.vp, self.vs, self.rh = [depthmodel1D(z, _) for _ in vp, vs, rh]
+        self.vp, self.vs, self.rh = [depthmodel1D(z, _) for _ in (vp, vs, rh)]
 
 
 # -------------------------------------------------

@@ -74,9 +74,9 @@ setuptools.setup(
     description='compute/inverse surface waves dispersion curves, based on Hermmann codes CPS',
     long_description=long_description,
     install_requires=['numpy', 'scipy', 'matplotlib', 'future'],
-    python_requires=">=2.7,<2.8",
+    python_requires=">=3.7",
     classifiers=[
-        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
         "Operating System :: Linux"],
     cmdclass={"build_py": CustomBuilder,
               "develop": CustomDevelop},

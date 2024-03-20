@@ -1,4 +1,3 @@
-from __future__ import print_function
 from builtins import input
 import numpy as np
 import matplotlib.pyplot as plt
@@ -227,6 +226,6 @@ if __name__ == '__main__':
         plt.plot(x__, y__, 'b-', alpha=alpha, linewidth=linewidth, label=label_fit)
 
     plt.legend()
-    plt.ion()
+    # plt.ion()
     plt.show()
-    input('pause')
+    # input('pause')

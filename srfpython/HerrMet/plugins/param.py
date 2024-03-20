@@ -104,7 +104,7 @@ def param(argv):
 
     nlayer = int(argv["main"][0])
     zbot = float(argv["main"][1])
-    type = argv['-t'][0] if "-t" in argv.keys() else default_parameterization
+    type_ = argv['-t'][0] if "-t" in argv.keys() else default_parameterization
     basedon = argv['-basedon'][0] if "-basedon" in argv.keys() else None
     if "-growing" in argv.keys():
         assert "-dvs" not in argv.keys()  # not compatible with -growing
@@ -121,11 +121,11 @@ def param(argv):
         drh = minmax(np.asarray(argv['-drh'], float)) if "-drh" in argv.keys() else None
         dpr = minmax(np.asarray(argv['-dpr'], float)) if "-dpr" in argv.keys() else None
 
-    if not type in default_parameterization_list:
+    if not type_ in default_parameterization_list:
         raise Exception('please pick one type in %s' % str(default_parameterization_list))
 
     write_default_paramfile(
-        nlayer, zbot, which_parameterizer=type, basedon=basedon, dvp=dvp, dvs=dvs, drh=drh, dpr=dpr)
+        nlayer, zbot, which_parameterizer=type_, basedon=basedon, dvp=dvp, dvs=dvs, drh=drh, dpr=dpr)
 
     print("you can edit {} to adjust parameters boundaries, "
           "do not change line orders".format(HERRMETPARAMFILELOCAL))

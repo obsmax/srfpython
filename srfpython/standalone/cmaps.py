@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from matplotlib import pyplot as plt
-from matplotlib import colors
+from matplotlib import colors, colormaps
 import numpy as np
 
 
@@ -15,13 +15,13 @@ def array2cmap(X):
     r = np.linspace(0., 1., N+1)
     r = np.sort(np.concatenate((r, r)))[1:-1]
 
-    rd = np.concatenate([[X[i, 0], X[i, 0]] for i in xrange(N)])
-    gr = np.concatenate([[X[i, 1], X[i, 1]] for i in xrange(N)])
-    bl = np.concatenate([[X[i, 2], X[i, 2]] for i in xrange(N)])
+    rd = np.concatenate([[X[i, 0], X[i, 0]] for i in range(N)])
+    gr = np.concatenate([[X[i, 1], X[i, 1]] for i in range(N)])
+    bl = np.concatenate([[X[i, 2], X[i, 2]] for i in range(N)])
     
-    rd = tuple([(r[i], rd[i], rd[i]) for i in xrange(2 * N)])
-    gr = tuple([(r[i], gr[i], gr[i]) for i in xrange(2 * N)])
-    bl = tuple([(r[i], bl[i], bl[i]) for i in xrange(2 * N)])
+    rd = tuple([(r[i], rd[i], rd[i]) for i in range(2 * N)])
+    gr = tuple([(r[i], gr[i], gr[i]) for i in range(2 * N)])
+    bl = tuple([(r[i], bl[i], bl[i]) for i in range(2 * N)])
 
    
     cdict = {'red': rd, 'green': gr, 'blue': bl}
@@ -32,7 +32,7 @@ def array2cmap(X):
 def cmapA2B(A = [0.5, 0.5, 0.5], B = [1.0, 0., 0.], N = 256):
     """create linear colorbar from colors A(r,g,b) to B(r,g,b)"""
     X = np.zeros((N, 3), float)
-    for i in xrange(3):
+    for i in range(3):
         X[:, i] = np.linspace(A[i], B[i], N)
     return array2cmap(X)
 
@@ -55,7 +55,7 @@ def display_cmap(ax, cmap):
 def stretchcmap(cmap, x, y=None, show=True):
     """modifies the repartition of colors along the colorbar using checkpoints
     input :
-        cmap = a colormab object, e.g. plt.get_cmap('jet')
+        cmap = a colormab object, e.g. matplotlib.colormaps['jet']
         x    = iterable, sorted, 0 to 1, horizontal positions of checkpoints
         y    = None or iterable, same len as x, 0 to 1, vertical positions of checkpoints
         show = bool, activate display for qc
@@ -63,7 +63,7 @@ def stretchcmap(cmap, x, y=None, show=True):
         cmapout = new colormap
 
     >> demo : try
-        cmap1 = stretchcmap(plt.get_cmap("spectral"), [0., 0.1, 1.0], [0., 0.4, 1.0], show = True)
+        cmap1 = stretchcmap(matplotlib.colormaps["Spectral"], [0., 0.1, 1.0], [0., 0.4, 1.0], show = True)
     """
 
     x = np.asarray(x, float)
@@ -127,7 +127,7 @@ def stretchcmap(cmap, x, y=None, show=True):
 #         while len(colors) < N:
 #             r, g, b = randcolor()
 #             keepcolor = True
-#             for i in xrange(len(colors)):
+#             for i in range(len(colors)):
 #                 ri, gi, bi = colors[i]
 #                 if ((r - ri) ** 2. + (g - gi) ** 2. + (b - bi) ** 2.) ** .5 < .2:
 #                     keepcolor=False
@@ -163,13 +163,13 @@ def linecmap(N=12):
             [.5,    1.,     .5],
             [.5,    .5,     1.] ])
 
-        for n in xrange(mycolors.shape[0]):
+        for n in range(mycolors.shape[0]):
             r, g, b = mycolors[n, :]
             yield r, g, b
-        for n in xrange(mycolors.shape[0]):
+        for n in range(mycolors.shape[0]):
             r, g, b = mycolors[n, :]
             yield r/1.5, g/1.5, b/1.5
-        for n in xrange(mycolors.shape[0]):
+        for n in range(mycolors.shape[0]):
             r, g, b = mycolors[n, :]
             yield r/3., g/3., b/3.
         yield 0., 0., 0.
@@ -178,57 +178,57 @@ def linecmap(N=12):
 
     X = []
     gen = linecolors()
-    for i in xrange(N):
-        X.append(gen.next())
+    for i in range(N):
+        X.append(next(gen))
 
     X = np.array(X)
     return array2cmap(X)
 ###########################################################################################
 def jetwk():
-    cmap = plt.cm.get_cmap('jet')
+    cmap = colormaps['jet']
     cmap.set_under('w')
     cmap.set_over('k')
     return cmap
 
 import warnings
 def yarg():
-    warnings.warn('obsolet use plt.get_cmap')
-    return plt.get_cmap('gray_r')
+    warnings.warn('obsolet use matplotlib.colormaps')
+    return colormaps['gray_r']
 
 
 def toh():
-    warnings.warn('obsolet use plt.get_cmap')
-    return plt.get_cmap('hot_r')
+    warnings.warn('obsolet use matplotlib.colormaps')
+    return colormaps['hot_r']
 
 
 def pamRMC():
-    warnings.warn('obsolet use plt.get_cmap')
-    return plt.get_cmap('CMRmap_r')
+    warnings.warn('obsolet use matplotlib.colormaps')
+    return colormaps['CMRmap_r']
 
 
 def cimsies():
-    warnings.warn('obsolet use plt.get_cmap')
-    return plt.get_cmap("seismic_r")
+    warnings.warn('obsolet use matplotlib.colormaps')
+    return colormaps["seismic_r"]
 
 
 def tej():
-    warnings.warn('obsolet use plt.get_cmap')
-    return plt.get_cmap('jet_r')
+    warnings.warn('obsolet use matplotlib.colormaps')
+    return colormaps['jet_r']
 
 
 def lartceps():
-    warnings.warn('obsolet use plt.get_cmap')
-    return plt.get_cmap('nipy_spectral_r')
+    warnings.warn('obsolet use matplotlib.colormaps')
+    return colormaps['nipy_spectral_r']
 
 
 def racn_tsig():
-    warnings.warn('obsolet use plt.get_cmap')
-    return plt.get_cmap('gist_ncar_r')
+    warnings.warn('obsolet use matplotlib.colormaps')
+    return colormaps['gist_ncar_r']
 
 
 def spectralwide():
-    l1 = plt.get_cmap('nipy_spectral')(np.arange(246))
-    l2 = plt.get_cmap('Set1')(np.arange(5, 256))#[::-1])
+    l1 = colormaps['nipy_spectral'](np.arange(246))
+    l2 = colormaps['Set1'](np.arange(5, 256))#[::-1])
     l = np.concatenate((l1, l2))    
     return array2cmap(l)
 
@@ -495,7 +495,7 @@ def bazcmap():
 
 def megawide():
    
-    lsup = plt.get_cmap('nipy_spectral')(np.arange(10, 256))
+    lsup = colormaps['nipy_spectral'](np.arange(10, 256))
     linf = plt.cm.jet(np.arange(230)[::4])
     linf = 0.33 * (linf - linf.min()) / (linf.max() - linf.min())#np.clip(linf - 0.4, 0., 1.)
     Ntra = 30
@@ -575,7 +575,7 @@ if __name__ == "__main__":
     display_cmap(gca(), gistncarb())
     
     # ############ demo stretchcmap
-    cmap1 = stretchcmap(plt.get_cmap("spectral"), [0., 0.1, 0.9, 1.0], [0., 0.4, 0.75, 1.0], show = True)
+    cmap1 = stretchcmap(colormaps["Spectral"], [0., 0.1, 0.9, 1.0], [0., 0.4, 0.75, 1.0], show = True)
     showme()
 
     # ############ dispaly all cmaps

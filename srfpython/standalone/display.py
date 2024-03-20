@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from matplotlib import _pylab_helpers, ticker, axes, colors, __version__ as matplotlibversion
+from matplotlib import _pylab_helpers, ticker, axes, colors, colormaps, __version__ as matplotlibversion
 from matplotlib.offsetbox import AnchoredText
 import numpy as np
 
@@ -10,7 +10,7 @@ gca = plt.gca
 
 # ______________________________________________
 def pause(message="pause : press enter"):
-    raw_input(message)
+    input(message)
 
 
 # ______________________________________________
@@ -25,7 +25,8 @@ def showme(block=True):
     for figure in figures:
         figure.canvas.draw()
         figure.show()
-    if block: pause()
+    # if block: pause()
+    if block: plt.show()
 
 
 # ______________________________________________
@@ -41,7 +42,7 @@ def chftsz(obj, fontsize):
 # ################################################ tickers
 def logtick(ax, axis='x', grid = True, color = "k", subs = [1., 2., 5.]):
     if matplotlibversion < "1.2":
-        print "ERROR : logtick doesn't work with maptplotlib < 1.2"
+        print("ERROR : logtick doesn't work with maptplotlib < 1.2")
         return
 
     def myfuncformatter(tick, tickposition=None):
@@ -94,7 +95,7 @@ def values2colors(values, vmin=0., vmax=1.0, cmap = plt.cm.jet):
 
 
 # ______________________________________________
-def makecolorbar(vmin, vmax, cmap=plt.cm.get_cmap('jet')):
+def makecolorbar(vmin, vmax, cmap=colormaps['jet']):
     cb = plt.cm.ScalarMappable(norm=None, cmap=cmap)
     cb.set_array([vmin, vmax])
     cb.set_clim((vmin, vmax))

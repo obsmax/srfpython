@@ -5,8 +5,6 @@ HerrMet : code for depth inversion of multimodal/multitypes surface waves
 This is the main program to be called from command lines with arguments,
 this program will call plugins with corresponding arguments
 """
-from __future__ import print_function
-
 import os, sys, matplotlib
 if "-png" in sys.argv[1:]: matplotlib.use('agg')
 

@@ -74,6 +74,7 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#fmt %5s %16f %16f\n')
             for k, vinf, vsup in zip(keys, vinfs, vsups):
                 fid.write('%s %s %s\n' % (k, vinf, vsup))
+
         A = AsciiFile(HERRMETPARAMFILELOCAL)
 
         A.write() #to screen

@@ -149,6 +149,6 @@ if __name__ == '__main__':
         lininvsmooth(xi, di, si, xmodel, modelprior, sigmamodel, correlation_length)
         plt.gca().set_ylim((min(di)-1, max(di)+1))
         plt.legend()
-    plt.ion()
+    # plt.ion()
     plt.show()
-    input('pause')
+    # input('pause')

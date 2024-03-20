@@ -24,7 +24,7 @@ help = '''m96
 if __name__ == "__main__":
     import sys, os
     if len(sys.argv) == 1:
-        print help
+        print(help)
         sys.exit()
 
     from srfpython.standalone.display import gcf, gca, showme, pause, plt, logtick
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # -----------------------------------
     if "help" in argv.keys() or "h" in argv.keys():
-        print help
+        print(help)
         sys.exit()
     
     # -----------------------------------
@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
                 fout = ".".join(fout)
                 assert not os.path.exists(fout)
-            print (f, ">", fout)
+            print(f, ">", fout)
             dm.write96(fout)
         sys.exit()
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 fout = f.split('.')[:-1] + [suffix,  f.split('.')[-1]]
                 fout = ".".join(fout)
                 assert not os.path.exists(fout)
-            print (f, ">", fout)
+            print(f, ">", fout)
             dm.write96(fout)
         sys.exit()
 
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         axrh = gcf().add_subplot(1, 4, 4, sharey = axvp)
         for f in argv['show']:
             dm = depthmodel_from_mod96(f)
-            print f
+            print(f)
 
             dm.vp.show(axvp, ".-")
             dm.vs.show(axvs, ".-")
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                         sfx = "_%d" % (int(sfx.strip("_")) + 1)
                     s96out = s96out + sfx + ".surf96"
 
-                print "%s => %s" % (m, s96out)
+                print("%s => %s" % (m, s96out))
 
                 assert s96out.endswith('.surf96') or s96out.endswith('.s96')
 

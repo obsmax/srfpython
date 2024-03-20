@@ -292,7 +292,7 @@ class surf96reader_from_surf96string(object):
         self.data['MODE'], self.data['PERIOD'], \
         self.data['VALUE'], self.data['DVALUE'] = \
             [np.array([], dtype=dtype) for dtype in \
-             ['|S1','|S1', '|S1', int, float, float, float]]
+             ['|U1','|U1', '|U1', int, float, float, float]]
 
     def copy(self):
         return copy.deepcopy(self)
@@ -398,7 +398,7 @@ class surf96reader_from_arrays(surf96reader_from_surf96string):
         if dvalues is None :
             dvalues = 0.1 * np.ones_like(values)
         if flags is None:
-            flags = np.array(['T' for _ in xrange(len(values))], '|S1')
+            flags = np.array(['T' for _ in range(len(values))], '|U1')
         self.clear()
         self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], \
             self.data['MODE'], self.data['PERIOD'], \
@@ -435,8 +435,8 @@ def groupbywtm(waves, types, modes, freqs, values, dvalues=None, keepnans=True):
     w (wave key, scalar), t (type key, scalar), m (mode number, scalar), freqs (array), values (array), dvalues (array)
     """
     freqs = np.array(freqs, float)
-    types = np.array(list(types), "|S1")
-    waves = np.array(list(waves), "|S1")
+    types = np.array(list(types), "|U1")
+    waves = np.array(list(waves), "|U1")
     modes = np.array(modes, int)
     assert len(waves) == len(types) == len(modes) == len(freqs)
     if dvalues is not None:
@@ -473,8 +473,8 @@ def igroupbywtm(Waves, Types, Modes, Freqs):
     Freqs                = [ f,   f,   f,   f ]
 
     becomes
-    array(['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R','R', 'R', 'R', 'R', 'R', 'R', 'R'], dtype='|S1')
-    array(['U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'], dtype='|S1')
+    array(['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R','R', 'R', 'R', 'R', 'R', 'R', 'R'], dtype='|U1')
+    array(['U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'], dtype='|U1')
     array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
     array([0.1, 0.37606031, 1.41421356, 5.3182959, 20., 0.1, 0.37606031, 1.41421356, 5.3182959, 20., 0.1, 0.37606031, 1.41421356, 5.3182959, 20., 0.1, 0.37606031, 1.41421356, 5.3182959, 20])
     """
@@ -482,8 +482,8 @@ def igroupbywtm(Waves, Types, Modes, Freqs):
     waves = Waves.repeat([len(ff) for ff in Freqs])
     types = Types.repeat([len(ff) for ff in Freqs])
     modes = Modes.repeat([len(ff) for ff in Freqs])
-    waves = np.array(waves, '|S1')
-    types = np.array(types, '|S1')
+    waves = np.array(waves, '|U1')
+    types = np.array(types, '|U1')
     modes = np.array(modes, int)
     freqs = np.concatenate(Freqs)
     return waves, types, modes, freqs

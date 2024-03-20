@@ -66,7 +66,7 @@ showme(0)
 #-----------------------
 if True:
     def gen():
-        for nchain in xrange(12):
+        for nchain in range(12):
             M0 = np.array([np.random.rand() * (amax - amin) + amin, np.random.rand() * (bmax - bmin) + bmin])
             MSTD = np.array([0.1, 0.1])
             nkeep = 1000

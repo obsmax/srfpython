@@ -84,7 +84,7 @@ class Datacoder_log(Datacoder):
 
     def __call__(self, values):
         assert len(values) == len(self.values)
-        d = np.asarray(map(log_nofail, values), float)
+        d = np.asarray(list(map(log_nofail, values)), float)
         return d
 
     def inv(self, d):

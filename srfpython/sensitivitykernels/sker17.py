@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from __future__ import print_function
 from builtins import input
 
 import numpy as np
@@ -29,7 +28,7 @@ def lognofail(x):
         return np.log(x)
 
     if hasattr(x, "__iter__"):
-        return np.asarray(map(ilognofail, x), float)
+        return np.asarray(list(map(ilognofail, x)), float)
     else:
         return ilognofail(x)
 
@@ -114,7 +113,7 @@ def sker17(ztop, vp, vs, rh,
                 ztopi, np.exp(logvsi + logpri),
                 np.exp(logvsi), np.exp(logrhi)))
         except CPiSDomainError as err:
-            print ("error during gradient computation %s" % str(err))
+            print("error during gradient computation %s" % str(err))
             return i, None
         except:
             raise

@@ -24,9 +24,9 @@ else:
     V = np.copy(v)
 
 
-print "l0", l0
-print "l1", l1
-print "l2", l2
+print("l0", l0)
+print("l1", l1)
+print("l2", l2)
 
 gcf().add_subplot(211, ylabel="log(pdf)")
 gca().plot(v, l0.calln(V), label="l0 (uni, k=10)")

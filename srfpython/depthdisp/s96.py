@@ -15,7 +15,7 @@ SURF96 {wave} {type} {flag} {mode} {period(s)} {value(km/s)} {dvalue(km/s)}
 if __name__ == "__main__":
     import sys
     if len(sys.argv) == 1:
-        print help
+        print(help)
         sys.exit()
 
     from srfpython.standalone.display import gcf, gca, showme, pause, plt, logtick
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # -----------------------------------
     if "help" in argv.keys() or "h" in argv.keys():
-        print help
+        print(help)
         sys.exit()
 
     # -----------------------------------
@@ -38,9 +38,9 @@ if __name__ == "__main__":
         pmin, pmax = np.inf, -np.inf
         for f in argv['show']:
             s = surf96reader(f)
-            print f
+            print(f)
             for law in s.get_all():
-                print "    %s" % str(law)
+                print("    %s" % str(law))
                 law.show(gca(), period= not "freq" in argv.keys(), label="%s%s%d" % (law.wave, law.type, law.mode))#alpha = 0.5, color = "r" if law.mode else "k")
                 pmin = min([pmin, 1. / law.freq.max()])
                 pmax = max([pmax, 1. / law.freq.min()])
@@ -78,13 +78,13 @@ if __name__ == "__main__":
             return ""
 
         sfx  = argv["sfx"][0] if "sfx" in argv.keys() else "resamp"        
-        print argv['fspace']
+        print(argv['fspace'])
         newf = freqspace(float(argv['fspace'][0]), float(argv['fspace'][1]), int(argv['fspace'][2]), argv['fspace'][3]) #np.sort(np.unique(np.abs(argv['newf'])))
-        print newf
+        print(newf)
         for f in argv['resamp']:
             s = surf96reader(f)
             fout = ".".join(f.split('/')[-1].split('.')[:-1] + [sfx] + [f.split('/')[-1].split('.')[-1]])
-            print fout
+            print(fout)
             out = ""
             for law in s.get_all():
                 out += "\n" + tostr(law, newf)

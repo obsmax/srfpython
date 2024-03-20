@@ -26,7 +26,7 @@ class disppdf(object):
     def appendN(self, law, Ntimes=1):
         """append the same model Ntimes times in the histogram"""
         v = law(self.f)
-        for i in xrange(len(self.f)):
+        for i in range(len(self.f)):
             if np.isnan(v[i]):continue
             j = np.clip(np.searchsorted(self.v, v[i]), 0, len(self.v) - 1)
             self.H[j, i] += float(Ntimes)
@@ -41,7 +41,7 @@ class disppdf(object):
     def appenddatN(self, f, v, Ntimes=1):
         if (f != self.f).any():
             v = np.interp(self.f, xp = f, fp = v, left = np.nan, right = np.nan)
-        for i in xrange(len(self.f)):
+        for i in range(len(self.f)):
             if np.isnan(v[i]):continue
             j = np.clip(np.searchsorted(self.v, v[i]), 0, len(self.v) - 1)
             self.H[j, i] += float(Ntimes)
@@ -51,7 +51,7 @@ class disppdf(object):
         H = np.ma.masked_where(self.H == 0., self.H)
         if norm:
             I = np.zeros(len(self.f))
-            for i in xrange(len(self.f)):
+            for i in range(len(self.f)):
                 I[i] = discrete_time_primitive(self.v, self.H[:, i], area = True)
             I = discrete_time_primitive(self.f, I, area = True)
             H /= I
@@ -125,8 +125,8 @@ def dispstats(ds, percentiles=[0.16, 0.5, 0.84], Ndisp=200, weights=None, **mapk
     for w, t, m, _, _ in groupbywtm(waves, types, modes, freqs, values):
         for p in percentiles:
             fpc, vpc = dpdfs["%s%s%d" % (w, t, m)].purcentile(p)
-            wavespc = np.array([w for _ in xrange(len(fpc))], "|S1")
-            typespc = np.array([t for _ in xrange(len(fpc))], "|S1")
-            modespc = np.array([m for _ in xrange(len(fpc))], int)
+            wavespc = np.array([w for _ in range(len(fpc))], "|U1")
+            typespc = np.array([t for _ in range(len(fpc))], "|U1")
+            modespc = np.array([m for _ in range(len(fpc))], int)
             yield p, (wavespc, typespc, modespc, fpc, vpc)
 
