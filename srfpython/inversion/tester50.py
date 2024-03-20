@@ -27,8 +27,8 @@ class fun2D():
         if False:
             self.N = N
             self.As = np.random.randn(self.N)
-            self.xos, self.yos = zip(*[np.random.rand(2) * 20. - 10. for _ in xrange(self.N)])
-            self.sigmamins, self.sigmajs = zip(*[np.sort(np.random.rand(2) * 3. + .1) for _ in xrange(self.N)])
+            self.xos, self.yos = zip(*[np.random.rand(2) * 20. - 10. for _ in range(self.N)])
+            self.sigmamins, self.sigmajs = zip(*[np.sort(np.random.rand(2) * 3. + .1) for _ in range(self.N)])
             self.alphadegs = np.random.rand(self.N) * 360.
         else:
             self.As = np.array([4., 1.])
@@ -42,7 +42,7 @@ class fun2D():
     def __call__(self, m):
         x, y = m
         z = np.zeros_like(x)
-        for n in xrange(self.N):
+        for n in range(self.N):
             z += self.As[n] * gauss2D2(x, y, self.xos[n], self.yos[n], self.sigmajs[n], self.sigmamins[n],
                                        self.alphadegs[n])
 

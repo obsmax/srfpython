@@ -12,6 +12,8 @@
 *.surf96.copy
 *.npy
 *.npz
+*.log
+
 .DS_Store
 srfpython/Herrmann/bin/max_srfdis96
 srfpython/Herrmann/bin/max_srfpre96

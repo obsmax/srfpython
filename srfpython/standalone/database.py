@@ -1,7 +1,7 @@
 import sqlite3, os, glob, sys, traceback
 import numpy as np
 import pickle
-from printcolors import printyellow #, printred
+from .printcolors import printyellow #, printred
 
 
 def repartition(z):
@@ -11,7 +11,7 @@ def repartition(z):
     x = np.sort(np.unique(zs))
     y = np.ones_like(x)
     i = 0
-    for j in xrange(1, len(zs)):
+    for j in range(1, len(zs)):
         zz = zs[j]
         if zz == x[i]:
             y[i] += 1.0
@@ -378,7 +378,7 @@ class Database(object):
             for item in selection:
                 yield item
             selection.close()
-            raise StopIteration
+            # raise StopIteration
         #-------
         
         assert isinstance(cmd, str) or isinstance(cmd, unicode)

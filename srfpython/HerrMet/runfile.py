@@ -239,7 +239,10 @@ class RunFile(Database):
 
         for n, (MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT,PL, PV, W, T, M, F, DV) in enumerate(s):
             if n % step: continue
-
+            #print('\n\n\n');
+            #for _ in (MODELID, CHAINID, WEIGHT, LLK, NLAYER, PT,PL, PV, W, T, M, F, DV):
+            #    print(_); print('')
+            #print('\n\n\n')
             PT = np.asarray(PT.split(','), '|U2')  # parameter type
             PL = np.asarray(PL.split(','), int)    # parameter layer
             PV = np.asarray(PV.split(','), float)  # parameter value

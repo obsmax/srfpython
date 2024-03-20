@@ -114,7 +114,7 @@ class multiline(object):
         curses.cbreak()    
         self.win.keypad(True)
         self.win.scrollok(True)
-        self.lines = ["" for i in xrange(self.maxlines)]
+        self.lines = ["" for i in range(self.maxlines)]
         self.line0 = 0 #first line printed
         self.lastcommunication = ""
         self.reset_termsize()
@@ -166,7 +166,7 @@ class multiline(object):
     #____________________________________
     def move(self, line0):
         self.line0 = line0
-        for i in xrange(self.line0, self.line0 + self.nmax + 1):
+        for i in range(self.line0, self.line0 + self.nmax + 1):
             self.write(i, self.lines[i], refresh = False)
         self.communicate(self.lastcommunication)
         self.refresh()

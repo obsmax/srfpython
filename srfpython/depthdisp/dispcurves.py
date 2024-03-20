@@ -398,7 +398,7 @@ class surf96reader_from_arrays(surf96reader_from_surf96string):
         if dvalues is None :
             dvalues = 0.1 * np.ones_like(values)
         if flags is None:
-            flags = np.array(['T' for _ in xrange(len(values))], '|U1')
+            flags = np.array(['T' for _ in range(len(values))], '|U1')
         self.clear()
         self.data['WAVE'], self.data['TYPE'], self.data['FLAG'], \
             self.data['MODE'], self.data['PERIOD'], \

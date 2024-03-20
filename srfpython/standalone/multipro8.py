@@ -127,7 +127,7 @@ class multiline(object):
         curses.cbreak()
         self.win.keypad(True)
         self.win.scrollok(True)
-        self.lines = ["" for i in xrange(self.maxlines)]
+        self.lines = ["" for i in range(self.maxlines)]
         self.line0 = 0  # first line printed
         self.lastcommunication = ""
         self.reset_termsize()
@@ -182,7 +182,7 @@ class multiline(object):
 
     def move(self, line0):
         self.line0 = line0
-        for i in xrange(self.line0, self.line0 + self.nmax + 1):
+        for i in range(self.line0, self.line0 + self.nmax + 1):
             self.write(i, self.lines[i], refresh=False)
         self.communicate(self.lastcommunication)
         self.refresh()
@@ -806,7 +806,7 @@ class Job(object):
     use it to pack jobs out of the job-generator
 
     def jobgenerator(N):
-        for n in xrange(N):
+        for n in range(N):
             yield Job(n, twotimesn = 2 * n)
     """
     args, kwargs = (), {}
@@ -896,7 +896,7 @@ class Worker(Process):
         if N == 1:
             return self.rand_()
         else:
-            return np.array([self.rand_() for i in xrange(N)])
+            return np.array([self.rand_() for i in range(N)])
 
     def randn(self, N=1):
         return np.interp(self.rand(N), xp=self.Fgauss, fp=self.tgauss)
@@ -1328,7 +1328,7 @@ class StackAsync(MapAsync):
             return Stacker(self.v + other.v)
 
     def JobGen():
-        for i in xrange(1000):
+        for i in range(1000):
             yield Job(i)
 
     s = Stacker(0.) #the stacker to be duplicated in each worker
@@ -1347,12 +1347,12 @@ class GenAsync(MapAsync):
     """usage : 
 
     def JobGen():
-        for jobid in xrange(10):
+        for jobid in range(10):
             yield Job(N=10)
 
     def Target(N):
         # must be a generator, no check
-        for nitem in xrange(N):
+        for nitem in range(N):
             answer = np.cos(nitem)
             yield answer
 
@@ -1481,7 +1481,7 @@ if __name__ == "__main__":
 
 
         # fun = Obj()
-        fun = [Obj(cst=i) for i in xrange(Nworkers)]  # one specific callable per worker
+        fun = [Obj(cst=i) for i in range(Nworkers)]  # one specific callable per worker
 
 
     # ----------------------
@@ -1493,7 +1493,7 @@ if __name__ == "__main__":
         use the yield command instead of return, so the jobs will be generated
         when required by the workers
         """
-        for i in xrange(n):
+        for i in range(n):
             workfor(0.1)
             # if i == 3: raise Exception('')
             yield Job(n=10, i=i)
@@ -1551,8 +1551,8 @@ if __name__ == "__main__":
     ax2.figure.show()
 
     #    C = np.zeros((len(randomseries), len(randomseries)))
-    #    for i in xrange(len(randomseries)):
-    #        for j in xrange(i, len(randomseries)):
+    #    for i in range(len(randomseries)):
+    #        for j in range(i, len(randomseries)):
     #            C[i, j] = C[j, i] = ccl(randomseries[i], randomseries[j])
 
     #    plt.figure()

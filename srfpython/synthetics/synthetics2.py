@@ -224,7 +224,7 @@ if __name__ == "__main__":
         xS = 10 * np.cos(tS)
         yS = 10 * np.sin(tS)
 
-        for n in xrange(len(xS)):
+        for n in range(len(xS)):
             starttime, npts, dt, y = G.ccf(xS[n], yS[n], xA, yA, xB, yB,
                                         delta=0.05,
                                         derivate=True,

@@ -72,7 +72,7 @@ if False:
     B = models[:, 1]
 else: #parallel
     def gen():
-        for nchain in xrange(48):
+        for nchain in range(48):
             M0 = np.array([np.random.rand() * (amax - amin) + amin, np.random.rand() * (bmax - bmin) + bmin])
             MSTD = np.array([0.1, 0.1])
             nkeep = 1000#00

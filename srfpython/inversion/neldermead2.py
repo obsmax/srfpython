@@ -109,7 +109,7 @@ def neldermead(M0, DM, G, ND, logRHOD, logRHOM,
     # ----------------- evaluate first simplex
     Lis = np.zeros(Npoints, float) * np.nan # log likelihood at simplex points
     Dis = np.zeros((ND, Npoints), float) * np.nan # Data corresponding to Mis
-    for j in xrange(Ndim + 1):
+    for j in range(Ndim + 1):
         # compute the data and likelihood of all the points in the simplex
         Dis[:, j], Lis[j] = call(Mis[:, j])
 
@@ -120,7 +120,7 @@ def neldermead(M0, DM, G, ND, logRHOD, logRHOM,
     # -----------------
     nstay = 0
     best = -np.inf
-    for niter in xrange(maxiter):
+    for niter in range(maxiter):
 
         h = np.argmax(Lis)  # worst point (index)
         l = np.argmin(Lis)  # best point (index)

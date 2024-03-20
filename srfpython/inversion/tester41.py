@@ -58,7 +58,7 @@ def logRHOM(model):
 
 if True:
     def gen():
-        for nchain in xrange(4):
+        for nchain in range(4):
             M0   = np.random.randn(2)
             MSTD = np.asarray([1., 1.])
             yield Job(nchain, M0, MSTD)

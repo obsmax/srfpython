@@ -15,13 +15,13 @@ def array2cmap(X):
     r = np.linspace(0., 1., N+1)
     r = np.sort(np.concatenate((r, r)))[1:-1]
 
-    rd = np.concatenate([[X[i, 0], X[i, 0]] for i in xrange(N)])
-    gr = np.concatenate([[X[i, 1], X[i, 1]] for i in xrange(N)])
-    bl = np.concatenate([[X[i, 2], X[i, 2]] for i in xrange(N)])
+    rd = np.concatenate([[X[i, 0], X[i, 0]] for i in range(N)])
+    gr = np.concatenate([[X[i, 1], X[i, 1]] for i in range(N)])
+    bl = np.concatenate([[X[i, 2], X[i, 2]] for i in range(N)])
     
-    rd = tuple([(r[i], rd[i], rd[i]) for i in xrange(2 * N)])
-    gr = tuple([(r[i], gr[i], gr[i]) for i in xrange(2 * N)])
-    bl = tuple([(r[i], bl[i], bl[i]) for i in xrange(2 * N)])
+    rd = tuple([(r[i], rd[i], rd[i]) for i in range(2 * N)])
+    gr = tuple([(r[i], gr[i], gr[i]) for i in range(2 * N)])
+    bl = tuple([(r[i], bl[i], bl[i]) for i in range(2 * N)])
 
    
     cdict = {'red': rd, 'green': gr, 'blue': bl}
@@ -32,7 +32,7 @@ def array2cmap(X):
 def cmapA2B(A = [0.5, 0.5, 0.5], B = [1.0, 0., 0.], N = 256):
     """create linear colorbar from colors A(r,g,b) to B(r,g,b)"""
     X = np.zeros((N, 3), float)
-    for i in xrange(3):
+    for i in range(3):
         X[:, i] = np.linspace(A[i], B[i], N)
     return array2cmap(X)
 
@@ -127,7 +127,7 @@ def stretchcmap(cmap, x, y=None, show=True):
 #         while len(colors) < N:
 #             r, g, b = randcolor()
 #             keepcolor = True
-#             for i in xrange(len(colors)):
+#             for i in range(len(colors)):
 #                 ri, gi, bi = colors[i]
 #                 if ((r - ri) ** 2. + (g - gi) ** 2. + (b - bi) ** 2.) ** .5 < .2:
 #                     keepcolor=False
@@ -163,13 +163,13 @@ def linecmap(N=12):
             [.5,    1.,     .5],
             [.5,    .5,     1.] ])
 
-        for n in xrange(mycolors.shape[0]):
+        for n in range(mycolors.shape[0]):
             r, g, b = mycolors[n, :]
             yield r, g, b
-        for n in xrange(mycolors.shape[0]):
+        for n in range(mycolors.shape[0]):
             r, g, b = mycolors[n, :]
             yield r/1.5, g/1.5, b/1.5
-        for n in xrange(mycolors.shape[0]):
+        for n in range(mycolors.shape[0]):
             r, g, b = mycolors[n, :]
             yield r/3., g/3., b/3.
         yield 0., 0., 0.
@@ -178,7 +178,7 @@ def linecmap(N=12):
 
     X = []
     gen = linecolors()
-    for i in xrange(N):
+    for i in range(N):
         X.append(next(gen))
 
     X = np.array(X)

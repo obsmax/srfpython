@@ -179,7 +179,7 @@ class depthmodel1D(object):
         #             thck.append(r)
         #
         #         if q > 0.:
-        #             for j in xrange(int(q)):
+        #             for j in range(int(q)):
         #                 values.append(v)
         #                 thck.append(thickness)
         #
@@ -330,7 +330,7 @@ class depthmodel(object):
     def simplify(self):
         # group layers with same values, return it as a new object
         ztop, vp, vs, rh = [self.vp.z[0]], [self.vp.values[0]], [self.vs.values[0]], [self.rh.values[0]]
-        for i in xrange(1, len(self.vp)):
+        for i in range(1, len(self.vp)):
             if self.vp.values[i] != self.vp.values[i - 1] or \
                             self.vs.values[i] != self.vs.values[i - 1] or \
                             self.rh.values[i] != self.rh.values[i - 1]:
