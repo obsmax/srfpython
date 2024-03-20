@@ -16,9 +16,9 @@ to_test = ['00_simple_dispersion_example/00_using_scripts/main_script.sh',
            '10_notebooks/00_how_to_use_srfpython.ipynb'
            ]
 
-ignore = ('03_cube_inversion_example', '10_notebooks')
+ignore = ('03_cube_inversion_example', )
 
-to_test = filter(lambda s: all((not(s in skipped) for skipped in ignore)), to_test)
+to_test = filter(lambda s: all((not(skip in s) for skip in ignore)), to_test)
 
 CWD = os.getcwd()
 
