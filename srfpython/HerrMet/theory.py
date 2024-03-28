@@ -47,10 +47,10 @@ class Theory(object):
             h=h, ddc=ddc)
 
         # the output of self.herrmanncaller.disperse must match excatcly the datacoder order
-        assert self.herrmanncaller.waves is datacoder.waves
-        assert self.herrmanncaller.types is datacoder.types
-        assert self.herrmanncaller.modes is datacoder.modes
-        assert self.herrmanncaller.freqs is datacoder.freqs
+        assert (self.herrmanncaller.waves == datacoder.waves).all()
+        assert (self.herrmanncaller.types == datacoder.types).all()
+        assert (self.herrmanncaller.modes == datacoder.modes).all()
+        assert (self.herrmanncaller.freqs == datacoder.freqs).all()
 
     def __call__(self, m):
         """solves the forward problem"""
