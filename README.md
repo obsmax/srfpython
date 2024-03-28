@@ -1,4 +1,4 @@
-# srfpython
+# SrfPython
   
 - programs for surface wave dispersion curves in python
 - compute, display, invert 1D depth models
@@ -69,6 +69,10 @@ more in the jupyter notebooks
 cd ~/git/srfpython/tutorials/10_notebooks
 jupyter notebook 
 ```
+
+## Contributing authors
+* 2024 : The program has been converted from python 2.7 to >3.7 by Pierric Mora.
+
 
 ## Related references
 * Lehujeur, M., Chevrot, S., Villaseñor, A., Masini, E., Saspiturry, N., Lescoutre, R., Sylvander, M., 2021. Three-dimensional shear velocity structure of the Mauléon and Arzacq Basins (Western Pyrenees). BSGF - Earth Sci. Bull. 192, 47. https://doi.org/10.1051/bsgf/2021039
