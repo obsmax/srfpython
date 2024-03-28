@@ -52,7 +52,7 @@ for vs in vstruth, vsinv:
 
     plt.figure()
     plt.colorbar(
-        plt.pcolormesh(xedges, zedges, vs[:, ny // 2, :], cmap=plt.get_cmap('jet_r'))
+        plt.pcolormesh(xedges, zedges, vs[:, ny // 5, :], cmap=plt.get_cmap('jet_r'))
         )
     plt.gca().set_xlabel('x (km)')
     plt.gca().set_ylabel('z (km)')

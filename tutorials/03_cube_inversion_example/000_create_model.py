@@ -10,8 +10,8 @@ build a 3D vs model (vp, rh from Brocher 2005)
 x0 = 0.
 y0 = 0.
 z0 = 0.
-nx = 15
-ny = 10
+nx = 5
+ny = 4
 nz = 10
 dx = 2.4  # km
 dy = 2.2  # km
@@ -65,7 +65,7 @@ plt.gca().set_ylabel('y (km)')
 
 plt.figure()
 plt.colorbar(
-    plt.pcolormesh(xedges, zedges, vs[:, ny // 2, :], cmap=plt.get_cmap('jet_r'))
+    plt.pcolormesh(xedges, zedges, vs[:, ny // 5, :], cmap=plt.get_cmap('jet_r'))
     )
 plt.gca().set_xlabel('x (km)')
 plt.gca().set_ylabel('z (km)')

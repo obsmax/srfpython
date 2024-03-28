@@ -9,14 +9,14 @@ HerrMet -verbose 0 --optimize -temp
 # in this tuto I edit here below :
 cat << END > _HerrMet.optimize.param
 # ========== recall the grid parameters
-nx           15
-ny           10
+nx           5
+ny           4
 dx           2.4    # km
 dy           2.2    # km
 
 # ========== path to the point-wise inversion data and results
 datafiles    ./inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.target
-extractfiles ./inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.best_1000_0_1.p0.50.mod96
+extractfiles ./inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.best_1000_0.00_1.p0.50.mod96
 
 # ========== optimization parameters
 ndecim       1    # downsamp the grid
