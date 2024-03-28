@@ -1,4 +1,4 @@
-from multiprocessing import queues, Process, Queue, Array, Value, sharedctypes, Lock, RLock
+from multiprocessing import queues, Process, Queue, Array, Value, sharedctypes, Lock, RLock, get_context
 import sys, os
 import traceback, inspect, random, time, types, copy, signal
 import curses
@@ -127,7 +127,7 @@ class multiline(object):
         curses.cbreak()
         self.win.keypad(True)
         self.win.scrollok(True)
-        self.lines = ["" for i in xrange(self.maxlines)]
+        self.lines = ["" for i in range(self.maxlines)]
         self.line0 = 0  # first line printed
         self.lastcommunication = ""
         self.reset_termsize()
@@ -182,7 +182,7 @@ class multiline(object):
 
     def move(self, line0):
         self.line0 = line0
-        for i in xrange(self.line0, self.line0 + self.nmax + 1):
+        for i in range(self.line0, self.line0 + self.nmax + 1):
             self.write(i, self.lines[i], refresh=False)
         self.communicate(self.lastcommunication)
         self.refresh()
@@ -300,7 +300,7 @@ class InteractiveStdOut(Process):
         # recall what was printed
         for l in lines:
             if len(l):
-                print l
+                print(l)
 
 
 # def multiprint(gen, maxlines = 10000):
@@ -335,7 +335,7 @@ class NoPrinter(object):
         return
 
     def communicate(self, message):
-        print message
+        print(message)
 
 
 class BasicPrinter(Process):
@@ -346,7 +346,7 @@ class BasicPrinter(Process):
         self.messagequeue = messagequeue
 
     def communicate(self, message):
-        print message
+        print(message)
 
     def run(self):
         while True:
@@ -355,7 +355,7 @@ class BasicPrinter(Process):
             sender, tim, mess, jobid = packet
             message = "%s at %s : %s " % (sender + " " * (20 - len(sender)), str(ut(tim)), mess)
             if jobid is not None: message += str(jobid)
-            print message
+            print(message)
         return
 
 
@@ -433,7 +433,7 @@ class JobPrinter(InteractiveStdOut):
 
 class FakePrinter(object):
     def communicate(self, message):
-        print message
+        print(message)
 
 
 # ----------------
@@ -449,7 +449,7 @@ def feed(q, g, m, verbose=False):
     while True:
         try:
             start = time.time()
-            job = g.next()
+            job = next(g)
             gentime = (start, time.time())
 
         except StopIteration:
@@ -474,7 +474,7 @@ def feed(q, g, m, verbose=False):
 # ########################## Exchanging Queues
 class InputQueue(queues.Queue):
     def __init__(self, maxsize, generator, messagequeue):
-        queues.Queue.__init__(self, maxsize=maxsize)
+        queues.Queue.__init__(self, maxsize=maxsize, ctx=get_context())
         self.p = Process(target=feed, args=(self, generator, messagequeue, messagequeue is not None))
         self.p.start()
 
@@ -533,7 +533,7 @@ class WaitQueue_old:
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if len(self) and self.l[0][0] == self.currentjob:
             # the first item in self.l is the expected packet,
             # remove it from self.l and return it
@@ -544,7 +544,7 @@ class WaitQueue_old:
         while True:
             try:
                 # get the next packet from the generator (i.e. the outputqueue)
-                packet = self.generator.next()
+                packet = next(self.generator)
                 # the first item of the packet must be the jobid
                 jobid = packet[0]
             except StopIteration:
@@ -561,7 +561,7 @@ class WaitQueue_old:
 
         if len(self):
             # may append if some processes have failed
-            # print "warning : job %s never showed up" % self.currentjob
+            # print("warning : job %s never showed up" % self.currentjob)
             self.currentjob += 1
             return self.currentjob - 1, MissingJob()
         raise StopIteration
@@ -617,7 +617,7 @@ class WaitQueue(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if len(self) and self.jobids[0] == self.currentjob:
             # the first item in self.l is the expected packet,
             # remove it from self.l and return it
@@ -628,7 +628,7 @@ class WaitQueue(object):
         while True:
             try:
                 # get the next packet from the generator (i.e. the outputqueue)
-                packet = self.generator.next()
+                packet = next(self.generator)
                 # the first item of the packet must be the jobid
                 jobid = packet[0]
             except StopIteration:
@@ -645,7 +645,7 @@ class WaitQueue(object):
 
         if len(self):
             # may append if some processes have failed
-            # print "warning : job %s never showed up" % self.currentjob
+            # print("warning : job %s never showed up" % self.currentjob)
             self.currentjob += 1
             return self.currentjob - 1, MissingJob()
         raise StopIteration
@@ -715,8 +715,8 @@ class WaitQueueGen(WaitQueue):
 
     def pop(self):
         "extract the packet in self.l[index], remove it from self.l"
-        # print ">>>", self.jobids
-        # print ">>>", self.nitems
+        # print(">>>", self.jobids)
+        # print(">>>", self.nitems)
         if len(self.nitems[0]) == 1 and self.nitems[0][0] == -1:
             # only one item with nitem==-1 remaining, remove this jobid from the store
             jobid = self.jobids.pop(0)  # e.g. 3
@@ -731,7 +731,7 @@ class WaitQueueGen(WaitQueue):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if len(self.jobids) and self.jobids[0] == self.currentjob and len(
                 self.nitems[0]):  # and self.nitems[0] == self.currentitem:
             # the first item in self.l is the expected packet,
@@ -751,7 +751,7 @@ class WaitQueueGen(WaitQueue):
         while True:
             try:
                 # get the next packet from the generator (i.e. the outputqueue)
-                packet = self.generator.next()
+                packet = next(self.generator)
                 if debug:
                     printgreen("$", packet)
 
@@ -788,13 +788,13 @@ class WaitQueueGen(WaitQueue):
                 if debug:
                     printblue("return directly", jobid, nitem, packet)
                 return packet
-                # print "append", jobid, nitem, packet
+                # print("append", jobid, nitem, packet)
                 # self.append(jobid, nitem, packet)
 
         if len(self):
             raise Exception('missing jobs')
             # may append if some processes have failed
-            # print "warning : job %s never showed up" % self.currentjob
+            # print("warning : job %s never showed up" % self.currentjob)
             self.currentjob += 1
             return self.currentjob - 1, MissingJob()
         raise StopIteration
@@ -806,7 +806,7 @@ class Job(object):
     use it to pack jobs out of the job-generator
 
     def jobgenerator(N):
-        for n in xrange(N):
+        for n in range(N):
             yield Job(n, twotimesn = 2 * n)
     """
     args, kwargs = (), {}
@@ -826,7 +826,7 @@ class Target(object):
             self.parent = None
             self.passparent = False
             self.passworker = inspect.getargspec(self.core).args[0] == "worker"
-        elif isinstance(smth, types.ObjectType):
+        elif isinstance(smth, object):
             self.core = smth.__call__
             self.parent = smth
             self.passparent = True
@@ -896,7 +896,7 @@ class Worker(Process):
         if N == 1:
             return self.rand_()
         else:
-            return np.array([self.rand_() for i in xrange(N)])
+            return np.array([self.rand_() for i in range(N)])
 
     def randn(self, N=1):
         return np.interp(self.rand(N), xp=self.Fgauss, fp=self.tgauss)
@@ -1243,7 +1243,7 @@ class MapAsync(object):
 
         else:
             # either an error has occured or the user leaves too soon
-            # if self.verbose:print "killing workers and queues"
+            # if self.verbose:print("killing workers and queues")
 
             queues.Queue.close(self.In)
             if self.verbose: queues.Queue.close(self.Mes)
@@ -1281,7 +1281,7 @@ class MapAsync(object):
     def communicate(self, *args, **kwargs):
         self.printer.communicate(*args, **kwargs)
 
-    def next(self):
+    def __next__(self):
         if not self.Nactive:
             raise StopIteration
         while self.Nactive:
@@ -1328,17 +1328,17 @@ class StackAsync(MapAsync):
             return Stacker(self.v + other.v)
 
     def JobGen():
-        for i in xrange(1000):
+        for i in range(1000):
             yield Job(i)
 
     s = Stacker(0.) #the stacker to be duplicated in each worker
     with StackAsync(s, JobGen(), Verbose = False) as sa:
         S = None
         for jobids, (s, wname), Tgen, Tpro in sa: #receive partial stacks
-            print "%s stacked %6d jobs in %.6fs, result %f" % (wname, len(jobids), Tgen + Tpro, s.v)
+            print("%s stacked %6d jobs in %.6fs, result %f" % (wname, len(jobids), Tgen + Tpro, s.v))
             if S is None: S = s
             else: S = S + s #merge all partial stacks using method __add__
-    print "Final sum %f" % S.v
+    print("Final sum %f" % S.v)
     """
 
 
@@ -1347,12 +1347,12 @@ class GenAsync(MapAsync):
     """usage : 
 
     def JobGen():
-        for jobid in xrange(10):
+        for jobid in range(10):
             yield Job(N=10)
 
     def Target(N):
         # must be a generator, no check
-        for nitem in xrange(N):
+        for nitem in range(N):
             answer = np.cos(nitem)
             yield answer
 
@@ -1360,7 +1360,7 @@ class GenAsync(MapAsync):
         for (jobid, nitem), answer, _, _ in ga:
             # jobid is the number of the job
             # nitem is the number of the item yielded by the target function that processed job jobid
-            print jobid, nitem, answer
+            print(jobid, nitem, answer)
 
     """
 
@@ -1409,10 +1409,10 @@ class FakeMapAsync(object):
     def communicate(self, message):
         self.printer.communicate(message)
 
-    def next(self):
+    def __next__(self):
         try:
             start = time.time()
-            job = self.generator.next()
+            job = next(self.generator)
             gentime = (start, time.time())
             self.jobid += 1
         except StopIteration:
@@ -1429,7 +1429,7 @@ class FakeMapAsync(object):
             jobtime = (start, time.time())
             return self.jobid, answer, gentime, jobtime
         except Exception as e:
-            print e
+            print(e)
             if self.raiseiferror: raise
 
 
@@ -1442,11 +1442,12 @@ class FakeMapSync(FakeMapAsync):
 
 
 if __name__ == "__main__":
-    from obsmax4.graphictools.gutils import *
-    from obsmax4.graphictools.cmaps import *
-    from obsmax4.statstools.pdf import PDF, ccl
+    #from obsmax4.graphictools.gutils import *
+    #from obsmax4.graphictools.cmaps import *
+    #from obsmax4.statstools.pdf import PDF, ccl
     import numpy as np
     import os
+    import matplotlib.pyplot as plt
 
     Njob = 96
     Nworkers = 12
@@ -1481,7 +1482,7 @@ if __name__ == "__main__":
 
 
         # fun = Obj()
-        fun = [Obj(cst=i) for i in xrange(Nworkers)]  # one specific callable per worker
+        fun = [Obj(cst=i) for i in range(Nworkers)]  # one specific callable per worker
 
 
     # ----------------------
@@ -1493,7 +1494,7 @@ if __name__ == "__main__":
         use the yield command instead of return, so the jobs will be generated
         when required by the workers
         """
-        for i in xrange(n):
+        for i in range(n):
             workfor(0.1)
             # if i == 3: raise Exception('')
             yield Job(n=10, i=i)
@@ -1503,7 +1504,6 @@ if __name__ == "__main__":
     lgd, pids = [], []
     fig1 = plt.figure()
     fig2 = plt.figure()
-    fig3 = plt.figure()
     ax1 = fig1.add_subplot(111)
     ax2 = fig2.add_subplot(211)
     ax3 = fig2.add_subplot(212, sharex=ax2)
@@ -1516,11 +1516,11 @@ if __name__ == "__main__":
         --- --- MapSync       ------ -- --- --- ------- in correct order
         --- --- FakeMapAsync  ------ -- switch parallel computing off
         """
-        print ma
+        print(ma)
         randomseries = []
         for jobid, (workerid, x), (genstart, genend), (jobstart, jobend) in ma:
             """iterate over the mapper to get the results"""
-            # print "jobid%d adv%d" % (jobid, int(round((jobend - jobstart) / (genend - genstart))) + 1) #advised worker number
+            # print("jobid%d adv%d" % (jobid, int(round((jobend - jobstart) / (genend - genstart))) + 1) #advised worker number)
             ma.printer.communicate("jobid-%d adviced-worker-number-%d" % (
             jobid, int(round((jobend - jobstart) / (genend - genstart))) + 1))
 
@@ -1538,26 +1538,27 @@ if __name__ == "__main__":
 
     # ----------------------
     ax1.legend(lgd)
-    timetick(ax2, "x")
+    #timetick(ax2, "x")
     ax2.grid()
 
-    timetick(ax3, "x")
+    #timetick(ax3, "x")
     pids = np.sort(np.unique(pids))
     ax3.set_yticks(pids)
     ax3.set_yticklabels(pids)
     ax3.grid()
 
-    ax1.figure.show()
-    ax2.figure.show()
+    #ax1.figure.show()
+    #ax2.figure.show()
+    plt.show()
 
     #    C = np.zeros((len(randomseries), len(randomseries)))
-    #    for i in xrange(len(randomseries)):
-    #        for j in xrange(i, len(randomseries)):
+    #    for i in range(len(randomseries)):
+    #        for j in range(i, len(randomseries)):
     #            C[i, j] = C[j, i] = ccl(randomseries[i], randomseries[j])
 
     #    plt.figure()
     #    gca().pcolormesh1(C, vmin = -1.0, vmax = 1.0)
     #    gcf().show()
 
-    pause()
+    #pause()
 

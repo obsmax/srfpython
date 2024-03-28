@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import numpy as np
 from numpy import array, zeros, ones #needed for eval
 
@@ -61,7 +59,7 @@ class AsciiFile_fromstring(object):
                     self.types = np.empty(len(self.formats), object)
                     for n, fmt in enumerate(self.formats):
                         if fmt.endswith('s'):
-                            self.types[n] = "S100"
+                            self.types[n] = "U100"
                         elif fmt.endswith('f'):
                             self.types[n] = float
                         elif fmt.endswith('d'):
@@ -104,7 +102,7 @@ class AsciiFile_fromstring(object):
 
     def write(self, filename=None):
         if filename is None:
-            print (self.__str__())
+            print(self.__str__())
         else:
             with open(filename, 'w') as fid:
                 fid.write(self.__str__())
@@ -129,8 +127,8 @@ class AsciiFile(AsciiFile_fromstring):
 if __name__ == "__main__":
     a = AsciiFile_fromstring(demo)
     print(a.metadata)
-    print ("---")
-    print (a.data)
-    print ("---")
-    print (a)
+    print("---")
+    print(a.data)
+    print("---")
+    print(a)
 

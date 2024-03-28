@@ -12,6 +12,9 @@
 *.surf96.copy
 *.npy
 *.npz
+*.log
+*.bdd
+
 .DS_Store
 srfpython/Herrmann/bin/max_srfdis96
 srfpython/Herrmann/bin/max_srfpre96
@@ -22,3 +25,5 @@ srfpython/Herrmann/bin/max_srfpre96
 !/maupasacq/*npy
 !/maupasacq/*npz
 /srfpython.egg-info/
+srfpython/Herrmann/src/in1.txt
+srfpython/Herrmann/src/in2.txt

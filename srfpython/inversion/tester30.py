@@ -45,7 +45,7 @@ models, _, weights, _ = \
                MPMIN = .1,
                MPMAX = 10.0)
 
-print "total time %f" % (time.time() -start)
+print("total time %f" % (time.time() -start))
 models = models.repeat(weights, axis = 0)
 hist, bin_edges = np.histogram(models[:, 0], bins = 30, density=True)
 for mid, width, height in zip(.5 * (bin_edges[:-1] + bin_edges[1:]), bin_edges[1:]-bin_edges[:-1], hist):

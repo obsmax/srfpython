@@ -22,9 +22,9 @@ git clone http://github.com/obsmax/srfpython.git
 - Create the virtual environment and activate it
 
 ```bash
-conda create -n py27-srfpython python=2.7 --yes
-conda activate py27-srfpython
-python --version  # must be 2.7.X, or conda failed, retry in new tty
+conda create -n py3-srfpython
+conda activate py3-srfpython
+python --version  # must be 3.X, or conda failed, retry in new tty
 ```
 
 - Go to the cloned repository and install the package
@@ -40,12 +40,12 @@ python -m pip install -e .
 srfpython_tester.py
 ```
 
-- If you wish to use the jupyter notebooks with python2 (optional):
+- If you wish to use the jupyter notebooks with python3 (optional):
 
 
 ```bash
 # make sure the environment is activated
-conda activate py27-srfpython
+conda activate py3-srfpython
 
 # install with
 conda install decorator=4.4.1 jupyter --yes

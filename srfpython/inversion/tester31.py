@@ -46,7 +46,7 @@ plt.colorbar()
 ax3 = gcf().add_subplot(122, sharex = ax2, sharey = ax2)
 
 def gen():
-    for nchain in xrange(1):
+    for nchain in range(1):
         M0   = np.random.randn(2)
         MSTD = np.asarray([0.05, 0.05])
         yield Job(nchain, M0, MSTD, nkeep = 15000)

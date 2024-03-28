@@ -46,7 +46,7 @@ class depthpdf(object):
         zstairs, vstairs = m1D.stairs()
         zstairs[-1] = self.z.max() + 1.  # np.max([self.z.max(), 1.5 * zstairs[-2] + 1.0])
         lenz, lenv = len(self.z), len(self.v)
-        # for i in xrange(len(zstairs)-1):
+        # for i in range(len(zstairs)-1):
         # if i % 2: #horizontal step
         #     continue
         #     vmin, vmax = np.sort([vstairs[i], vstairs[i+1]])
@@ -62,7 +62,7 @@ class depthpdf(object):
         #     # np.clip(np.searchsorted(self.v, vstairs[i]), 0,len(self.v) - 1)
         #     self.H[i0:i1,jj] += float(Ntimes)
 
-        for i in xrange(0, len(zstairs) - 1, 2):
+        for i in range(0, len(zstairs) - 1, 2):
             zmin, zmax = zstairs[i], zstairs[i + 1]
             i0 = search_sorted_nearest(self.z, zmin, lenz)  # np.clip(np.searchsorted(self.z, zmin), 0, len(self.z) - 1)
             i1 = search_sorted_nearest(self.z, zmax, lenz) + 1  # np.clip(np.searchsorted(self.z, zmax), 0, len(self.z))
@@ -72,7 +72,7 @@ class depthpdf(object):
 
     def show(self, ax, **kwargs):
         I = np.zeros(len(self.z))
-        for i in xrange(len(self.z)):
+        for i in range(len(self.z)):
             I[i] = discrete_time_primitive(self.v, self.H[i, :], area=True)
         I = discrete_time_primitive(self.z, I, area=True)
 

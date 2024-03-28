@@ -45,7 +45,7 @@ def unpackmod96(string):
         raise BadFileFormat(error_message)
 
     nlayer = len(string) - 12
-    #H, VP, VS, RHO, QP, QS, ETAP, ETAS, FREFP, FREFS = [np.empty(nlayer, float) for _ in xrange(10)]
+    #H, VP, VS, RHO, QP, QS, ETAP, ETAS, FREFP, FREFS = [np.empty(nlayer, float) for _ in range(10)]
     DAT = np.zeros((nlayer, 10), float)
 
     for n in range(nlayer):

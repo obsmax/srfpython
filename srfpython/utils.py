@@ -1,4 +1,3 @@
-from __future__ import print_function
 import time
 import signal
 import imp
@@ -38,7 +37,7 @@ class Timer(object):
         return self
 
     def __exit__(self, *args, **kwargs):
-        print ("elapsed time %s : %fs" % (self.title, time.time() - self.start))
+        print("elapsed time %s : %fs" % (self.title, time.time() - self.start))
 
 
 def firstfalse(I):
@@ -280,11 +279,11 @@ def readargv1():
 
 
 if __name__ == "__main__":
-    print (sys.argv[1:])
+    print(sys.argv[1:])
     D = readargv1()
-    print (D.keys())
+    print(D.keys())
     #
-    # print ("########MAIN")
+    # print("########MAIN")
     # print(D['main'])
     # print(D['_keyorder'])
     # print(D.keys())

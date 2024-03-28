@@ -31,9 +31,9 @@ def test211():
         k      = 20.,
         nanbehavior = 1)
     start = time.time()
-    for _ in xrange(1000):
+    for _ in range(1000):
         l.call1([np.nan, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2])
-    print time.time() - start
+    print(time.time() - start)
 
 def test212():
     """speed test, no nans expected"""
@@ -46,11 +46,11 @@ def test212():
         nanbehavior=0)
 
     start = time.time()
-    for _ in xrange(1000):
+    for _ in range(1000):
         l.call1(
             [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
              0.2, 0.2, 0.2, 0.2, 0.2])
-    print time.time() - start
+    print(time.time() - start)
 
 
 test2()
