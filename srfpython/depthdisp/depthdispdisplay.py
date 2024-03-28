@@ -243,8 +243,9 @@ class DepthDispDisplay(object):
     def showdispcoll(self, vmin, vmax, cmap, **kwargs):
         for key, ax in self.axdisp.items():
             coll = self.dispcoll[key]
-            segments = np.asarray(coll['segments'])
-            colorvalues = np.asarray(coll['colorvalues'])
+
+            segments = coll['segments']
+            colorvalues = coll['colorvalues']
             lc = LineCollection(segments, array=colorvalues, norm=plt.Normalize(vmin, vmax), cmap=cmap, **kwargs)
             ax.add_collection(lc)
 
