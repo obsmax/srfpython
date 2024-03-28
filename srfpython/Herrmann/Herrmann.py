@@ -566,15 +566,15 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from srfpython.standalone.display import logtick
     check_herrmann_codes()
-
+  
     # depth model
-    ztop = [0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80]  # km, top layer depth
-    vp   = [1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80]  # km/s
-    vs   = [0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31]  # km/s
-    rh   = [2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63]  # g/cm3
+    ztop = np.asarray([0.00, 0.25, 0.45, 0.65, 0.85, 1.05, 1.53, 1.80], float)  # km, top layer depth
+    vp   = np.asarray([1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80], float)  # km/s
+    vs   = np.asarray([0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31], float)  # km/s
+    rh   = np.asarray([2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63], float)  # g/cm3
 
     # dipsersion parameters
-    f = np.logspace(np.log10(0.2), np.log10(3.5), 85)
+    f = np.logspace(np.log10(0.2), np.log10(3.5), 85)  # Hz
     curves = [Curve(wave='R', type='U', mode=0, freqs=f),
               Curve(wave='R', type='U', mode=1, freqs=f),
               Curve(wave='R', type='C', mode=0, freqs=f),
@@ -601,9 +601,56 @@ if __name__ == "__main__":
     ax.grid(True, which="minor")
     logtick(ax, "xy")
     plt.legend()
+    #plt.show()
+
+    # =========================
+    # test the scaling modes
+    caracteristic_length = 800.0  # e.g. max depth of your problem in m
+    caracteristic_time = 7.531  # e.g. max duration of your measurements in s
+    caracteristic_mass = 1000. * caracteristic_length ** 3. # mass on the caracteristic volume filled with water in kg
+    
+    ztop = ztop * 1000. / caracteristic_length # km * (1000. / m) => dimeless
+    vp   = np.asarray([1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80], float)  * (1000. / caracteristic_length * caracteristic_time) # km/s => dimless
+    vs   = np.asarray([0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31], float)  * (1000. / caracteristic_length * caracteristic_time) # km/s => dimless
+    rh   = np.asarray([2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63], float)  * (1000. / caracteristic_mass * caracteristic_length ** 3.) # g/cm3 => dimless
+
+    # 1g/cm3 = 1000 kg/m3
+    # 1000 * rh = kg/m3
+    # rh * 1000 / caracteristic_mass * caracteristic_length ** 3
+    # dipsersion parameters
+    f = np.logspace(np.log10(0.2), np.log10(3.5), 85) * caracteristic_time  # s^-1 => dimless
+    curves = [Curve(wave='R', type='U', mode=0, freqs=f),
+              Curve(wave='R', type='U', mode=1, freqs=f),
+              Curve(wave='R', type='C', mode=0, freqs=f),
+              Curve(wave='R', type='C', mode=1, freqs=f),
+              Curve(wave='L', type='U', mode=0, freqs=f),
+              Curve(wave='L', type='U', mode=1, freqs=f),
+              Curve(wave='L', type='C', mode=0, freqs=f),
+              Curve(wave='L', type='C', mode=1, freqs=f)]
+    
+    hc = HerrmannCaller(curves=curves, h=0.005, ddc=0.005)
+
+    start = time.time()
+    curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh)
+    print(time.time() - start)
+
+    # display results
+    #plt.figure()
+    #ax = plt.gca()
+    for curve in curves:
+        # rescale
+        curve.freqs *= 1. / caracteristic_time
+        curve.values *= caracteristic_length / caracteristic_time / 1000.
+        ax.loglog(1. / curve.freqs, curve.values, 'x-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
+    ax.set_xlabel('period (s)')
+    ax.set_ylabel('velocity (km/s)')
+    ax.grid(True, which="major")
+    ax.grid(True, which="minor")
+    logtick(ax, "xy")
+    plt.legend()
     plt.show()
-
-
+    
+    
 #    # test the scaling modes
 #    plt.figure()
 #    ax = plt.gca()
@@ -615,7 +662,9 @@ if __name__ == "__main__":
 #            h=0.005, ddc=0.005,
 #            freq_scaling_coeff=freq_scaling_coeff)
 
-#        for depth_scaling_coeff in [1., 2., 5., 10.0]:
+#        #for depth_scaling_coeff in [0.2, 0.5, 1.0, 2.0, 5.0]: #[1., 2., 5., 10.0]:
+#        if True:
+#            depth_scaling_coeff = 1. / freq_scaling_coeff
 #            print("beta", freq_scaling_coeff, "eps", depth_scaling_coeff)
 
 #            try:
