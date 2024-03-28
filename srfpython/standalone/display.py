@@ -25,8 +25,8 @@ def showme(block=True):
     for figure in figures:
         figure.canvas.draw()
         figure.show()
-    # if block: pause()
-    if block: plt.show()
+    #if block: pause()  # < was needed in HerrMet --manage --display to loop over figures
+    if block: plt.show()  # TODO : find a solution that works for all cases
 
 
 # ______________________________________________
