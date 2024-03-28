@@ -1,4 +1,5 @@
 """
+Script used to convert all files from python2 to python 3, Pierric Mora 2024
 Walks the srfpython/ directory and executes all .py files
 """
 
