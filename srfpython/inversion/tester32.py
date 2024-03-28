@@ -13,7 +13,7 @@ def histogram2d(xflat, yflat, xbins, ybins):
     """quite similar to np.histogram2d with several available normalizations
     """
     if len(xflat) - len(yflat): raise ValueError('')
-    H, X, Y = np.histogram2d(x = xflat, y = yflat, bins=(xbins, ybins), normed=True)
+    H, X, Y = np.histogram2d(x = xflat, y = yflat, bins=(xbins, ybins), density=True)
 
     H[np.isnan(H)] = 0.
     return X, Y, H.T
