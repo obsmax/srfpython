@@ -48,7 +48,7 @@ def display_cmap(ax, cmap):
     cb = plt.cm.ScalarMappable(norm=None, cmap=cmap)
     cb.set_array([0, 255])
     cb.set_clim((0, 255))
-    ax.figure.colorbar(cb, orientation="horizontal")
+    plt.colorbar(cb, ax=ax, orientation="horizontal")
 
 
 # -------------------------------
