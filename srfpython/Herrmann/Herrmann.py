@@ -639,8 +639,8 @@ if __name__ == "__main__":
     #ax = plt.gca()
     for curve in curves:
         # rescale
-        curve.freqs *= 1. / caracteristic_time
-        curve.values *= caracteristic_length / caracteristic_time / 1000.
+        curve.freqs *= 1. / caracteristic_time  # dimless to Hz
+        curve.values *= caracteristic_length / caracteristic_time / 1000.  # dimless to km/s
         ax.loglog(1. / curve.freqs, curve.values, 'x-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
     ax.set_xlabel('period (s)')
     ax.set_ylabel('velocity (km/s)')
@@ -649,33 +649,4 @@ if __name__ == "__main__":
     logtick(ax, "xy")
     plt.legend()
     plt.show()
-    
-    
-#    # test the scaling modes
-#    plt.figure()
-#    ax = plt.gca()
 
-#    for freq_scaling_coeff in [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]:
-
-#        hc = HerrmannCaller(
-#            curves=curves,
-#            h=0.005, ddc=0.005,
-#            freq_scaling_coeff=freq_scaling_coeff)
-
-#        #for depth_scaling_coeff in [0.2, 0.5, 1.0, 2.0, 5.0]: #[1., 2., 5., 10.0]:
-#        if True:
-#            depth_scaling_coeff = 1. / freq_scaling_coeff
-#            print("beta", freq_scaling_coeff, "eps", depth_scaling_coeff)
-
-#            try:
-#                curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh, depth_scaling_coeff=depth_scaling_coeff)
-#                print('ok')
-#            except CPiSDomainError as err:
-#                print(err)
-#                continue
-
-#            for curve in curves:
-#                ax.loglog(1. / curve.freqs,
-#                          curve.values,
-#                          '+-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
-#    plt.show()
