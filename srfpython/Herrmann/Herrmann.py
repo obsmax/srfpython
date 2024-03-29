@@ -290,8 +290,8 @@ class HerrmannCallerBasis(object):
         if (np.isinf(vs) | np.isnan(vs)).any():
             raise CPiSDomainError('vs value error %s' % str(vs))
 
-        # if not (vs > 0.08).all():  
-        #     raise CPiSDomainError('vs domain error %s' % str(vs))  # => issue for low scaling factors
+        if not (vs > 0.08).all():
+            raise CPiSDomainError('vs domain error %s' % str(vs))
 
         if (np.isinf(vp) | np.isnan(vp)).any():
             raise CPiSDomainError('vp value error %s' % str(vp))
@@ -313,19 +313,13 @@ class HerrmannCallerBasis(object):
         return out
 
     def __init__(self, waves, types, modes, freqs,
-                 h=0.005, ddc=0.005, freq_scaling_coeff=1.0):
+                 h=0.005, ddc=0.005):
         """
         initiate HerrmannCaller with 4 zippable arrays with same length
         :param waves: 1d array with the wave type letter 'R' for Rayleigh, 'L' for Love
         :param types: 1d array with the wave type letter 'C' for phase vel, 'U' from group vel
         :param modes: 1d array with mode numbers 0=fundamental mode, 1=1st overtone, ...
         :param freqs: 1d array with frequency values, in Hz
-        :param freq_scaling_coeff:
-            scale the frequencies by this factor (< 1.0)
-            to reduce the frequencies at which computations will
-            be done. => This will have no impact on the output disp. curves.
-            consider using a depth_scaling_coeff to the order of 1. / freq_scaling_coeff
-            in self.disperse
         e.g.
         waves = ['R', 'R', 'R', 'L', 'L', 'L']
         types = ['C', 'C', 'C', 'C', 'C', 'C']
@@ -334,9 +328,9 @@ class HerrmannCallerBasis(object):
         :param h: see HerrmannCaller
         :param ddc: see HerrmannCaller
         """
-        if not 0 <= freq_scaling_coeff:
-            raise ValueError(freq_scaling_coeff)
-        self.freq_scaling_coeff = freq_scaling_coeff
+        self.caracteristic_time = 1. / freqs.mean()  # s
+        self.caracteristic_length = None  # m
+        self.caracteristic_mass = None  # kg
 
         self.waves = np.asarray(waves, '|U1')
         self.types = np.asarray(types, '|U1')
@@ -347,7 +341,7 @@ class HerrmannCallerBasis(object):
             waves=self.waves,
             types=self.types,
             modes=self.modes,
-            freqs=self.freqs * self.freq_scaling_coeff)
+            freqs=self.freqs * self.caracteristic_time)
 
         self.srfpre96output, stderr = self.callherrmann(
             stdin=srfpre96input, exe=SRFPRE96_EXE)
@@ -357,28 +351,23 @@ class HerrmannCallerBasis(object):
         if len(stderr):
             raise CPiSError('srfpre96 failed with error {}'.format(stderr))
 
-    def disperse(self, ztop, vp, vs, rh, depth_scaling_coeff=1.):
+    def disperse(self, ztop, vp, vs, rh):
         """
         :param ztop: top layer depth array, km, first = 0
         :param vp: in km/s, array 1d
         :param vs: in km/s, array 1d
         :param rh: density in g/cm3, array 1d
-        :param depth_scaling_coeff: scaling factor to apply to the model dimensions
-            i.e. call Herrmann's routines with a scaled version
-                 of the model so that the output is the same.
-                 consider using a depth_scaling_coeff to the order of 1. / freq_scaling_coeff
-                 in self.__init__
         :return values: dispersion values in km/s, or nan
         """
 
-        if not 0 < depth_scaling_coeff:
-            raise ValueError(depth_scaling_coeff)
-
+        self.caracteristic_length = 1000. * ztop[-1] / 3.  # m
+        self.caracteristic_mass = 1000. * self.caracteristic_length ** 3.
         depthmodel_string = self.depthmodel_arrays_to_string(
-            ztop=np.asarray(ztop, float) * depth_scaling_coeff,
-            vp=np.asarray(vp, float) * self.freq_scaling_coeff * depth_scaling_coeff,
-            vs=np.asarray(vs, float) * self.freq_scaling_coeff * depth_scaling_coeff,
-            rh=np.asarray(rh, float) / (self.freq_scaling_coeff ** 2. * depth_scaling_coeff))
+            ztop=np.asarray(ztop, float) * 1000. / self.caracteristic_length,
+            vp=np.asarray(vp, float) * (1000. / self.caracteristic_length * self.caracteristic_time),
+            vs=np.asarray(vs, float) * (1000. / self.caracteristic_length * self.caracteristic_time),
+            rh=np.asarray(rh, float) * (1000. / self.caracteristic_mass * self.caracteristic_length ** 3.),
+            )
 
         srfdis96input = \
             "{depthmodel_string:s}\n".format(
@@ -397,13 +386,14 @@ class HerrmannCallerBasis(object):
             waves=self.waves,
             types=self.types,
             modes=self.modes,
-            freqs=self.freqs * self.freq_scaling_coeff)  # no scaling to freqs because the chosen scaling scheme is freq indep
+            freqs=self.freqs * self.caracteristic_time)
 
-        return values / (self.freq_scaling_coeff * depth_scaling_coeff)
+        values *= self.caracteristic_length / self.caracteristic_time / 1000.
+        return values
 
 
 class HerrmannCaller(HerrmannCallerBasis):
-    def __init__(self, curves, h=0.005, ddc=0.005, freq_scaling_coeff=1.0):
+    def __init__(self, curves, h=0.005, ddc=0.005):
         """
         :param curves: a list of Curve objects with the data points at which to compute dispersion
         :param h: factor to convert phase to group see CPS
@@ -418,13 +408,13 @@ class HerrmannCaller(HerrmannCallerBasis):
         HerrmannCallerBasis.__init__(
             self, waves=waves, types=types,
             modes=modes, freqs=freqs,
-            h=h, ddc=ddc, freq_scaling_coeff=freq_scaling_coeff)
+            h=h, ddc=ddc)
 
         self.curves = curves
         self.curve_end_index = np.cumsum([curve.nfreqs for curve in curves])
         self.curve_begin_index = np.concatenate(([0], self.curve_end_index[:-1]))
 
-    def __call__(self, ztop, vp, vs, rh, keepnans=False, depth_scaling_coeff=1.0):
+    def __call__(self, ztop, vp, vs, rh, keepnans=False):
         """
         call Herrmann codes for a depth model
         :param ztop: top layer depth array, km, first = 0
@@ -436,8 +426,7 @@ class HerrmannCaller(HerrmannCallerBasis):
         """
 
         values = self.disperse(
-            ztop=ztop, vp=vp, vs=vs, rh=rh,
-            depth_scaling_coeff=depth_scaling_coeff)
+            ztop=ztop, vp=vp, vs=vs, rh=rh)
 
         curves = []
         for b, e in zip(self.curve_begin_index, self.curve_end_index):
@@ -463,7 +452,7 @@ class HerrmannCaller(HerrmannCallerBasis):
 
 
 class HerrmannCallerFromGroupedLists(HerrmannCaller):
-    def __init__(self, Waves, Types, Modes, Freqs, h=0.005, ddc=0.005, freq_scaling_coeff=1.0):
+    def __init__(self, Waves, Types, Modes, Freqs, h=0.005, ddc=0.005):
         """
         initiate HerrmannCaller with curves data grouped by dispersion curves into arrays
         :param Waves: list of wave letters (one per dispersion curve) ('R' or 'L')
@@ -488,7 +477,7 @@ class HerrmannCallerFromGroupedLists(HerrmannCaller):
 
             curves.append(curve)
 
-        HerrmannCaller.__init__(self, curves=curves, h=h, ddc=ddc, freq_scaling_coeff=freq_scaling_coeff)
+        HerrmannCaller.__init__(self, curves=curves, h=h, ddc=ddc)
 
 
 def check_herrmann_codes():
@@ -522,12 +511,12 @@ def check_herrmann_codes():
         assert curves[0].wave == "R"
         assert curves[0].type == "C"
         assert curves[0].mode == 0
-        assert np.all(curves[0].freqs == np.array([1., 2.]))
+        assert np.all(curves[0].freqs == np.array([1., 2.])), curves[0].freqs
 
         assert curves[1].wave == "L"
         assert curves[1].type == "C"
         assert curves[1].mode == 0
-        assert np.all(curves[1].freqs == np.array([2., 3.]))
+        assert np.all(curves[1].freqs == np.array([2., 3.])), curves[1].freqs
 
     except AssertionError:
         raise Exception('could not execute fortran codes\n%s' % solution)
@@ -603,50 +592,50 @@ if __name__ == "__main__":
     plt.legend()
     #plt.show()
 
-    # =========================
-    # test the scaling modes
-    caracteristic_length = 800.0  # e.g. max depth of your problem in m
-    caracteristic_time = 7.531  # e.g. max duration of your measurements in s
-    caracteristic_mass = 1000. * caracteristic_length ** 3. # mass on the caracteristic volume filled with water in kg
-    
-    ztop = ztop * 1000. / caracteristic_length # km * (1000. / m) => dimeless
-    vp   = np.asarray([1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80], float)  * (1000. / caracteristic_length * caracteristic_time) # km/s => dimless
-    vs   = np.asarray([0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31], float)  * (1000. / caracteristic_length * caracteristic_time) # km/s => dimless
-    rh   = np.asarray([2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63], float)  * (1000. / caracteristic_mass * caracteristic_length ** 3.) # g/cm3 => dimless
-
-    # 1g/cm3 = 1000 kg/m3
-    # 1000 * rh = kg/m3
-    # rh * 1000 / caracteristic_mass * caracteristic_length ** 3
-    # dipsersion parameters
-    f = np.logspace(np.log10(0.2), np.log10(3.5), 85) * caracteristic_time  # s^-1 => dimless
-    curves = [Curve(wave='R', type='U', mode=0, freqs=f),
-              Curve(wave='R', type='U', mode=1, freqs=f),
-              Curve(wave='R', type='C', mode=0, freqs=f),
-              Curve(wave='R', type='C', mode=1, freqs=f),
-              Curve(wave='L', type='U', mode=0, freqs=f),
-              Curve(wave='L', type='U', mode=1, freqs=f),
-              Curve(wave='L', type='C', mode=0, freqs=f),
-              Curve(wave='L', type='C', mode=1, freqs=f)]
-    
-    hc = HerrmannCaller(curves=curves, h=0.005, ddc=0.005)
-
-    start = time.time()
-    curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh)
-    print(time.time() - start)
-
-    # display results
-    #plt.figure()
-    #ax = plt.gca()
-    for curve in curves:
-        # rescale
-        curve.freqs *= 1. / caracteristic_time  # dimless to Hz
-        curve.values *= caracteristic_length / caracteristic_time / 1000.  # dimless to km/s
-        ax.loglog(1. / curve.freqs, curve.values, 'x-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
-    ax.set_xlabel('period (s)')
-    ax.set_ylabel('velocity (km/s)')
-    ax.grid(True, which="major")
-    ax.grid(True, which="minor")
-    logtick(ax, "xy")
-    plt.legend()
-    plt.show()
+    # # =========================
+    # # test the scaling modes
+    # caracteristic_length = 800.0  # e.g. max depth of your problem in m
+    # caracteristic_time = 7.531  # e.g. max duration of your measurements in s
+    # caracteristic_mass = 1000. * caracteristic_length ** 3. # mass on the caracteristic volume filled with water in kg
+    #
+    # ztop = ztop * 1000. / caracteristic_length # km * (1000. / m) => dimeless
+    # vp   = np.asarray([1.85, 2.36, 2.63, 3.15, 3.71, 4.54, 5.48, 5.80], float)  * (1000. / caracteristic_length * caracteristic_time) # km/s => dimless
+    # vs   = np.asarray([0.86, 1.10, 1.24, 1.47, 1.73, 2.13, 3.13, 3.31], float)  * (1000. / caracteristic_length * caracteristic_time) # km/s => dimless
+    # rh   = np.asarray([2.47, 2.47, 2.47, 2.47, 2.47, 2.58, 2.58, 2.63], float)  * (1000. / caracteristic_mass * caracteristic_length ** 3.) # g/cm3 => dimless
+    #
+    # # 1g/cm3 = 1000 kg/m3
+    # # 1000 * rh = kg/m3
+    # # rh * 1000 / caracteristic_mass * caracteristic_length ** 3
+    # # dipsersion parameters
+    # f = np.logspace(np.log10(0.2), np.log10(3.5), 85) * caracteristic_time  # s^-1 => dimless
+    # curves = [Curve(wave='R', type='U', mode=0, freqs=f),
+    #           Curve(wave='R', type='U', mode=1, freqs=f),
+    #           Curve(wave='R', type='C', mode=0, freqs=f),
+    #           Curve(wave='R', type='C', mode=1, freqs=f),
+    #           Curve(wave='L', type='U', mode=0, freqs=f),
+    #           Curve(wave='L', type='U', mode=1, freqs=f),
+    #           Curve(wave='L', type='C', mode=0, freqs=f),
+    #           Curve(wave='L', type='C', mode=1, freqs=f)]
+    #
+    # hc = HerrmannCaller(curves=curves, h=0.005, ddc=0.005)
+    #
+    # start = time.time()
+    # curves = hc(ztop=ztop, vp=vp, vs=vs, rh=rh)
+    # print(time.time() - start)
+    #
+    # # display results
+    # #plt.figure()
+    # #ax = plt.gca()
+    # for curve in curves:
+    #     # rescale
+    #     curve.freqs *= 1. / caracteristic_time  # dimless to Hz
+    #     curve.values *= caracteristic_length / caracteristic_time / 1000.  # dimless to km/s
+    #     ax.loglog(1. / curve.freqs, curve.values, 'x-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
+    # ax.set_xlabel('period (s)')
+    # ax.set_ylabel('velocity (km/s)')
+    # ax.grid(True, which="major")
+    # ax.grid(True, which="minor")
+    # logtick(ax, "xy")
+    # plt.legend()
+    # plt.show()
 
