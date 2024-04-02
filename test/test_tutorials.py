@@ -13,6 +13,7 @@ to_test = ['00_simple_dispersion_example/00_using_scripts/main_script.sh',
            '00_simple_dispersion_example/01_using_python_programs/001_forward_dispersion.py',
            '00_simple_dispersion_example/02_1d_sensitivity_kernel.py',
            '01_simple_inversion_example/main_script.sh',
+           '02_acoustic_scale_inversion_example/main_script.sh',
            '03_cube_inversion_example/main_script.sh',
            '10_notebooks/00_how_to_use_srfpython.ipynb'
            ]
