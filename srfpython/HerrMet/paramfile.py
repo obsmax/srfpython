@@ -71,7 +71,7 @@ def write_default_paramfile(nlayer, zbot,
 
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
-            fid.write('#fmt %5s %.16f %16f\n')
+            fid.write('#fmt %5s %16f %16f\n')
             for k, vinf, vsup in zip(keys, vinfs, vsups):
                 fid.write('%s %s %s\n' % (k, vinf, vsup))
 
