@@ -328,9 +328,9 @@ class HerrmannCallerBasis(object):
         :param h: see HerrmannCaller
         :param ddc: see HerrmannCaller
         """
-        self.caracteristic_time = 1. / freqs.mean()  # s
-        self.caracteristic_length = None  # m
-        self.caracteristic_mass = None  # kg
+        self.caracteristic_time = 1. / freqs.mean()  # in seconds
+        self.caracteristic_length = None  # in meters (adjusted when htop is provided)
+        self.caracteristic_mass = None  # in kg (adjusted when htop is provided)
 
         self.waves = np.asarray(waves, '|U1')
         self.types = np.asarray(types, '|U1')
@@ -341,7 +341,7 @@ class HerrmannCallerBasis(object):
             waves=self.waves,
             types=self.types,
             modes=self.modes,
-            freqs=self.freqs * self.caracteristic_time)
+            freqs=self.freqs * self.caracteristic_time)  # configure the caller with dimensionless frequencies
 
         self.srfpre96output, stderr = self.callherrmann(
             stdin=srfpre96input, exe=SRFPRE96_EXE)
@@ -360,8 +360,12 @@ class HerrmannCallerBasis(object):
         :return values: dispersion values in km/s, or nan
         """
 
-        self.caracteristic_length = 1000. * ztop[-1] / 3.  # m
-        self.caracteristic_mass = 1000. * self.caracteristic_length ** 3.
+        # scale sizes so that the max depth is about 3 km wathever the scale of the pb
+        self.caracteristic_length = 1000. * ztop[-1] / 3.  # in meters
+
+        # mass of 1 caracteristic volume filled with water
+        self.caracteristic_mass = 1000. * self.caracteristic_length ** 3.  # in kilograms
+
         depthmodel_string = self.depthmodel_arrays_to_string(
             ztop=np.asarray(ztop, float) * 1000. / self.caracteristic_length,
             vp=np.asarray(vp, float) * (1000. / self.caracteristic_length * self.caracteristic_time),
@@ -388,6 +392,7 @@ class HerrmannCallerBasis(object):
             modes=self.modes,
             freqs=self.freqs * self.caracteristic_time)
 
+        # rescale velocity from dimless to km/s
         values *= self.caracteristic_length / self.caracteristic_time / 1000.
         return values
 

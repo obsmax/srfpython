@@ -34,15 +34,15 @@ def write_default_paramfile(nlayer, zbot,
     if which_parameterizer == "mZVSPRRH":
         if basedon is None:
             ztop = np.linspace(0, zbot, nlayer)
-            ztopinf = -ztop[1:]  # deepest side
-            ztopsup = -ztop[:-1] # shallow side
-            ztopsup[0] -= 0.001
-            vsinf = 0.1 * np.ones(nlayer)
-            vssup = 3.5 * np.ones(nlayer)
-            prinf = 1.70 * np.ones(nlayer) #r43 * np.ones(nlayer)
-            prsup = 2.15 * np.ones(nlayer) #3.5 * np.ones(nlayer)
-            rhinf = 1.8 * np.ones(nlayer)
-            rhsup = 3.0 * np.ones(nlayer)
+            ztopinf = -ztop[1:]  # bottom of each layer
+            ztopsup = -ztop[:-1] / 2. # shallow side
+            ztopsup[0] = -zbot / 20.
+            vsinf = np.linspace(0.1, 0.5, nlayer)
+            vssup = np.linspace(3.0, 4.0, nlayer)
+            prinf = np.linspace(1.9, 1.7, nlayer)
+            prsup = np.linspace(2.3, 2.1, nlayer)
+            rhinf = np.linspace(1.80, 2.00, nlayer)
+            rhsup = np.linspace(3.00, 3.60, nlayer)
         else:
             b = depthmodel_from_mod96(basedon)
             #ztop = np.linspace(0., b.vp.z.max(), nlayer)
@@ -71,7 +71,7 @@ def write_default_paramfile(nlayer, zbot,
 
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
-            fid.write('#fmt %5s %16f %16f\n')
+            fid.write('#fmt %5s %.16f %16f\n')
             for k, vinf, vsup in zip(keys, vinfs, vsups):
                 fid.write('%s %s %s\n' % (k, vinf, vsup))
 
@@ -85,7 +85,7 @@ def write_default_paramfile(nlayer, zbot,
             ztop = np.linspace(0, zbot, nlayer)
             ztopinf = -ztop[1:]  # deepest side
             ztopsup = -ztop[:-1] # shallow side
-            ztopsup[0] -= 0.001
+            ztopsup[0] = -zbot / 20. #0.001
             vsinf = 0.1 * np.ones(nlayer)
             vssup = 3.5 * np.ones(nlayer)
             vpinf = 0.5 * np.ones(nlayer)
@@ -136,7 +136,7 @@ def write_default_paramfile(nlayer, zbot,
             ztop = np.linspace(0, zbot, nlayer)
             ztopinf = -ztop[1:]  # deepest side
             ztopsup = -ztop[:-1] # shallow side
-            ztopsup[0] -= 0.001
+            ztopsup[0] = -zbot / 20. #0.001
             vsinf = 0.1 * np.ones(nlayer)
             vssup = 3.5 * np.ones(nlayer)
         else:
@@ -180,7 +180,7 @@ def write_default_paramfile(nlayer, zbot,
             ztop = np.linspace(0, zbot, nlayer)
             ztopinf = -ztop[1:]  # deepest side
             ztopsup = -ztop[:-1] # shallow side
-            ztopsup[0] -= 0.001
+            ztopsup[0] =-zbot / 20 # -= 0.001
             vsinf = 0.1 * np.ones(nlayer)
             vssup = 3.5 * np.ones(nlayer)
         else:
@@ -224,7 +224,7 @@ def write_default_paramfile(nlayer, zbot,
             ztop = np.linspace(0, zbot, nlayer)
             ztopinf = -ztop[1:]  # deepest side
             ztopsup = -ztop[:-1]  # shallow side
-            ztopsup[0] -= 0.001
+            ztopsup[0] = -zbot / 20. # -= 0.001
             vsinf = 0.1 * np.ones(nlayer)
             vssup = 3.5 * np.ones(nlayer)
         else:

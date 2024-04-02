@@ -7,11 +7,11 @@ from srfpython.standalone.display import values2colors, legendtext, chftsz
 from srfpython.standalone import cmaps #used in function eval
 from srfpython.standalone.asciifile import AsciiFile
 from srfpython.Herrmann.Herrmann import groupbywtm, igroupbywtm
-from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthmodel
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays, depthmodel, depthmodel1D
 from srfpython.depthdisp.dispcurves import freqspace
 from srfpython.depthdisp.depthpdfs import dmstats1
 from srfpython.depthdisp.disppdfs import dispstats
-from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, DepthDispDisplayCompact, plt, showme
+from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay, DepthDispDisplayCompact, DepthDispDisplaySI, DepthDispDisplayCompactSI, plt, showme #
 from srfpython.HerrMet.runfile import RunFile
 from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
@@ -39,7 +39,7 @@ default_dpi = 100
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-svg", "-m96", "-cmap", "-compact", "-ftsz", "-inline", "-h", "-help"]
+authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-svg", "-m96", "-cmap", "-compact", "-si", "-ftsz", "-inline", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
@@ -61,6 +61,7 @@ long_help = """\
     -m96    s [s...] append depth model(s) to the plot from mod96 file(s)
     -cmap            colormap, default {default_cmap}
     -compact         display only vs and the dispersion curves, default False
+    -si              display in units of the international system
     -ftsz  i         set font size, default {default_fontsize}
     -inline          do not pause (use in jupyter notebooks)
     -h, -help        display the help message for this plugin     
@@ -105,8 +106,17 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
 
     # ------ Initiate the displayer using the target data if exists
     if "-compact" in argv.keys():  # compact mode
-        which_displayer = DepthDispDisplayCompact
+        if "-si" in argv.keys():  # compact&si modes
+            which_displayer = DepthDispDisplayCompactSI
+        else:
+            which_displayer = DepthDispDisplayCompact
+
         displayfile = HERRMETDISPLAYFILE.format(rootname=rootname, options="_compact")
+
+    elif "-si" in argv.keys():
+        which_displayer = DepthDispDisplaySI
+        displayfile = HERRMETDISPLAYFILE.format(rootname=rootname, options="")
+
     else:
         which_displayer = DepthDispDisplay
         displayfile = HERRMETDISPLAYFILE.format(rootname=rootname, options="")
@@ -252,11 +262,10 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
                                      **mapkwargs):
                         try:
                             l = 3 if p == 0.5 else 1
-                            for what, where in zip(
-                                    [vppc, vspc, rhpc, prpc],
-                                    [rd.axdepth['VP'], rd.axdepth['VS'], rd.axdepth['RH'], rd.axdepth['PR']]):
-                                if where is not None:
-                                    what.show(where, color=clr, linewidth=l, alpha=alp)
+                            rd.scale_and_plot_depthmodel1D(dm1d=vppc, which="vp", color=clr, linewidth=l, alpha=alp)
+                            rd.scale_and_plot_depthmodel1D(dm1d=vspc, which="vs", color=clr, linewidth=l, alpha=alp)
+                            rd.scale_and_plot_depthmodel1D(dm1d=rhpc, which="rh", color=clr, linewidth=l, alpha=alp)
+                            rd.scale_and_plot_depthmodel1D(dm1d=prpc, which="pr", color=clr, linewidth=l, alpha=alp)
 
                         except KeyboardInterrupt:
                             raise
@@ -300,46 +309,45 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
         #
         vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh = p.boundaries()
 
-        for what, where in zip(
-                [vplow, vphgh, vslow, vshgh, rhlow, rhhgh, prlow, prhgh],
-                [rd.axdepth['VP'], rd.axdepth['VP'],
-                 rd.axdepth['VS'], rd.axdepth['VS'],
-                 rd.axdepth['RH'], rd.axdepth['RH'],
-                 rd.axdepth['PR'], rd.axdepth['PR']]):
+        _kwargs = dict(alpha=1.0, color="k", marker="o--", linewidth=1, markersize=3)
 
-            if where is not None:
-                what.show(
-                    where,
-                    alpha=1.0, color="k", marker="o--",
-                    linewidth=1, markersize=3)
+        rd.scale_and_plot_depthmodel1D(vplow, "vp", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(vphgh, "vp", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(vslow, "vs", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(vshgh, "vs", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(rhlow, "rh", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(rhhgh, "rh", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(prlow, "pr", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(prhgh, "pr", **_kwargs)
 
         vpmean, vsmean, prmean, rhmean = p.meanmodel()
-        for what, where in zip(
-                [vpmean, vsmean, prmean, rhmean],
-                [rd.axdepth['VP'], rd.axdepth['VS'],
-                 rd.axdepth['PR'], rd.axdepth['RH']]):
 
-            if where is not None:
-                what.show(
-                    where,
-                    alpha=1.0, color="r", marker="o--",
-                    linewidth=1, markersize=3)
+        _kwargs = dict(alpha=1.0, color="r", marker="o--", linewidth=1, markersize=3)
+        rd.scale_and_plot_depthmodel1D(vpmean, "vp", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(vsmean, "vs", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(prmean, "pr", **_kwargs)
+        rd.scale_and_plot_depthmodel1D(rhmean, "rh", **_kwargs)
 
         zmax = 1.1 * p.inv(p.MINF)[0][-1]
 
         if isinstance(p, Parameterizer_mZVSPRzRHvp):
-            rd.axdepth['PR'].plot(
-                p.PRz(np.linspace(0., zmax, 100)),
-                np.linspace(0., zmax, 100), "r--", linewidth=3)
+            dm1d = depthmodel1D(
+                ztop=p.PRz(np.linspace(0., zmax, 100)),
+                values=np.linspace(0., zmax, 100))
+            rd.scale_and_plot_depthmodel1D(dm1d=dm1d, which="pr", color="r", linestyle="--", linewidth=3)
             legendtext(rd.axdepth['PR'], p.PRzName, loc=4)
             legendtext(rd.axdepth['RH'], p.RHvpName, loc=4)
+
         elif isinstance(p, Parameterizer_mZVSPRzRHz):
-            rd.axdepth['PR'].plot(
-                p.PRz(np.linspace(0., zmax, 100)),
-                np.linspace(0., zmax, 100), "r--", linewidth=3)
-            rd.axdepth['RH'].plot(
-                p.RHz(np.linspace(0., zmax, 100)),
-                np.linspace(0., zmax, 100), "r--", linewidth=3)
+            dm1d = depthmodel1D(
+                ztop=p.PRz(np.linspace(0., zmax, 100)),
+                values=np.linspace(0., zmax, 100))
+            rd.scale_and_plot_depthmodel1D(dm1d=dm1d, which="pr", color="r", linestyle="--", linewidth=3)
+            dm1d = depthmodel1D(
+                ztop=p.RHz(np.linspace(0., zmax, 100)),
+                values=np.linspace(0., zmax, 100))
+            rd.scale_and_plot_depthmodel1D(dm1d=dm1d, which="rh", color="r", linestyle="--", linewidth=3)
+
             legendtext(rd.axdepth['PR'], p.PRzName, loc=4)
             legendtext(rd.axdepth['RH'], p.RHzName, loc=4)
 
@@ -353,14 +361,15 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
             try:
                 dm = depthmodel_from_mod96(m96)
                 if "-compact" in argv.keys():  # compact mode 
-                     dm.vs.show(rd.axdepth['VS'], "m", linewidth=3)               
+                     #dm.vs.show(rd.axdepth['VS'], "m", linewidth=3)
+                     rd.scale_and_plot_depthmodel1D(dm.vs, which="vs", color="m", linewidth=3)
                      rd.axdepth['VS'].legend(loc=3)
                      
                 else:
-                    dm.vp.show(rd.axdepth['VP'], "m", linewidth=3, label=m96)
-                    dm.vs.show(rd.axdepth['VS'], "m", linewidth=3)
-                    dm.rh.show(rd.axdepth['RH'], "m", linewidth=3)
-                    dm.pr().show(rd.axdepth['PR'], "m", linewidth=3)
+                    rd.scale_and_plot_depthmodel1D(dm.vp, which='VP', color="m", linewidth=3, label=m96)
+                    rd.scale_and_plot_depthmodel1D(dm.vs, which='VS', color="m", linewidth=3)
+                    rd.scale_and_plot_depthmodel1D(dm.rh, which='RH', color="m", linewidth=3)
+                    rd.scale_and_plot_depthmodel1D(dm.pr(), which='PR', color="m", linewidth=3)
                     rd.axdepth['VP'].legend(loc=3)
 
             except KeyboardInterrupt:
@@ -408,7 +417,10 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
     elif "-inline" in argv.keys():
         plt.show()
     else:
-        showme()
+        plt.ion()
+        plt.show()
+        input('pause : press enter to see the next figure, (do not close the figure please!!!)')
+        # showme()
 
     if return_fig:
         return rd.fig  # caution not for parallel apps

@@ -11,7 +11,7 @@ class _OverdispCore(object):
     def __call__(self, mms):
         ztop, vp, vs, rh = mms
         try:
-            overvalues = self.herrmanncaller.dispersion(ztop, vp, vs, rh)
+            overvalues = self.herrmanncaller.disperse(ztop, vp, vs, rh)
 
         except KeyboardInterrupt:
             raise

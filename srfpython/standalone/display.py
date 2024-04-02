@@ -41,6 +41,7 @@ def chftsz(obj, fontsize):
 
 # ################################################ tickers
 def logtick(ax, axis='x', grid = True, color = "k", subs = [1., 2., 5.]):
+
     if matplotlibversion < "1.2":
         print("ERROR : logtick doesn't work with maptplotlib < 1.2")
         return
@@ -50,23 +51,23 @@ def logtick(ax, axis='x', grid = True, color = "k", subs = [1., 2., 5.]):
         if "." in s: s = s.rstrip('0').rstrip('.')
         return s
 
+    for letter in axis:
+        major_locator = ticker.LogLocator(base=10., subs=subs)
+        major_formatter = ticker.FuncFormatter(myfuncformatter)
 
-    major_locator = ticker.LogLocator(base=10., subs=subs)
-    major_formatter = ticker.FuncFormatter(myfuncformatter)
+        minor_locator = ticker.LogLocator(base=10., subs=[3., 4., 6., 7., 8., 9.])
+        minor_formatter = ticker.NullFormatter()
 
-    minor_locator = ticker.LogLocator(base=10., subs=[3., 4., 6., 7., 8., 9.])
-    minor_formatter = ticker.NullFormatter()
-
-    if 'x' in axis.lower():
-        ax.xaxis.set_major_locator(major_locator)
-        ax.xaxis.set_major_formatter(major_formatter)
-        ax.xaxis.set_minor_locator(minor_locator)
-        ax.xaxis.set_minor_formatter(minor_formatter)
-    if 'y' in axis.lower():
-        ax.yaxis.set_major_locator(major_locator)
-        ax.yaxis.set_major_formatter(major_formatter)
-        ax.yaxis.set_minor_locator(minor_locator)
-        ax.yaxis.set_minor_formatter(minor_formatter)
+        if 'x' == letter.lower():
+            ax.xaxis.set_major_locator(major_locator)
+            ax.xaxis.set_major_formatter(major_formatter)
+            ax.xaxis.set_minor_locator(minor_locator)
+            ax.xaxis.set_minor_formatter(minor_formatter)
+        if 'y' == letter.lower():
+            ax.yaxis.set_major_locator(major_locator)
+            ax.yaxis.set_major_formatter(major_formatter)
+            ax.yaxis.set_minor_locator(minor_locator)
+            ax.yaxis.set_minor_formatter(minor_formatter)
 
     if grid:
         ax.grid(True, which="major", color=color, linestyle=":")

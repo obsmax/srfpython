@@ -39,7 +39,7 @@ class depthmodel1D(object):
     def __init__(self, ztop, values, interpmethod="stairs"):
         #last value of v stand for half space
         assert len(ztop) == len(values)
-        assert np.all(ztop[1:] > ztop[:-1])
+        assert np.all(ztop[1:] > ztop[:-1]), ztop
         assert ztop[0] == 0.
         self.values, self.z = np.array(values), np.array(ztop)
         self.interpmethod = interpmethod #to be used by default

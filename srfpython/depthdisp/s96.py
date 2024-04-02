@@ -48,11 +48,15 @@ if __name__ == "__main__":
         gca().set_xscale('log')
         gca().set_yscale('log')
         logtick(gca(), "xy")
-        if not "freq" in argv.keys(): gca().set_xlim(pmin, pmax)
-        else:                         gca().set_xlim(1. / pmax, 1. / pmin)
+        if not "freq" in argv.keys(): 
+            gca().set_xlim(pmin, pmax)
+            gca().set_xlabel("Period (s)")
+
+        else:                         
+            gca().set_xlim(1. / pmax, 1. / pmin)
+            gca().set_xlabel("Frequency (Hz)")
         gca().grid(True)
-        gca().set_xlabel("period (s)")
-        gca().set_ylabel("velocity (km/s)")
+        gca().set_ylabel("Velocity (km/s)")
         # plt.legend()
         showme()
         sys.exit()
