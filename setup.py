@@ -16,7 +16,6 @@ assert os.path.isdir(fortran_src_path), "{} not found".format(fortran_src_path)
 
 
 # ================ get version number from version file
-# fuck distutils boolshit, find version string by myself
 if not os.path.isfile(version_file):
     raise IOError(version_file)
 
