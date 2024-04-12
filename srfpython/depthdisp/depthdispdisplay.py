@@ -479,6 +479,14 @@ class DepthDispDisplaySI(DepthDispDisplay):
     time_unit = "s"
     density_unit = "kg/m3"  # "g/cm3"
     period = False
+    
+    def tick(self):
+        for _, ax in self.axdisp.items():
+            pass  # logtick(ax, "xy")
+
+        for _, ax in self.axdepth.items():
+            if ax is not None:
+                Ntick(ax, 4, "x")
 
 
 class DepthDispDisplayCompactSI(DepthDispDisplayCompact):
@@ -486,3 +494,12 @@ class DepthDispDisplayCompactSI(DepthDispDisplayCompact):
     time_unit = "s"
     density_unit = "kg/m3"  # "g/cm3"
     period = False
+    
+    def tick(self):
+        for _, ax in self.axdisp.items():
+            pass  # logtick(ax, "xy")
+
+        for _, ax in self.axdepth.items():
+            if ax is not None:
+                Ntick(ax, 4, "x")
+
