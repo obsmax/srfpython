@@ -1,10 +1,8 @@
+import sys
 import time
 import signal
-import imp
-import os
-import sys
 import numpy as np
-from numpy import log10, inf, nan #needed by eval
+from numpy import log10, inf, nan  # needed by eval
 
 
 class TimeOutError(Exception):
@@ -90,21 +88,6 @@ def cosTaperwidth(data, sampling_rate, width):
 
 
 # -------------------------------------
-def string2func(s):
-    raise Exception('obsolet; not safe')
-    "converts string into callable function using temporary python file"
-    pyfilename = "/tmp/%s.py" % randstr(10)
-    with open(pyfilename, 'w') as fid:
-        fid.write(s)
-
-    funcname = s.split('def ')[-1].split('(')[0].strip()
-    func = getattr(imp.load_source(pyfilename.split('/')[-1].split('.py')[0], pyfilename), funcname)
-    os.remove(pyfilename)
-    os.remove(pyfilename + "c")
-    return func
-
-
-# -------------------------------------
 def tostr(l, fmt):
     return " ".join(fmt % v for v in l)
 
@@ -118,15 +101,15 @@ def randstr(n):
 
 
 # -------------------------------------
-def string2func(s):
-    "converts string into callable function using temporary python file"
-    pyfilename = "_string2func_tmpfile_%s.py" % randstr(10)
-    with open(pyfilename, 'w') as fid: fid.write(s)
-    funcname = s.split('def ')[-1].split('(')[0].strip()
-    func = getattr(imp.load_source(pyfilename.split('/')[-1].split('.py')[0], pyfilename), funcname)
-    os.remove(pyfilename)
-    os.remove(pyfilename + "c")
-    return func
+# def string2func(s):
+#     "converts string into callable function using temporary python file"
+#     pyfilename = "_string2func_tmpfile_%s.py" % randstr(10)
+#     with open(pyfilename, 'w') as fid: fid.write(s)
+#     funcname = s.split('def ')[-1].split('(')[0].strip()
+#     func = getattr(imp.load_source(pyfilename.split('/')[-1].split('.py')[0], pyfilename), funcname)
+#     os.remove(pyfilename)
+#     os.remove(pyfilename + "c")
+#     return func
 
 
 # --------------------------------------
