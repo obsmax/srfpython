@@ -302,7 +302,7 @@ class HerrmannCallerBasis(object):
         if (np.isinf(rh) | np.isnan(rh)).any():
             raise CPiSDomainError('rh value error %s' % str(rh))
 
-        if not np.all((rh > 1.)):
+        if not np.all((rh > 0.)):
             raise CPiSDomainError('density domain error : %s' % str(rh))
 
         out = "%d\n" % n + \
