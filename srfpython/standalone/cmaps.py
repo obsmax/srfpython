@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from matplotlib import pyplot as plt
-from matplotlib import colors, colormaps
+from matplotlib import colors
 import numpy as np
 
 
@@ -55,7 +55,7 @@ def display_cmap(ax, cmap):
 def stretchcmap(cmap, x, y=None, show=True):
     """modifies the repartition of colors along the colorbar using checkpoints
     input :
-        cmap = a colormab object, e.g. matplotlib.colormaps['jet']
+        cmap = a colormab object, e.g. plt.get_cmap('jet')
         x    = iterable, sorted, 0 to 1, horizontal positions of checkpoints
         y    = None or iterable, same len as x, 0 to 1, vertical positions of checkpoints
         show = bool, activate display for qc
@@ -63,7 +63,7 @@ def stretchcmap(cmap, x, y=None, show=True):
         cmapout = new colormap
 
     >> demo : try
-        cmap1 = stretchcmap(matplotlib.colormaps["Spectral"], [0., 0.1, 1.0], [0., 0.4, 1.0], show = True)
+        cmap1 = stretchcmap(plt.get_cmap('Spectral'), [0., 0.1, 1.0], [0., 0.4, 1.0], show = True)
     """
 
     x = np.asarray(x, float)
@@ -185,7 +185,7 @@ def linecmap(N=12):
     return array2cmap(X)
 ###########################################################################################
 def jetwk():
-    cmap = colormaps['jet']
+    cmap = plt.get_cmap('jet')
     cmap.set_under('w')
     cmap.set_over('k')
     return cmap
@@ -193,42 +193,42 @@ def jetwk():
 import warnings
 def yarg():
     warnings.warn('obsolet use matplotlib.colormaps')
-    return colormaps['gray_r']
+    return plt.get_cmap('gray_r')
 
 
 def toh():
     warnings.warn('obsolet use matplotlib.colormaps')
-    return colormaps['hot_r']
+    return plt.get_cmap('hot_r')
 
 
 def pamRMC():
     warnings.warn('obsolet use matplotlib.colormaps')
-    return colormaps['CMRmap_r']
+    return plt.get_cmap('CMRMap_r')
 
 
 def cimsies():
     warnings.warn('obsolet use matplotlib.colormaps')
-    return colormaps["seismic_r"]
+    return plt.get_cmap("seismic_r")
 
 
 def tej():
     warnings.warn('obsolet use matplotlib.colormaps')
-    return colormaps['jet_r']
+    return plt.get_cmap('jet_r')
 
 
 def lartceps():
     warnings.warn('obsolet use matplotlib.colormaps')
-    return colormaps['nipy_spectral_r']
+    return plt.get_cmap('nipy_spectral_r')
 
 
 def racn_tsig():
     warnings.warn('obsolet use matplotlib.colormaps')
-    return colormaps['gist_ncar_r']
+    return plt.get_cmap('gist_ncar_r')
 
 
 def spectralwide():
-    l1 = colormaps['nipy_spectral'](np.arange(246))
-    l2 = colormaps['Set1'](np.arange(5, 256))#[::-1])
+    l1 = plt.get_cmap('nipy_spectral')(np.arange(246))
+    l2 = plt.get_cmap('Set1')(np.arange(5, 256))#[::-1])
     l = np.concatenate((l1, l2))    
     return array2cmap(l)
 
@@ -495,7 +495,7 @@ def bazcmap():
 
 def megawide():
    
-    lsup = colormaps['nipy_spectral'](np.arange(10, 256))
+    lsup = plt.get_cmap('nipy_spectral')(np.arange(10, 256))
     linf = plt.cm.jet(np.arange(230)[::4])
     linf = 0.33 * (linf - linf.min()) / (linf.max() - linf.min())#np.clip(linf - 0.4, 0., 1.)
     Ntra = 30
@@ -575,7 +575,7 @@ if __name__ == "__main__":
     display_cmap(gca(), gistncarb())
     
     # ############ demo stretchcmap
-    cmap1 = stretchcmap(colormaps["Spectral"], [0., 0.1, 0.9, 1.0], [0., 0.4, 0.75, 1.0], show = True)
+    cmap1 = stretchcmap(plt.get_cmap("Spectral"), [0., 0.1, 0.9, 1.0], [0., 0.4, 0.75, 1.0], show = True)
     showme()
 
     # ############ dispaly all cmaps
