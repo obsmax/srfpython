@@ -86,7 +86,7 @@ LINE10
 LINE11
 H(KM) VP(KM/S) VS(KM/S) RHO(GM/CC) QP QS ETAP ETAS FREFP FREFS
 """
-    fmt = "%.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n"
+    fmt = "%.12f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n"
 
     H = np.zeros_like(Z)
     H[:-1] = Z[1:] - Z[:-1]
