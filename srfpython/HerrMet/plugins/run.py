@@ -2,7 +2,7 @@ from __future__ import print_function
 import os, glob
 import numpy as np
 from srfpython.standalone.multipro8 import Job, MapAsync
-from srfpython.inversion.metropolis2 import LogGaussND, metropolis
+from srfpython.inversion.metropolis2 import LogGaussND, LogUniND, metropolis
 from srfpython.HerrMet.runfile import RunFile
 from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.HerrMet.datacoders import makedatacoder, Datacoder_log
@@ -10,15 +10,16 @@ from srfpython.HerrMet.theory import Theory
 from srfpython.HerrMet.files import DEFAULTROOTNAMES, \
     HERRMETTARGETFILE, HERRMETRUNFILE, HERRMETPARAMFILE, rootname_to_nodename
 
-SURFVELOMIN = 0.025
-SURFVELOMAX = 4.8
+
 # ------------------------------ defaults
 default_rootnames = DEFAULTROOTNAMES
 default_nchain = 12
 default_nkeep = 100
 default_mode = "skip"
+default_surfvelomin = 0.025
+default_surfvelomax = 4.8
 # ------------------------------ autorized_keys
-authorized_keys = ["-mode", "-nchain", "-nkeep", "-h", "-help"]
+authorized_keys = ["-mode", "-nchain", "-nkeep", "-surflim", "-notarget", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--run        invert dispersion data using the Markov Chain Monte Carlo method"
@@ -31,12 +32,21 @@ long_help = """\
                      skip     : ignore rootnames with existsing run file(s)               
     -nchain  i       number of chains to use, default {default_nchain}
     -nkeep   i       number of models to keep per chain, default {default_nkeep}
+    -surflim f  f    Controls the uper and lower surface wave velocity
+                     default {default_surfvelomin}, {default_surfvelomax}km/s
+    -notarget        replaces the data term of the cost functions
+                     by a n-dimensional uniform PDF in the dispersion space
+                     between the two limits provided by -surflim
+                     This allows to visualize the dataspace mapped 
+                     according to the parameterization and the prior conditions                         
     -h, -help        display the help message for this plugin
     [use -w option before --run to control the maximum number of chains to run simultaneously]
     """.format(default_rootnames=default_rootnames,
                default_mode=default_mode,
                default_nchain=default_nchain,
-               default_nkeep=default_nkeep)
+               default_nkeep=default_nkeep,
+               default_surfvelomin=default_surfvelomin,
+               default_surfvelomax=default_surfvelomax)
 
 # ------------------------------ example usage
 example = """\
@@ -76,6 +86,10 @@ def run(argv, verbose, mapkwargs):
     Nchain = int(argv['-nchain'][0]) if "-nchain" in argv.keys() else default_nchain
     Nkeep = int(argv['-nkeep'][0]) if "-nkeep" in argv.keys() else default_nkeep
 
+    notarget = "-notarget" in argv.keys()
+
+    surfvelomin = float(argv['-surflim'][0]) if "-surflim" in argv.keys() else default_surfvelomin
+    surfvelomax = float(argv['-surflim'][1]) if "-surflim" in argv.keys() else default_surfvelomax
     # ------------------------
     def gen(rootnames, runmode):
 
@@ -96,12 +110,17 @@ def run(argv, verbose, mapkwargs):
             p, logRHOM = load_paramfile(paramfile)
             # ------
             d = makedatacoder(targetfile, which=Datacoder_log)  # datacoder based on observations
-            dobs, CDinv = d.target()
-            duncs = CDinv ** -.5
-            ND = len(dobs)
-            dinfs = d(SURFVELOMIN * np.ones_like(d.values))
-            dsups = d(SURFVELOMAX * np.ones_like(d.values))
-            logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
+            ND = len(d.values)
+            dinfs = d(surfvelomin * np.ones(ND, float))
+            dsups = d(surfvelomax * np.ones(ND, float))
+
+            if notarget:
+                logRHOD = LogUniND(dinfs, dsups, k=1000., nanbehavior=1)
+            else:
+                dobs, CDinv = d.target()
+                duncs = CDinv ** -.5
+                logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
+
             # ------
             G = Theory(parameterizer=p, datacoder=d)
             # ---------------------------------
