@@ -159,22 +159,50 @@ class LogRhoM_DVPDVSDRHDPR(DefaultLogRhoM):
 class LogRhoM_TIKHONOV(DefaultLogRhoM):
     """add new constraitns on the vs offsets on interfaces"""
 
+    def __init__(self, parameterizer):
+        DefaultLogRhoM.__init__(self, parameterizer=parameterizer)
+
+        # compute the range of each parameters to normalize the gradients
+        (vplow, vphgh,
+         vslow, vshgh,
+         rhlow, rhhgh,
+         prlow, prhgh) = self.p.boundaries()
+
+        self.vs_range = vshgh.values.max() - vslow.values.min()
+        self.vp_range = vphgh.values.max() - vplow.values.min()
+        self.rh_range = rhhgh.values.max() - rhlow.values.min()
+        self.pr_range = prhgh.values.max() - prlow.values.min()
+
     def __call__(self, m):
 
         log_rhom_1 = DefaultLogRhoM.__call__(self, model=m)
 
-        ZTOP, VP, VS, RH = self.p.inv(m)
-        H = ZTOP[1:] - ZTOP[:-1]
-        DVP = VS[1:] - VS[:-1]
-        DVS = VP[1:] - VP[:-1]
-        DRH = RH[1:] - RH[:-1]
-        PR = VP / VS
-        DPR = PR[1:] - PR[:-1]
+        ztop, vp, vs, rh = self.p.inv(m)
+        pr = vp / vs
 
-        log_rhom_2 = -0.5 * ((ZTOP[-1] * DVS / H) ** 2.0).sum()
-        log_rhom_3 = -0.5 * ((ZTOP[-1] * DVP / H) ** 2.0).sum()
-        log_rhom_4 = -0.5 * ((ZTOP[-1] * DRH / H) ** 2.0).sum()
-        log_rhom_5 = -0.5 * ((ZTOP[-1] * DPR / H) ** 2.0).sum()
+        # top of half space
+        depthmax = ztop[-1]
+
+        # layer thicknesses
+        dz = ztop[1:] - ztop[:-1]
+
+        # vertical gradients in each layer except half space
+        dvp_o_dz = (vs[1:] - vs[:-1]) / dz
+        dvs_o_dz = (vp[1:] - vp[:-1]) / dz
+        drh_o_dz = (rh[1:] - rh[:-1]) / dz
+        dpr_o_dz = (pr[1:] - pr[:-1]) / dz
+
+        # scale the gradients
+        dvs_o_dz *= depthmax / self.vs_range
+        dvp_o_dz *= depthmax / self.vp_range
+        drh_o_dz *= depthmax / self.rh_range
+        dpr_o_dz *= depthmax / self.pr_range        #
+
+        # gradients norms
+        log_rhom_2 = -0.5 * (dvs_o_dz ** 2.0).sum()
+        log_rhom_3 = -0.5 * (dvp_o_dz ** 2.0).sum()
+        log_rhom_4 = -0.5 * (drh_o_dz ** 2.0).sum()
+        log_rhom_5 = -0.5 * (dpr_o_dz ** 2.0).sum()
 
         return log_rhom_1 + (log_rhom_2 + log_rhom_3 + log_rhom_4 + log_rhom_5)
 
