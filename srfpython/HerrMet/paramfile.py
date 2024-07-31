@@ -3,7 +3,13 @@ import os
 import numpy as np
 from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthspace
 from srfpython.standalone.asciifile import AsciiFile, AsciiFile_fromstring
-from srfpython.HerrMet.priorpdf import DefaultLogRhoM, LogRhoM_DVS, LogRhoM_DVPDVSDRH, LogRhoM_DVPDVSDRHDPR
+from srfpython.HerrMet.priorpdf import (
+    DefaultLogRhoM,
+    LogRhoM_DVS,
+    LogRhoM_DVPDVSDRH,
+    LogRhoM_DVPDVSDRHDPR,
+    LogRhoM_TIKHONOV,
+    )
 from srfpython.HerrMet.files import HERRMETPARAMFILELOCAL
 from srfpython.HerrMet.parameterizers import \
     Parameterizer_mZVSVPRH, Parameterizer_mZVSPRRH, Parameterizer_mZVSPRzRHvp, \
@@ -320,6 +326,10 @@ def load_paramfile(paramfile, verbose=True):
                     drhmax=A.metadata['DRHMAX'],
                     dprmin=A.metadata['DPRMIN'],
                     dprmax=A.metadata['DPRMAX'])
+
+    elif A.metadata['PRIORTYPE'] == "TIKHONOV":
+        logRHOM = LogRhoM_TIKHONOV(parameterizer)
+
     else:
         raise Exception('could not load %s (PRIORTYPE not recognized)' % paramfile)
 

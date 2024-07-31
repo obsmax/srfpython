@@ -1,4 +1,4 @@
-from srfpython.inversion.metropolis2 import LogUniND
+from srfpython.inversion.metropolis2 import LogUniND, LogGaussNDCov
 import numpy as np
 
 
@@ -17,6 +17,7 @@ class DefaultLogRhoM(LogUniND):
                       vsups=parameterizer.MSUP,
                       k=self.k,
                       nanbehavior=self.nanbehavior)
+        self.p = parameterizer
 
     @staticmethod
     def header(dvp=None, dvs=None, drh=None, dpr=None):
@@ -139,6 +140,43 @@ class LogRhoM_DVPDVSDRHDPR(DefaultLogRhoM):
         DPR = PR[1:] - PR[:-1]
         extended_m = np.concatenate((m, DVP, DVS, DRH, DPR))
         return LogUniND.__call__(self, extended_m)
+
+    @staticmethod
+    def header(dvp=None, dvs=None, drh=None, dpr=None):
+
+        header  = '#met PRIORTYPE = "DVPDVSDRHDPR"\n'
+        header += '#met DVPMIN = {}\n'.format(dvp[0])
+        header += '#met DVPMAX = {}\n'.format(dvp[1])
+        header += '#met DVSMIN = {}\n'.format(dvs[0])
+        header += '#met DVSMAX = {}\n'.format(dvs[1])
+        header += '#met DRHMIN = {}\n'.format(drh[0])
+        header += '#met DRHMAX = {}\n'.format(drh[1])
+        header += '#met DPRMIN = {}\n'.format(dpr[0])
+        header += '#met DPRMAX = {}\n'.format(dpr[1])
+        return header
+
+
+class LogRhoM_TIKHONOV(DefaultLogRhoM):
+    """add new constraitns on the vs offsets on interfaces"""
+
+    def __call__(self, m):
+
+        log_rhom_1 = DefaultLogRhoM.__call__(self, model=m)
+
+        ZTOP, VP, VS, RH = self.p.inv(m)
+        H = ZTOP[1:] - ZTOP[:-1]
+        DVP = VS[1:] - VS[:-1]
+        DVS = VP[1:] - VP[:-1]
+        DRH = RH[1:] - RH[:-1]
+        PR = VP / VS
+        DPR = PR[1:] - PR[:-1]
+
+        log_rhom_2 = -0.5 * ((ZTOP[-1] * DVS / H) ** 2.0).sum()
+        log_rhom_3 = -0.5 * ((ZTOP[-1] * DVP / H) ** 2.0).sum()
+        log_rhom_4 = -0.5 * ((ZTOP[-1] * DRH / H) ** 2.0).sum()
+        log_rhom_5 = -0.5 * ((ZTOP[-1] * DPR / H) ** 2.0).sum()
+
+        return log_rhom_1 + (log_rhom_2 + log_rhom_3 + log_rhom_4 + log_rhom_5)
 
     @staticmethod
     def header(dvp=None, dvs=None, drh=None, dpr=None):
