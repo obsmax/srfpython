@@ -159,8 +159,9 @@ class LogRhoM_DVPDVSDRHDPR(DefaultLogRhoM):
 class LogRhoM_TIKHONOV(DefaultLogRhoM):
     """add new constraitns on the vs offsets on interfaces"""
 
-    def __init__(self, parameterizer):
+    def __init__(self, parameterizer, alpha_tikhonov: float):
         DefaultLogRhoM.__init__(self, parameterizer=parameterizer)
+        self.alpha_tikhonov = alpha_tikhonov
 
         # compute the range of each parameters to normalize the gradients
         (vplow, vphgh,
@@ -204,7 +205,8 @@ class LogRhoM_TIKHONOV(DefaultLogRhoM):
         log_rhom_4 = -0.5 * (drh_o_dz ** 2.0).sum()
         log_rhom_5 = -0.5 * (dpr_o_dz ** 2.0).sum()
 
-        return log_rhom_1 + (log_rhom_2 + log_rhom_3 + log_rhom_4 + log_rhom_5)
+        return log_rhom_1 +\
+            self.alpha_tikhonov * (log_rhom_2 + log_rhom_3 + log_rhom_4 + log_rhom_5)
 
     @staticmethod
     def header(dvp=None, dvs=None, drh=None, dpr=None):
