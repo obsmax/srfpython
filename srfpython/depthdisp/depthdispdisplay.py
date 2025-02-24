@@ -482,7 +482,12 @@ class DepthDispDisplaySI(DepthDispDisplay):
     
     def tick(self):
         for _, ax in self.axdisp.items():
-            pass  # logtick(ax, "xy")
+            logtick(ax, "xy")
+            plt.setp(ax.get_yticklabels(),
+                     rotation=-90,
+                     ha="left", va="center",
+                     fontsize=4)
+            ax.tick_params(axis='y', which='major', pad=0)
 
         for _, ax in self.axdepth.items():
             if ax is not None:
@@ -497,7 +502,14 @@ class DepthDispDisplayCompactSI(DepthDispDisplayCompact):
     
     def tick(self):
         for _, ax in self.axdisp.items():
-            pass  # logtick(ax, "xy")
+            logtick(ax, "xy")
+            plt.setp(ax.get_yticklabels(),
+                     rotation=-90,
+                     ha="left", va="center",
+                     fontsize=4)
+            ax.tick_params(axis='y', which='major', pad=0)
+
+
 
         for _, ax in self.axdepth.items():
             if ax is not None:
