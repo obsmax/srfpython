@@ -49,11 +49,12 @@ class DepthDispDisplay(object):
             wtms = list(s.wtm())
             for n, (w, t, m) in enumerate(wtms):
 
-                ax = self.fig.add_subplot(Ndisp, 5, (n+1)*5,
-                                          title="%s%s%d" % (w, t, m),
-                                          sharex=share, sharey=share,
-                                          #ylabel="velocity (km/s)")
-                                          ylabel="%s (%s/%s)" % (["grpvel", "phsvel"][int(t=="C")], self.dist_unit, self.time_unit))
+                ax = self.fig.add_subplot(
+                    Ndisp, 5, (n+1)*5,
+                    title="%s%s%d" % (w, t, m),
+                    sharex=share, sharey=share,
+                    ylabel="%s (%s/%s)" % (["grpvel", "phsvel"][int(t=="C")],
+                                           self.dist_unit, self.time_unit))
                 ax.yaxis.set_label_position("right")
                 ax.yaxis.tick_right()
 
@@ -349,7 +350,9 @@ class DepthDispDisplay(object):
 
         for law in mklaws(waves, types, modes, freqs / time_scale , values * dist_scale / time_scale, dvalues=None):
             key = "%s%s%d" % (law.wave.upper(), law.type.upper(), law.mode)
+
             coll = self.dispcoll[key]
+
             if self.period:
                 coll['segments'].append(np.column_stack((1. / law.freq, law.value)))
             else:
@@ -370,7 +373,15 @@ class DepthDispDisplay(object):
             ax.add_collection(lc)
 
     def showdispcoll(self, vmin, vmax, cmap, **kwargs):
-        for key, ax in self.axdisp.items():
+        # sort by decreasing mode if several modes are displayed on the same axis (overmode)
+        keys = list(self.axdisp.keys())
+        waves, types, modes = zip(*[(wts[0], wts[1], wts[2]) for wts in keys])
+        waves, types, modes = [np.array(_) for _ in [waves, types, modes]]
+        i = np.lexsort((1000 - modes.astype(int), types, waves))
+
+        for key in np.array(keys)[i]:
+            print(key)
+            ax = self.axdisp[key]
             coll = self.dispcoll[key]
 
             segments = coll['segments']
