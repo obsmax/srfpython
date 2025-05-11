@@ -36,10 +36,15 @@ default_pdf_step = 1
 default_cmap = "viridis"  # plt.cm.jet# plt.cm.gray #
 default_fontsize = 10
 default_dpi = 100
+default_hstep = 0.005   # solver step to convert phase to group
+default_ddc = 0.005  # accuracy of the forward solver, too low => slower, too high : risk to miss modes
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-plot", "-overdisp", "-overmode", "-pdf", "-png", "-svg", "-m96", "-cmap", "-compact", "-si", "-ftsz", "-inline", "-h", "-help"]
+authorized_keys = ["-plot", "-overdisp", "-overmode", 
+                    "-ddc", "-hstep",
+                    "-pdf", "-png", "-svg", "-m96", 
+                    "-cmap", "-compact", "-si", "-ftsz", "-inline", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
@@ -54,6 +59,8 @@ long_help = """\
                      fourth argument = include only one model over "step" (>=1)
                      default {default_plot_mode} {default_plot_limit} {default_plot_llkmin} {default_plot_step}             
     -overdisp        recompute dispersion curves of the best models selected with higher resolution
+    -ddc             solver accuracy to be used if overdisp is used, it is adviced to use the same values as the run, default {default_ddc}
+    -hstep           solver step to convert phase to group if overdisp is used, it is adviced to use the same values as the run, default {default_hstep}    
     -overmode i      use together with overdisp to add more overtones [experimental], 
                      provide max mode number
     -pdf   [s i f i] compute and show the statistics for the selected models, see -plot for arguments
@@ -80,7 +87,10 @@ long_help = """\
                default_pdf_step=default_pdf_step,
                default_cmap=default_cmap,
                default_fontsize=default_fontsize,
-               default_dpi=default_dpi)
+               default_dpi=default_dpi,
+               default_ddc=default_ddc,
+               default_hstep=default_hstep,
+               )
 
 # ------------------------------ example usage
 example = """\
@@ -186,7 +196,6 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
 
                         waves, types, modes, freqs, _ = ds[0]
 
-
                         overwaves, overtypes, overmodes, _, _ = zip(
                             *list(groupbywtm(waves, types, modes, freqs, np.arange(len(freqs)), None, True)))
 
@@ -219,11 +228,15 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
                         overwaves, overtypes, overmodes, overfreqs = \
                             igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
 
+                        ddc = float(argv['-ddc'][0]) if "-ddc" in argv.keys() else default_ddc
+                        hstep = float(argv['-hstep'][0]) if "-hstep" in argv.keys() else default_hstep
+                        
                         overdisp_results = overdisp(
                             ms[::-1],
                             overwaves, overtypes, overmodes, overfreqs,
                             verbose=verbose,
-                            h=0.001, ddc=0.001,
+                            h=hstp, 
+                            ddc=ddc,
                             **mapkwargs)
 
                         for llk, (mms, dds) in zip(llks[::-1], overdisp_results):
