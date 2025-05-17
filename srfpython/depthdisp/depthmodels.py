@@ -105,12 +105,21 @@ class depthmodel1D(object):
         #return ax.fill_betweenx(y=zz, x1=vv1, x2=vv2, **kwargs)
         return ax.fill(x, y, **kwargs)
 
-    def show(self, ax, marker="-", **kwargs): #halfspacemarker="-",
-
+    def show(self, ax, marker="-", units='km/s/g.cm-3', **kwargs): 
         zz, vv = self.stairs()
-        # zz[-1] = np.max([1.5 * self.z[-1], 3.0]) #cannot plot np.inf...
-        zz[-1] = 1.1 * self.z[-1]
 
+        if units == 'km/s/g.cm-3':
+            zz[-1] = 1.1 * self.z[-1]
+
+        elif units in ['m/s/kg.m-3', 'si']:
+
+            zz *= 1000.
+            vv *= 1000. #km/s -> m/s  g/cm3 -> kg/m3
+            zz[-1] = 1100. * self.z[-1]
+
+        else:
+            raise NotImplementedError(units)
+        # zz[-1] = np.max([1.5 * self.z[-1], 3.0]) #cannot plot np.inf...
         hdl, = ax.plot(vv, zz, marker, **kwargs)
 
         if not ax.yaxis_inverted():
@@ -399,16 +408,22 @@ class depthmodel(object):
         return self.ztop(), self.vp.values, self.vs.values, self.rh.values
 
     # -------------------------------------------------
-    def show(self, ax, *args, **kwargs):
+    def show(self, ax, *args, **kwargs):             
 
         hdls = []
         kwargs['color'] = "b"
-        hdls.append(self.vp.show(ax, label="$ V_p (km/s) $", *args, **kwargs))
+        hdls.append(
+            self.vp.show(ax, label="$ V_p $", *args, **kwargs))
+
         kwargs['color'] = "g"
-        hdls.append(self.vs.show(ax, label="$ V_s (km/s) $", *args, **kwargs))
+        hdls.append(
+            self.vs.show(ax, label="$ V_s $", *args, **kwargs))
+
         kwargs['color'] = "r"
-        hdls.append(self.rh.show(ax, label=r"$ \rho (g/cm^3) $", *args, **kwargs))
-        ax.set_ylabel('$ depth (km) $')
+        hdls.append(self.rh.show(ax, 
+            label=r"$ \rho $", *args, **kwargs))
+
+        ax.set_ylabel('$ Depth $')
         return hdls
 
 
