@@ -235,7 +235,7 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
                             ms[::-1],
                             overwaves, overtypes, overmodes, overfreqs,
                             verbose=verbose,
-                            h=hstp, 
+                            h=hstep, 
                             ddc=ddc,
                             **mapkwargs)
 
