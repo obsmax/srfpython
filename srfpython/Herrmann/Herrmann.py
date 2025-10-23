@@ -585,17 +585,19 @@ if __name__ == "__main__":
     print(time.time() - start)
 
     # display results
-    plt.figure()
-    ax = plt.gca()
-    for curve in curves:
-        ax.loglog(1. / curve.freqs, curve.values, '+-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
-    ax.set_xlabel('period (s)')
-    ax.set_ylabel('velocity (km/s)')
-    ax.grid(True, which="major")
-    ax.grid(True, which="minor")
-    logtick(ax, "xy")
-    plt.legend()
-    #plt.show()
+    import sys
+    if "--show" in sys.argv[1:]:
+        plt.figure()
+        ax = plt.gca()
+        for curve in curves:
+            ax.loglog(1. / curve.freqs, curve.values, '+-', label="%s%s%d" % (curve.wave, curve.type, curve.mode))
+        ax.set_xlabel('period (s)')
+        ax.set_ylabel('velocity (km/s)')
+        ax.grid(True, which="major")
+        ax.grid(True, which="minor")
+        logtick(ax, "xy")
+        plt.legend()
+        plt.show()
 
     # # =========================
     # # test the scaling modes
