@@ -1,5 +1,6 @@
+import os
 from srfpython.standalone.display import plt, gcf, gca, pause, showme, Ntick, logtick, makecolorbar
-from srfpython.depthdisp.dispcurves import surf96reader, mklaws
+from srfpython.depthdisp.dispcurves import surf96reader_from_surf96string, surf96reader, mklaws
 from srfpython.depthdisp.depthmodels import depthmodel1D, depthmodel_from_mod96
 from matplotlib.collections import LineCollection
 import numpy as np
@@ -41,7 +42,11 @@ class DepthDispDisplay(object):
                 ax.yaxis.tick_right()
         else:
             # adjust the suplots according to the target data
-            s = surf96reader(targetfile)
+            if os.path.isfile(targetfile):
+                s = surf96reader(targetfile)
+            elif "SURF96" in targetfile:
+                s = surf96reader_from_surf96string(targetfile)
+
             Ndisp = max([4, len(list(s.wtm()))])
 
             self.axdisp = {}
@@ -139,8 +144,12 @@ class DepthDispDisplay(object):
             **kwargs
             )
 
-    def plot_depthmodel(self, dm, which, **kwargs):
-        raise NotImplementedError
+    def plot_depthmodel(self, dm, **kwargs):
+        self.plotmodel(
+            dm.vp.ztop(),
+            dm.vp.values, dm.vs.values, dm.rh.values,
+            **kwargs
+            )
 
     def plotmodel(self, ztop, vp, vs, rh, color="k", alpha=0.2,
                   showvp=True, showvs=True, showrh=True, showpr=True,
