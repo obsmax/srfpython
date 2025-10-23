@@ -328,7 +328,10 @@ def load_paramfile(paramfile, verbose=True):
                     dprmax=A.metadata['DPRMAX'])
 
     elif A.metadata['PRIORTYPE'] == "TIKHONOV":
-        logRHOM = LogRhoM_TIKHONOV(parameterizer)
+        logRHOM = LogRhoM_TIKHONOV(
+            parameterizer,
+            alpha_tikhonov=A.metadata['ALPHATIKHONOV'],
+            )
 
     else:
         raise Exception('could not load %s (PRIORTYPE not recognized)' % paramfile)

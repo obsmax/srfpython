@@ -264,7 +264,8 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
                normallaw=np.random.randn, unilaw=np.random.rand,
                chainid=1, HL = 100, IK0 = 0.25,
                MPMIN = 1.e-6, MPMAX = 1e6, adjustspeed=0.01,
-               nofail=False, debug=False, verbose=True, head=""):
+               nofail=False, debug=False, verbose=True, head="", 
+               timeout=None):
     """
     input :
         M0      = starting model, np.ndarray
@@ -321,6 +322,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
 
     statsreport = "{head}chain{chainid:5d} " \
                   "kept{nkept:5d}/{ntest:5d} " \
+                  "elapsed{elapsed_time:5.0f}/{timeout:5.0f}s " \
                   "fail{nfail:5d} " \
                   "stay{nstay:5d} " \
                   "MP {MP:5.2f} " \
@@ -360,6 +362,8 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
     Ikept = np.zeros(HL, bool)  # chain status history
     start = time.time()
     lasttime, lastntest = start, 0
+    if timeout is None:
+        timeout = np.inf
 
     # ---- chain data
     # store every distinct model and data of the chain
@@ -375,6 +379,16 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
     weights[icurrent] += 1
 
     while nkept < nkeep:
+        current_time = time.time()
+
+        if (current_time - start) >= timeout:
+            if verbose:
+                print(summary.format(
+                    head=head, chainid=chainid, status="TIMEDOUT",
+                    nkept=nkept, ntest=ntest, nfail=nfail,
+                    AK=AK, MP=MP, AS=AS, BEST=BEST))  # PRESUMED ERROR IN THEORY
+            return models[:icurrent, :], datas[:icurrent, :], weights[:icurrent], llks[:icurrent]
+
         ntest += 1
 
         if not ntest % HL and ntest:
@@ -383,10 +397,9 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
             AK  = nkept / float(ntest)     # average keep ratio
             MP *= 1. - adjustspeed * (IK0 - IK)   # master proposal, used to scale the markov chain proposal stds
             MP = np.clip(MP, MPMIN, MPMAX)
-            t = time.time()
-            AS  = ntest / (t - start)                  # Average test speed
-            IS  = (ntest - lastntest) / (t - lasttime) # Instantaneous test speed
-            lasttime, lastntest = t, ntest
+            AS  = ntest / (current_time - start)                  # Average test speed
+            IS  = (ntest - lastntest) / (current_time - lasttime) # Instantaneous test speed
+            lasttime, lastntest = current_time, ntest
 
         if not ntest % (10 * HL) and ntest:
             # reevaluate proposal stds
@@ -419,6 +432,7 @@ def metropolis(M0, MSTD, G, ND, logRHOD, logRHOM, nkeep,
                 print(statsreport.format(
                     head=head, chainid=chainid,
                     ntest=ntest, nfail=nfail, nkept=nkept, nstay=nstay,
+                    elapsed_time=(current_time-start), timeout=timeout,
                     IK=IK, AK=AK, MP=MP, AS=AS, IS=IS, BEST=BEST))
 
         MII = MI + MP * MSTD * normallaw(len(M0))

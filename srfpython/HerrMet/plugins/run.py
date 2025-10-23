@@ -18,8 +18,14 @@ default_nkeep = 100
 default_mode = "skip"
 default_surfvelomin = 0.025
 default_surfvelomax = 4.8
+default_hstep = 0.005   # solver step to convert phase to group
+default_ddc = 0.005  # accuracy of the forward solver, too low => slower, too high : risk to miss modes
+default_timeout = None
 # ------------------------------ autorized_keys
-authorized_keys = ["-mode", "-nchain", "-nkeep", "-surflim", "-notarget", "-h", "-help"]
+authorized_keys = ["-mode", "-nchain", "-nkeep", "-surflim", "-notarget", 
+                   "-ddc", "-hstep",
+                   "-timeout",
+                   "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--run        invert dispersion data using the Markov Chain Monte Carlo method"
@@ -39,6 +45,9 @@ long_help = """\
                      between the two limits provided by -surflim
                      This allows to visualize the dataspace mapped 
                      according to the parameterization and the prior conditions                         
+    -ddc             solver accuracy, default {default_ddc}
+    -timeout f       time limit for the Markov Chains in seconds, default {default_timeout}  
+    -hstep           solver step to convert phase to group, default {default_hstep}
     -h, -help        display the help message for this plugin
     [use -w option before --run to control the maximum number of chains to run simultaneously]
     """.format(default_rootnames=default_rootnames,
@@ -46,7 +55,11 @@ long_help = """\
                default_nchain=default_nchain,
                default_nkeep=default_nkeep,
                default_surfvelomin=default_surfvelomin,
-               default_surfvelomax=default_surfvelomax)
+               default_surfvelomax=default_surfvelomax,
+               default_ddc=default_ddc,
+               default_hstep=default_hstep,
+               default_timeout=default_timeout,
+               )
 
 # ------------------------------ example usage
 example = """\
@@ -90,6 +103,11 @@ def run(argv, verbose, mapkwargs):
 
     surfvelomin = float(argv['-surflim'][0]) if "-surflim" in argv.keys() else default_surfvelomin
     surfvelomax = float(argv['-surflim'][1]) if "-surflim" in argv.keys() else default_surfvelomax
+    
+    ddc = float(argv['-ddc'][0]) if "-ddc" in argv.keys() else default_ddc
+    hstep = float(argv['-hstep'][0]) if "-hstep" in argv.keys() else default_hstep
+
+    timeout = float(argv['-timeout'][0]) if "-timeout" in argv.keys() else default_timeout
     # ------------------------
     def gen(rootnames, runmode):
 
@@ -122,7 +140,7 @@ def run(argv, verbose, mapkwargs):
                 logRHOD = LogGaussND(dobs, duncs, dinfs, dsups, k=1000., nanbehavior=1)
 
             # ------
-            G = Theory(parameterizer=p, datacoder=d)
+            G = Theory(parameterizer=p, datacoder=d, ddc=ddc, h=hstep)
             # ---------------------------------
             if runmode == "restart" or runmode == "skip":
                 with RunFile(runfile, create=True, verbose=verbose) as rundb:
@@ -169,7 +187,8 @@ def run(argv, verbose, mapkwargs):
             nofail=True,
             debug=False,
             verbose=verbose,
-            head="{:10s} ".format(rootname_to_nodename(rootname)))
+            head="{:10s} ".format(rootname_to_nodename(rootname)),
+            timeout=timeout)
 
         I = np.any(~np.isnan(datas), axis=1)
         models, datas, weights, llks = models[I, :], datas[I, :], weights[I], llks[I]

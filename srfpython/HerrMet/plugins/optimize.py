@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 from builtins import input
 import sys, glob, os
 import warnings
@@ -15,6 +16,11 @@ from srfpython.utils import Timer
 from srfpython.HerrMet.files import \
     HERRMETOPTIMIZEPARAMFILE, HERRMETOPTIMIZEPRIORFILE, \
     HERRMETOPTIMIZEDOBSFILE, HERRMETOPTIMIZEINVFILE
+
+try:
+    from numpy.lib.npyio import _savez
+except ImportError:
+    from numpy.lib._npyio_impl import _savez
 
 # ------------------------------ defaults
 default_option = None
@@ -105,7 +111,7 @@ def load_optimize_parameters():
             if l.startswith('damping'): damping = float(l.split()[1])
 
             if l.startswith('extractfiles'): extractfiles = l.split()[1]
-            if l.startswith('datafiles'):       datafiles = l.split()[1]
+            if l.startswith(('datafiles', 'targetfiles')): datafiles = l.split()[1]
 
     return nx, ny, newnz, dx, dy, newdz, ndecim, Lh, Lv, vsunc, damping, extractfiles, datafiles
 
@@ -130,7 +136,7 @@ def add_to_npz(npzfile, allow_pickle=False, **kwargs):
         d = kwargs
 
     # save
-    from numpy.lib.npyio import _savez
+
     _savez(npzfile, args=(), kwds=d, compress=True, allow_pickle=allow_pickle)
 
 
@@ -215,8 +221,20 @@ def optimize(argv, verbose, mapkwargs):
         Mprior = vs_cube  # .flat[:]
         Munc = vsunc_cube  # .flat[:]
 
-        xedges = np.hstack((x - 0.5 * (x[1] - x[0]), x[-1] + 0.5 * (x[1] - x[0])))
-        yedges = np.hstack((y - 0.5 * (y[1] - y[0]), y[-1] + 0.5 * (y[1] - y[0])))
+        if len(x) >= 2:
+            xedges = np.hstack((x - 0.5 * (x[1] - x[0]), x[-1] + 0.5 * (x[1] - x[0])))
+        elif len(x) == 1:
+            xedges = np.array([x[0] - 0.5, x[0] + 0.5])
+        else:
+            raise ValueError
+        if len(y) >= 2:
+            yedges = np.hstack((y - 0.5 * (y[1] - y[0]), y[-1] + 0.5 * (y[1] - y[0])))
+        elif len(y) == 1:
+            yedges = np.array([y[0] - 0.5, y[0] + 0.5])
+        else:
+            raise ValueError
+
+        assert len(ztop) >= 2
         zedges = np.hstack((ztop, ztop[-1] + 0.5 * (ztop[1] - ztop[0])))
 
         # ================== compute the parameterizers

@@ -36,10 +36,15 @@ default_pdf_step = 1
 default_cmap = "viridis"  # plt.cm.jet# plt.cm.gray #
 default_fontsize = 10
 default_dpi = 100
+default_hstep = 0.005   # solver step to convert phase to group
+default_ddc = 0.005  # accuracy of the forward solver, too low => slower, too high : risk to miss modes
 
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-plot", "-overdisp", "-pdf", "-png", "-svg", "-m96", "-cmap", "-compact", "-si", "-ftsz", "-inline", "-h", "-help"]
+authorized_keys = ["-plot", "-overdisp", "-overmode", 
+                    "-ddc", "-hstep",
+                    "-pdf", "-png", "-svg", "-m96", 
+                    "-cmap", "-compact", "-si", "-ftsz", "-inline", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--display    display target, parameterization, solutions"
@@ -54,6 +59,10 @@ long_help = """\
                      fourth argument = include only one model over "step" (>=1)
                      default {default_plot_mode} {default_plot_limit} {default_plot_llkmin} {default_plot_step}             
     -overdisp        recompute dispersion curves of the best models selected with higher resolution
+    -ddc             solver accuracy to be used if overdisp is used, it is adviced to use the same values as the run, default {default_ddc}
+    -hstep           solver step to convert phase to group if overdisp is used, it is adviced to use the same values as the run, default {default_hstep}    
+    -overmode i      use together with overdisp to add more overtones [experimental], 
+                     provide max mode number
     -pdf   [s i f i] compute and show the statistics for the selected models, see -plot for arguments
                      default {default_pdf_mode} {default_pdf_limit} {default_pdf_llkmin} {default_pdf_step} 
                      use --extract to save pdf outputs
@@ -78,7 +87,10 @@ long_help = """\
                default_pdf_step=default_pdf_step,
                default_cmap=default_cmap,
                default_fontsize=default_fontsize,
-               default_dpi=default_dpi)
+               default_dpi=default_dpi,
+               default_ddc=default_ddc,
+               default_hstep=default_hstep,
+               )
 
 # ------------------------------ example usage
 example = """\
@@ -97,6 +109,14 @@ HerrMet --display \\
 
 
 # -------------------------------------
+import matplotlib.pyplot as plt
+import matplotlib._pylab_helpers
+
+def is_figure_open(fig):
+    figures = [manager.canvas.figure
+                for manager in matplotlib._pylab_helpers.Gcf.get_all_fig_managers()]
+    return fig in figures
+
 def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=False):
     """private"""
     targetfile = HERRMETTARGETFILE.format(rootname=rootname)
@@ -127,7 +147,7 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
         dobs, _ = d.target()
     else:
         print("no target file found in %s" % rootname)
-        rd = which_displayer()
+        rd = which_displayer(fig=fig)
 
     # ------ Display run results if exist
     if os.path.exists(runfile) and ("-plot" in argv.keys() or "-pdf" in argv.keys()):
@@ -171,27 +191,63 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
                     if "-overdisp" in argv.keys():
                         """note : recomputing dispersion with another frequency array might
                                   result in a completely different dispersion curve in case
-                                  of root search failure """
+                                  of root search failure
+                                reducing with h and ddc parameters may help """
+
                         waves, types, modes, freqs, _ = ds[0]
+
                         overwaves, overtypes, overmodes, _, _ = zip(
                             *list(groupbywtm(waves, types, modes, freqs, np.arange(len(freqs)), None, True)))
-                        overfreqs = [freqspace(0.6 * min(freqs), 1.4 * max(freqs), 100, "plog") for _ in
-                                     range(len(overwaves))]
+
+                        if "-overmode" in argv.keys():
+                            overmode_max = int(argv["-overmode"][0])
+                            assert 1 <= overmode_max <= 10
+                            unique_wave_types = np.unique([w+"/"+t for w, t in zip(overwaves, overtypes)])
+                            for wt in unique_wave_types:
+                                w, t = wt.split('/')
+                                max_mode = overmodes[(overwaves == w) & (overtypes == t)].max()
+                                ax = rd.axdisp['%s%s%d' % (w, t, max_mode)]
+                                ax_title = ax.get_title()
+                                for extra_mode in list(range(max_mode + 1, overmode_max + 1)):
+                                    # fake axe identical to existing one
+                                    rd.axdisp['%s%s%d' % (w, t, extra_mode)] = ax
+                                    ax_title += '/%s%s%d' % (w, t, extra_mode)
+
+                                    # new collection for the overmodes
+                                    rd.dispcoll['%s%s%d' % (w, t, extra_mode)] = \
+                                        {'segments': [], 'colorvalues': []}
+
+                                    overwaves = np.concatenate((overwaves, [w], ))
+                                    overtypes = np.concatenate((overtypes, [t], ))
+                                    overmodes = np.concatenate((overmodes, [extra_mode], ))
+                                ax.set_title(ax_title)
+
+                        overfreqs = [freqspace(0.6 * min(freqs), 1.4 * max(freqs), 100, "plog")
+                                     for _ in range(len(overwaves))]
+
                         overwaves, overtypes, overmodes, overfreqs = \
                             igroupbywtm(overwaves, overtypes, overmodes, overfreqs)
-                        for llk, (mms, dds) in zip(llks[::-1],
-                                                   overdisp(ms[::-1],
-                                                            overwaves, overtypes, overmodes, overfreqs,
-                                                            verbose=verbose, **mapkwargs)):
+
+                        ddc = float(argv['-ddc'][0]) if "-ddc" in argv.keys() else default_ddc
+                        hstep = float(argv['-hstep'][0]) if "-hstep" in argv.keys() else default_hstep
+                        
+                        overdisp_results = overdisp(
+                            ms[::-1],
+                            overwaves, overtypes, overmodes, overfreqs,
+                            verbose=verbose,
+                            h=hstep, 
+                            ddc=ddc,
+                            **mapkwargs)
+
+                        for llk, (mms, dds) in zip(llks[::-1], overdisp_results):
+
                             # rd.plotmodel(color=clr, alpha=1.0, linewidth=3, *mms)
                             rd.addmodel(colorvalue=llk, *mms)
                             try:
                                 # rd.plotdisp(color=clr, alpha=1.0, linewidth=3, *dds)
                                 rd.adddisp(colorvalue=llk, *dds)
-                            except KeyboardInterrupt:
-                                raise
                             except Exception as e:
-                                print("Error : could not plot dispersion curve (%s)" % str(e))
+                                print("Error : could not plot dispersion curve:", type(e), str(e))
 
                         # cb = makecolorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'])
                         # pos = rd.axdisp[-1].get_position()
@@ -216,7 +272,9 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
                     rd.showdepthcoll(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], alpha=1.0, linewidth=3)
                     rd.colorbar(vmin=vmin, vmax=vmax, cmap=argv['-cmap'], label="log likelihood", orientation="horizontal")
                     # print rd.cax.get_position()
-                    rd.cax.set_xticklabels(rd.cax.get_xticklabels(), rotation=90., horizontalalignment="center")
+                    plt.setp(
+                        rd.cax.get_xticklabels(),
+                        rotation=90., horizontalalignment="center")
 
                 # ---- display posterior pdf
                 if "-pdf" in argv.keys():
@@ -419,11 +477,12 @@ def _display_function(rootname, argv, verbose, mapkwargs, fig=None, return_fig=F
     else:
         plt.ion()
         plt.show()
-        input('pause : press enter to see the next figure, (do not close the figure please!!!)')
+        input('pause')
         # showme()
 
     if return_fig:
         return rd.fig  # caution not for parallel apps
+
     else:
         plt.close(rd.fig)
 
@@ -473,12 +532,24 @@ def display(argv, verbose, mapkwargs):
             # display mode, cannot parallelize
             fig = None
             for rootname in rootnames:
+
+                if fig is not None:
+                    if not is_figure_open(fig):
+                        # the user has closed the figure, reinitialize from None
+                        fig = None
+                    else:
+                        # reuse the current figure to save initialization time
+                        pass
+
                 fig = _display_function(
-                    rootname, argv=argv, verbose=verbose, mapkwargs=mapkwargs, fig=fig, return_fig=True)
+                    rootname, argv=argv, verbose=verbose, mapkwargs=mapkwargs,
+                    fig=fig, return_fig=True)
         else:
             def gen():
                 for rootname in rootnames:
-                    yield Job(rootname, argv, verbose=verbose, mapkwargs=mapkwargs, return_fig=False)
+                    yield Job(rootname, argv,
+                              verbose=verbose, mapkwargs=mapkwargs,
+                              return_fig=False)
 
             with MapAsync(_display_function, gen(), **mapkwargs) as ma:
                 for _ in ma:

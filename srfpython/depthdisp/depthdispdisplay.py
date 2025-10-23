@@ -1,5 +1,6 @@
+import os
 from srfpython.standalone.display import plt, gcf, gca, pause, showme, Ntick, logtick, makecolorbar
-from srfpython.depthdisp.dispcurves import surf96reader, mklaws
+from srfpython.depthdisp.dispcurves import surf96reader_from_surf96string, surf96reader, mklaws
 from srfpython.depthdisp.depthmodels import depthmodel1D, depthmodel_from_mod96
 from matplotlib.collections import LineCollection
 import numpy as np
@@ -41,7 +42,11 @@ class DepthDispDisplay(object):
                 ax.yaxis.tick_right()
         else:
             # adjust the suplots according to the target data
-            s = surf96reader(targetfile)
+            if os.path.isfile(targetfile):
+                s = surf96reader(targetfile)
+            elif "SURF96" in targetfile:
+                s = surf96reader_from_surf96string(targetfile)
+
             Ndisp = max([4, len(list(s.wtm()))])
 
             self.axdisp = {}
@@ -49,11 +54,12 @@ class DepthDispDisplay(object):
             wtms = list(s.wtm())
             for n, (w, t, m) in enumerate(wtms):
 
-                ax = self.fig.add_subplot(Ndisp, 5, (n+1)*5,
-                                          title="%s%s%d" % (w, t, m),
-                                          sharex=share, sharey=share,
-                                          #ylabel="velocity (km/s)")
-                                          ylabel="%s (%s/%s)" % (["grpvel", "phsvel"][int(t=="C")], self.dist_unit, self.time_unit))
+                ax = self.fig.add_subplot(
+                    Ndisp, 5, (n+1)*5,
+                    title="%s%s%d" % (w, t, m),
+                    sharex=share, sharey=share,
+                    ylabel="%s (%s/%s)" % (["grpvel", "phsvel"][int(t=="C")],
+                                           self.dist_unit, self.time_unit))
                 ax.yaxis.set_label_position("right")
                 ax.yaxis.tick_right()
 
@@ -138,8 +144,12 @@ class DepthDispDisplay(object):
             **kwargs
             )
 
-    def plot_depthmodel(self, dm, which, **kwargs):
-        raise NotImplementedError
+    def plot_depthmodel(self, dm, **kwargs):
+        self.plotmodel(
+            dm.vp.ztop(),
+            dm.vp.values, dm.vs.values, dm.rh.values,
+            **kwargs
+            )
 
     def plotmodel(self, ztop, vp, vs, rh, color="k", alpha=0.2,
                   showvp=True, showvs=True, showrh=True, showpr=True,
@@ -349,7 +359,9 @@ class DepthDispDisplay(object):
 
         for law in mklaws(waves, types, modes, freqs / time_scale , values * dist_scale / time_scale, dvalues=None):
             key = "%s%s%d" % (law.wave.upper(), law.type.upper(), law.mode)
+
             coll = self.dispcoll[key]
+
             if self.period:
                 coll['segments'].append(np.column_stack((1. / law.freq, law.value)))
             else:
@@ -370,7 +382,15 @@ class DepthDispDisplay(object):
             ax.add_collection(lc)
 
     def showdispcoll(self, vmin, vmax, cmap, **kwargs):
-        for key, ax in self.axdisp.items():
+        # sort by decreasing mode if several modes are displayed on the same axis (overmode)
+        keys = list(self.axdisp.keys())
+        waves, types, modes = zip(*[(wts[0], wts[1], wts[2]) for wts in keys])
+        waves, types, modes = [np.array(_) for _ in [waves, types, modes]]
+        i = np.lexsort((1000 - modes.astype(int), types, waves))
+
+        for key in np.array(keys)[i]:
+            print(key)
+            ax = self.axdisp[key]
             coll = self.dispcoll[key]
 
             segments = coll['segments']
@@ -482,7 +502,12 @@ class DepthDispDisplaySI(DepthDispDisplay):
     
     def tick(self):
         for _, ax in self.axdisp.items():
-            pass  # logtick(ax, "xy")
+            logtick(ax, "xy")
+            plt.setp(ax.get_yticklabels(),
+                     rotation=-90,
+                     ha="left", va="center",
+                     fontsize=4)
+            ax.tick_params(axis='y', which='major', pad=0)
 
         for _, ax in self.axdepth.items():
             if ax is not None:
@@ -497,7 +522,14 @@ class DepthDispDisplayCompactSI(DepthDispDisplayCompact):
     
     def tick(self):
         for _, ax in self.axdisp.items():
-            pass  # logtick(ax, "xy")
+            logtick(ax, "xy")
+            plt.setp(ax.get_yticklabels(),
+                     rotation=-90,
+                     ha="left", va="center",
+                     fontsize=4)
+            ax.tick_params(axis='y', which='major', pad=0)
+
+
 
         for _, ax in self.axdepth.items():
             if ax is not None:

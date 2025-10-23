@@ -84,5 +84,6 @@ setuptools.setup(
              'srfpython/bin/s96',
              'srfpython/bin/HerrMet',
              'srfpython/bin/sker17',
+             'srfpython/bin/poisson.py',
              'srfpython/bin/quickdisp.py',
-            ])
+             ])

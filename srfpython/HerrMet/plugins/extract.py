@@ -269,7 +269,7 @@ def extract(argv, verbose, mapkwargs):
                     rootname, extract_mode, extract_limit,
                     extract_llkmin, extract_step,
                     verbose,
-                    percentiles=[.16, .5, .84],
+                    percentiles=[0.01, 0.05, 0.16, 0.5, 0.84, 0.95, 0.99], #[.16, .5, .84],
                     mapkwargs=mapkwargs)
 
         with MapAsync(_extract_pdf, gen(), **mapkwargs) as ma:

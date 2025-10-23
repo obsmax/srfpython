@@ -13,4 +13,6 @@ cd inversion || exit 1;
 HerrMet -w 12 --run  \
     -mode restart \
     -nchain 2 \
-    -nkeep 1000
+    -nkeep 1000 \
+    -timeout 60
+

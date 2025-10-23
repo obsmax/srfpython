@@ -208,11 +208,11 @@ class FrequencyInterpolator(object):
 
                 if period:
                     ax.plot([1. / f, 1. / f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-",
-                            color=hdl.get_color())
+                            color=hdl.get_color(), alpha=hdl.get_alpha())
 
                 else:
                     ax.plot([f, f], [val * np.exp(-dval / val), val * np.exp(+dval / val)], "_-",
-                            color=hdl.get_color())
+                            color=hdl.get_color(), alpha=hdl.get_alpha())
 
         return hdl
 

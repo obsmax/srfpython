@@ -31,13 +31,15 @@ class _OverdispCore(object):
         return mms, overvalues
 
 
-def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True, **mapkwargs):
+def overdisp(ms, overwaves, overtypes, overmodes, overfreqs, verbose=True,
+             h=0.001, ddc=0.001,
+             **mapkwargs):
     """extrapolate dispersion curves"""
 
     herrmanncaller = HerrmannCallerBasis(
         waves=overwaves, types=overtypes,
         modes=overmodes, freqs=overfreqs,
-        h=0.005, ddc=0.005)
+        h=h, ddc=ddc)
 
     fun = _OverdispCore(herrmanncaller)
     gen = (Job(mms) for mms in ms)
