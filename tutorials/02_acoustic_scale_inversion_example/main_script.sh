@@ -30,7 +30,7 @@ HerrMet --display -si
 
 echo "# =========== Run the inversion for all parameterizations"
 echo "HerrMet --HerrMet --run"
-HerrMet -w 8 --run _HerrMet_?layers -mode restart -nchain 2 -nkeep 2000 
+HerrMet -w 8 --run _HerrMet_?layers -mode restart -nchain 2 -nkeep 2000 -timeout 60
 
 echo "# =========== Display results"
 echo "HerrMet --HerrMet --display"
