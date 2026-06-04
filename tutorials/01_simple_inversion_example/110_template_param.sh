@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-HerrMet --param 9 3. -t mZVSPRRH -op \
-    -dvp -.5 1.5 \
-    -dvs -.5 1.5 \
-    -drh -0. 1. \
-    -dpr -1.0 0.
 
+# HerrMet --param -help
 #--param      i f     generate a template parameter file to custom in .
 #                     need the number of layers and bottom depth in km
 #    -basedon s       build parametrization based on an existing mod96 file, require a filename, 
@@ -38,4 +34,10 @@ HerrMet --param 9 3. -t mZVSPRRH -op \
 #    -dpr     f f     add prior constraint on the vp/vs offset between layers, idem, no unit
 #    -growing         shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0.
 #    -op              force overwriting ./_HerrMet.param if exists
-#    
+
+
+HerrMet --param 9 3. -t mZVSPRRH -op \
+    -dvp -.5 1.5 \
+    -dvs -.5 1.5 \
+    -drh -0. 1. \
+    -dpr -1.0 0.

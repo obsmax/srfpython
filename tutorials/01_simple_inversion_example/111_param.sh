@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# A template parameter (./_HerrMet.param) file has been generated in 110 for editing
+# here I overwrite it using this script for demo
+
 cat << END > _HerrMet.param
 #met  NLAYER = 9
 #met  TYPE = 'mZVSPRRH'
