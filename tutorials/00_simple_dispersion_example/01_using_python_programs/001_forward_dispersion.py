@@ -28,7 +28,8 @@ curves = [Curve(wave='R', type='U', mode=0, freqs=f),
           Curve(wave='L', type='C', mode=1, freqs=f)]
 
 # compute dispersion curves and display
-hc = HerrmannCaller(curves=curves)
+hc = HerrmannCaller(curves=curves, h=0.005, ddc=0.005)
+
 curves_out = hc(
     ztop=dm.vp.z,
     vp=dm.vp.values, 
