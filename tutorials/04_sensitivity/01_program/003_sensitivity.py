@@ -59,11 +59,11 @@ norm=True
 sker_gen = sker17_2(
     depthmodel=dm, 
     curves=curves,
-    dz=0.00001, dlogvs=0.01, dlogpr=0.01, dlogrh=0.01, norm=norm,
+    dz=0.00001, dlogvs=0.01, dlogpr=0.01, dlogrh=0.01, dlogvp=0.01, norm=norm,
     h=0.005, ddc=0.005)  
 
 # ===================    
-for wave, typ, mode, freqs, dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh in sker_gen:
+for wave, typ, mode, freqs, dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp in sker_gen:
 
     # sensitivity kernel
     z_edges = np.hstack((dm.vp.z, [1.1 * dm.vp.z[-1]])) * 1000.  # m
@@ -72,16 +72,16 @@ for wave, typ, mode, freqs, dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh i
 
     if not norm:
         # mask half space because it integrates the sensitivity over very thick layer => overestimated sensitivity
-        for _ in dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh:
+        for _ in dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp:
             _[-1, :] = np.nan
-        dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh = \
+        dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp = \
             [np.ma.masked_where(np.isnan(_), _) \
-             for _ in [dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh]]
+             for _ in [dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp]]
 
     cmap = tomocmap1(w=0.01, W=0.2)  # cccfcmap3() #plt.cm.RdBu
-    for M, p, q in zip([dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh],
-                       ["Z^{top}_i", "ln Vs_i", "ln (Vp/Vs)_i", r"ln \rho _i"],
-                       ["Ztop", "lnVs", "lnVpaVs", "lnrho"]):
+    for M, p, q in zip([dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp],
+                       ["Z^{top}_i", "ln Vs_i", "ln (Vp/Vs)_i", r"ln \rho _i", r"ln Vp_i"],
+                       ["Ztop", "lnVs", "lnVpaVs", "lnrho", "lnVp"]):
                            
         # ==== display
         fig1 = plt.figure(figsize=(8,8))

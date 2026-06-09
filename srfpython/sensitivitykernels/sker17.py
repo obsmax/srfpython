@@ -1,11 +1,12 @@
 #!/usr/bin/env python
+from typing import List
 from builtins import input
 
 import sys
 import numpy as np
 
 from srfpython.depthdisp.dispcurves import freqspace
-from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
+from srfpython.depthdisp.depthmodels import depthmodel, depthmodel_from_mod96
 from srfpython.Herrmann.Herrmann import Timer, groupbywtm, igroupbywtm, CPiSDomainError
 from srfpython.Herrmann.Herrmann import HerrmannCallerBasis, HerrmannCallerFromGroupedLists
 from srfpython.Herrmann.Herrmann import Curve
@@ -39,10 +40,14 @@ def lognofail(x):
         return ilognofail(x)
 
 
-def sker17(ztop, vp, vs, rh,
-    waves, types, modes, freqs,
-    dz=0.001, dlogvs=0.01, dlogpr=0.01, dlogrh=0.01, norm=True,
-    h=0.005, ddc=0.005):
+def sker17(
+        ztop: np.ndarray, vp: np.ndarray, vs: np.ndarray, rh: np.ndarray,
+        waves: np.ndarray, types: np.ndarray, modes: np.ndarray, freqs: np.ndarray,
+        dz: float=0.001, dlogvs: float=0.01, dlogpr: float=0.01, dlogrh: float=0.01,
+        dlogvp: float=0.01,
+        norm: bool=True,
+        h: float=0.005, ddc: float=0.005):
+
     """sker17 : compute finite difference sensitivity kernels for surface waves dispersion curves 
     input: 
         -> depth model
@@ -56,11 +61,17 @@ def sker17(ztop, vp, vs, rh,
         dlogvs = increment to apply to the logarithm of vs
         dlogpr = increment to apply to the logarithm of vp/vs
         dlogrh = increment to apply to the logarithm of rho
-        norm = if True, I divide the sensitivity values by the thickness of each layer
-                => this corrects for the difference of sensitivity due to the variable thicknesss
+        norm:
+            if False: no layer thickness correction applied, the output kernels are
+                    dlnc)fj / dztop)zi
+                    dlnc)fj / dlnvs)zi
+                    dlnc)fj / dlnpr)zi
+                    dlnc)fj / dlnrh)zi
+            if True: The output kernels are multiplied by H / Hi
+                so that heterogeneous layer thickness are taken into account and the dimension of the kernels is preserved
 
-        -> Herrmann's parameters, see CPS documentation
-        h, dcl, dcr = passed to dispersion
+        -> Herrmann's parameters, see surf96 documentation (CPS)
+        h, ddc = passed to dispersion
 
     output:
         -> yields a tuple (w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH) for each wave, type and mode
@@ -86,26 +97,36 @@ def sker17(ztop, vp, vs, rh,
     H = np.array(ztop) # NOT ASARRAY
     H[:-1], H[-1] = H[1:] - H[:-1], np.inf #layer thickness in km
 
-    model0 = np.concatenate((ztop, np.log(vs), np.log(vp/vs), np.log(rh)))
-    dmodel = np.concatenate((dz * np.ones_like(ztop),
-                             dlogvs * np.ones_like(vs),
-                             dlogpr * np.ones_like(vs),
-                             dlogrh * np.ones_like(rh)))
+    model0 = np.concatenate((ztop, np.log(vs), np.log(vp/vs), np.log(rh), np.log(vp)))
+    dmodel = np.concatenate((dz     * np.ones_like(ztop),
+                             dlogvs * np.ones_like(ztop),
+                             dlogpr * np.ones_like(ztop),
+                             dlogrh * np.ones_like(ztop),
+                             dlogvp * np.ones_like(ztop),
+                             ))
 
     logvalues0 = lognofail(herrmanncaller.disperse(ztop, vp, vs, rh))
 
-    IZ = np.arange(nlayer)
-    IVS = np.arange(nlayer, 2*nlayer)
+    IZ  = np.arange(0*nlayer, 1*nlayer)
+    IVS = np.arange(1*nlayer, 2*nlayer)
     IPR = np.arange(2*nlayer, 3*nlayer)
-    IRH = np.arange(3*nlayer, 4*nlayer)        
-    DVADP = np.zeros((4 * nlayer, len(waves)), float) * np.nan
+    IRH = np.arange(3*nlayer, 4*nlayer)
+    IVP = np.arange(4*nlayer, 5*nlayer)
+    assert (dmodel[IZ]  == dz).all()
+    assert (dmodel[IVS] == dlogvs).all()
+    assert (dmodel[IPR] == dlogpr).all()
+    assert (dmodel[IRH] == dlogrh).all()
+    assert (dmodel[IVP] == dlogvp).all()
+
+    # allocate empty matrix for all kernels on top of each other, all dispersion points in columns
+    DVADP = np.zeros((5 * nlayer, len(waves)), float) * np.nan
 
     # ----
     # parallel
     # ----
     def fun(i, modeli):
-        ztopi, logvsi, logpri, logrhi = \
-            modeli[IZ], modeli[IVS], modeli[IPR], modeli[IRH]
+        ztopi, logvsi, logpri, logrhi, logvpi = \
+            modeli[IZ], modeli[IVS], modeli[IPR], modeli[IRH], modeli[IVP]
         n = len(ztopi)
         ilayer = i % n
         H = ztop[-1] - ztop[0]
@@ -114,49 +135,57 @@ def sker17(ztop, vp, vs, rh,
         else:
             Hi = ztopi[ilayer + 1] - ztopi[ilayer]
 
+        if  2 * n <= i < 3 * n:
+            # we are perturbing vp/vs not vp
+            vpi = np.exp(logvsi + logpri)
+        else:
+            vpi = np.exp(logvpi)
+
         try:
             logvaluesi = lognofail(herrmanncaller.disperse(
-                ztopi, np.exp(logvsi + logpri),
-                np.exp(logvsi), np.exp(logrhi)))
+                ztopi,
+                vpi,
+                np.exp(logvsi),
+                np.exp(logrhi)))
         except CPiSDomainError as err:
             print("error during gradient computation %s" % str(err))
             return i, None
-        except:
-            raise
+
+        # absolute sensitivity regardless the thickness differences
+        DVAVPi = (logvaluesi - logvalues0) / (modeli[i] - model0[i])
         if norm:
             # sensitivity corrected from the layer thicknesses
-            DVAVPi = (logvaluesi - logvalues0) / (modeli[i] - model0[i]) * H / Hi
-        else:
-            # absolute sensitivity regardless the thickness differences
-            DVAVPi = (logvaluesi - logvalues0) / (modeli[i] - model0[i])
+            DVAVPi *= H / Hi
 
         return i, DVAVPi
 
     def gen():
-        for i in range(1, 4 * len(ztop)):
+        # loop over layers, then parameters. skip depth of surface
+        for i in range(1, 5 * len(ztop)):
             modeli = model0.copy()
             modeli[i] += dmodel[i]
             yield Job(i, modeli)
 
     with MapSync(fun, gen()) as ma:
         for _, (i, DVAVPi), _, _ in ma:
-            if DVAVPi is None: continue
+            if DVAVPi is None:
+                continue
             DVADP[i, :] = DVAVPi
 
     for w, t, m, F, Iwtm in groupbywtm(waves, types, modes, freqs, np.arange(len(waves))):
-        DLOGVADZ = DVADP[IZ, :][:, Iwtm]
-        DLOGVADLOGPR = DVADP[IPR, :][:, Iwtm]
+        DLOGVADZ     = DVADP[IZ,  :][:, Iwtm]
         DLOGVADLOGVS = DVADP[IVS, :][:, Iwtm]
+        DLOGVADLOGPR = DVADP[IPR, :][:, Iwtm]
         DLOGVADLOGRH = DVADP[IRH, :][:, Iwtm]
-        DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH = \
-            [np.ma.masked_where(np.isnan(_), _) for _ in
-             [DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH]]
-        
-        
-        # TEST
+        DLOGVADLOGVP = DVADP[IVP, :][:, Iwtm]
 
-        
-        yield w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH
+        DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH, DLOGVADLOGVP = \
+            [np.ma.masked_where(np.isnan(_), _) for _ in
+             [DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH, DLOGVADLOGVP]]
+
+        # DLOGVADLOGVP = 1. / (1. / DLOGVADLOGPR + 1. / DLOGVADLOGVS / vp[:, None])
+        # TEST
+        yield w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH, DLOGVADLOGVP
 
 
 def sker17_1(ztop, vp, vs, rh,
@@ -176,7 +205,7 @@ def sker17_1(ztop, vp, vs, rh,
         yield tup
 
 
-def sker17_2(depthmodel, curves, **kwargs):
+def sker17_2(depthmodel: depthmodel, curves: List[Curve], **kwargs):
     """sker17_2 : same as sker17 with same arguments as HerrmannCaller
     
     see sker17 for detailed input and output arguments
@@ -188,10 +217,6 @@ def sker17_2(depthmodel, curves, **kwargs):
     rh = depthmodel.rh.values
     
     Waves, Types, Modes, Freqs = zip(*[(curve.wave, curve.type, curve.mode, curve.freqs) for curve in curves])
-    print(Waves)
-    print(Types)    
-    print(Modes)        
-    print(Freqs)            
     waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
     
     for tup in sker17(ztop, vp, vs, rh,
