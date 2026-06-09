@@ -279,13 +279,12 @@ class HerrmannCallerBasis(object):
         if (np.isinf(ztop) | np.isnan(ztop)).any():
             raise CPiSDomainError('got inapropriate values for Z (%s)' % str(ztop))
 
-        Ibad = (ztop[1:] - ztop[:-1] < 0.001)
+        Ibad = ((ztop[1:] - ztop[:-1]) / ztop[-1] < 0.001)
         if Ibad.any():
             H = ztop[1:] - ztop[:-1]
             raise CPiSDomainError(
                 'Z must be growing, layers must be at least '
-                '0.001km thick, got %s (%s), '
-                'please consider scaling your model' % (str(ztop), str(H[Ibad])))
+                '0.001 times the finite layer, got %s (%s)' % (str(ztop), str(H[Ibad])))
 
         if (np.isinf(vs) | np.isnan(vs)).any():
             raise CPiSDomainError('vs value error %s' % str(vs))
@@ -454,6 +453,14 @@ class HerrmannCaller(HerrmannCallerBasis):
             curve.freqs, curve.values = curve.freqs[~I], curve.values[~I]
             curves_out.append(curve)
         return curves_out
+
+    def call_dm(self, depthmodel: "Depthmodel", keepnans=False):
+        return self.__call__(
+            ztop=depthmodel.vp.ztop(), 
+            vp=depthmodel.vp.values, 
+            vs=depthmodel.vs.values, 
+            rh=depthmodel.rh.values, 
+            keepnans=keepnans)
 
 
 class HerrmannCallerFromGroupedLists(HerrmannCaller):
