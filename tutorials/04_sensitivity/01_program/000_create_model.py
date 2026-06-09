@@ -14,7 +14,6 @@ vs = (3.5 - .86) / (ztop[-1] - ztop[0]) * (ztop - 0.) + .86 + \
      .1 * np.cos(2. * np.pi * ztop / 2.) + \
      .15 * np.cos(2. * np.pi * ztop / 3.)
 
-# infer vp and rh from vs using Brocher 2005 empirical laws
 vp, rh = brocher2005(vs)
 
 # create the depthmodel object, use a subclass that is to be intitiated with arrays

@@ -1,13 +1,19 @@
 #!/usr/bin/env python
 from builtins import input
 
+import sys
 import numpy as np
+
+from srfpython.depthdisp.dispcurves import freqspace
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
 from srfpython.Herrmann.Herrmann import Timer, groupbywtm, igroupbywtm, CPiSDomainError
 from srfpython.Herrmann.Herrmann import HerrmannCallerBasis, HerrmannCallerFromGroupedLists
-from srfpython.utils import minmax
+from srfpython.Herrmann.Herrmann import Curve
+from srfpython.utils import minmax, readargv
 from srfpython.standalone.cmaps import cccfcmap3, tomocmap1
 from srfpython.standalone.multipro8 import MapSync, Job
 from srfpython.standalone.display import logtick, textonly
+from srfpython.standalone.display import plt
 
 """
 srfker17, Maximilien Lehujeur, 01/11/2017
@@ -62,10 +68,10 @@ def sker17(ztop, vp, vs, rh,
         t      = string, type letter (C = phase or U = group)
         m      = int, mode number (0= fundamental)
         F      = array, 1D, frequency array in Hz
-        DLOGVADZ  = array, 2D, [normed] sensitivity kernel relative to top depth of each layer (lines) and frequency (columns)
-        DLOGVADLOGVS  = array, 2D, [normed] sensitivity kernel relative to Pwave velocity of each layer (lines) and frequency (columns)
-        DLOGVADLOGPR  = array, 2D, [normed] sensitivity kernel relative to Swave velocity of each layer (lines) and frequency (columns)
-        DLOGVADLOGRH  = array, 2D, [normed] sensitivity kernel relative to density of each layer (lines) and frequency (columns)                
+        DLOGVADZ  = array, 2D, [normalized] sensitivity kernel relative to top depth of each layer (lines) and frequency (columns)
+        DLOGVADLOGVS  = array, 2D, [normalized] sensitivity kernel relative to Pwave velocity of each layer (lines) and frequency (columns)
+        DLOGVADLOGPR  = array, 2D, [normalized] sensitivity kernel relative to Swave velocity of each layer (lines) and frequency (columns)
+        DLOGVADLOGRH  = array, 2D, [normalized] sensitivity kernel relative to density of each layer (lines) and frequency (columns)                
                  note that these arrays might contain nans
     see also :
         sker17_1
@@ -146,6 +152,10 @@ def sker17(ztop, vp, vs, rh,
             [np.ma.masked_where(np.isnan(_), _) for _ in
              [DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH]]
         
+        
+        # TEST
+
+        
         yield w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH
 
 
@@ -166,9 +176,31 @@ def sker17_1(ztop, vp, vs, rh,
         yield tup
 
 
-# -----------------------------
-if __name__ == "__main__":
-    import sys
+def sker17_2(depthmodel, curves, **kwargs):
+    """sker17_2 : same as sker17 with same arguments as HerrmannCaller
+    
+    see sker17 for detailed input and output arguments
+    """
+    
+    ztop = depthmodel.vp.ztop()
+    vp = depthmodel.vp.values
+    vs = depthmodel.vs.values
+    rh = depthmodel.rh.values
+    
+    Waves, Types, Modes, Freqs = zip(*[(curve.wave, curve.type, curve.mode, curve.freqs) for curve in curves])
+    print(Waves)
+    print(Types)    
+    print(Modes)        
+    print(Freqs)            
+    waves, types, modes, freqs = igroupbywtm(Waves, Types, Modes, Freqs)
+    
+    for tup in sker17(ztop, vp, vs, rh,
+            waves, types, modes, freqs, 
+            **kwargs):
+        yield tup
+
+
+def main():
 
     help = '''sker17
     -m96          depthmodel to read 
@@ -187,12 +219,6 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         print(help)
         sys.exit()
-
-    from srfpython.standalone.display import plt
-    from srfpython.utils import readargv
-    from srfpython.depthdisp.dispcurves import freqspace
-    from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
-    import numpy as np
 
     argv = readargv()
     # -----------------------------------:
@@ -245,13 +271,14 @@ if __name__ == "__main__":
     if not png:
         fig1.show()
 
-    for w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH in \
-            sker17_1(ztop, vp, vs, rh,
+    sker_gen = sker17_1(ztop, vp, vs, rh,
                      Waves, Types, Modes, Freqs,
                      dz=0.001, dlogvs=.01,
                      dlogpr=.01, dlogrh=.01, norm=norm,
-                     h=0.005, ddc=0.005):
-
+                     h=0.005, ddc=0.005)
+                     
+    for w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH in sker_gen:
+            
         # ------
         z_edges = np.hstack((ztop, [1.1 * ztop[-1]]))
         z_mid = np.hstack((0.5 * (ztop[1:] + ztop[:-1]), [1.05 * ztop[-1]]))
@@ -328,3 +355,7 @@ if __name__ == "__main__":
     if "png" not in argv.keys():
         input('bye')
 
+
+# -----------------------------
+if __name__ == "__main__":
+    main()
