@@ -43,8 +43,7 @@ def lognofail(x):
 def sker17(
         ztop: np.ndarray, vp: np.ndarray, vs: np.ndarray, rh: np.ndarray,
         waves: np.ndarray, types: np.ndarray, modes: np.ndarray, freqs: np.ndarray,
-        dz: float=0.001, dlogvs: float=0.01, dlogpr: float=0.01, dlogrh: float=0.01,
-        dlogvp: float=0.01,
+        dlogz: float=0.001, dlogvp: float=0.01, dlogvs: float=0.01, dlogrh: float=0.01,
         norm: bool=True,
         h: float=0.005, ddc: float=0.005):
 
@@ -57,15 +56,15 @@ def sker17(
         waves, types, modes, freqs : lists or arrays, see dispersion
 
         -> sensitivity kernel computation
-        dz = depth increment in km
-        dlogvs = increment to apply to the logarithm of vs
-        dlogpr = increment to apply to the logarithm of vp/vs
-        dlogrh = increment to apply to the logarithm of rho
+        dlogz  = relative z increment, dimless
+        dlogvp = relative vp increment, dimless
+        dlogvs = relative vs increment, dimless
+        dlogrh = relative rh increment, dimless
         norm:
             if False: no layer thickness correction applied, the output kernels are
                     dlnc)fj / dztop)zi
+                    dlnc)fj / dlnvp)zi
                     dlnc)fj / dlnvs)zi
-                    dlnc)fj / dlnpr)zi
                     dlnc)fj / dlnrh)zi
             if True: The output kernels are multiplied by H / Hi
                 so that heterogeneous layer thickness are taken into account and the dimension of the kernels is preserved
@@ -80,8 +79,8 @@ def sker17(
         m      = int, mode number (0= fundamental)
         F      = array, 1D, frequency array in Hz
         DLOGVADZ  = array, 2D, [normalized] sensitivity kernel relative to top depth of each layer (lines) and frequency (columns)
-        DLOGVADLOGVS  = array, 2D, [normalized] sensitivity kernel relative to Pwave velocity of each layer (lines) and frequency (columns)
-        DLOGVADLOGPR  = array, 2D, [normalized] sensitivity kernel relative to Swave velocity of each layer (lines) and frequency (columns)
+        DLOGVADLOGVP  = array, 2D, [normalized] sensitivity kernel relative to Pwave velocity of each layer (lines) and frequency (columns)
+        DLOGVADLOGVS  = array, 2D, [normalized] sensitivity kernel relative to Swave velocity of each layer (lines) and frequency (columns)
         DLOGVADLOGRH  = array, 2D, [normalized] sensitivity kernel relative to density of each layer (lines) and frequency (columns)                
                  note that these arrays might contain nans
     see also :
@@ -97,37 +96,38 @@ def sker17(
     H = np.array(ztop) # NOT ASARRAY
     H[:-1], H[-1] = H[1:] - H[:-1], np.inf #layer thickness in km
 
-    model0 = np.concatenate((ztop, np.log(vs), np.log(vp/vs), np.log(rh), np.log(vp)))
-    dmodel = np.concatenate((dz     * np.ones_like(ztop),
-                             dlogvs * np.ones_like(ztop),
-                             dlogpr * np.ones_like(ztop),
-                             dlogrh * np.ones_like(ztop),
+    model0 = np.concatenate(([0], np.log(ztop[1:]), np.log(vp), np.log(vs), np.log(rh)))
+    dmodel = np.concatenate((dlogz  * np.ones_like(ztop),
                              dlogvp * np.ones_like(ztop),
+                             dlogvs * np.ones_like(ztop),
+                             dlogrh * np.ones_like(ztop),
                              ))
 
     logvalues0 = lognofail(herrmanncaller.disperse(ztop, vp, vs, rh))
 
     IZ  = np.arange(0*nlayer, 1*nlayer)
-    IVS = np.arange(1*nlayer, 2*nlayer)
-    IPR = np.arange(2*nlayer, 3*nlayer)
+    IVP = np.arange(1*nlayer, 2*nlayer)
+    IVS = np.arange(2*nlayer, 3*nlayer)
     IRH = np.arange(3*nlayer, 4*nlayer)
-    IVP = np.arange(4*nlayer, 5*nlayer)
-    assert (dmodel[IZ]  == dz).all()
-    assert (dmodel[IVS] == dlogvs).all()
-    assert (dmodel[IPR] == dlogpr).all()
-    assert (dmodel[IRH] == dlogrh).all()
+
+    assert (dmodel[IZ]  == dlogz).all()
     assert (dmodel[IVP] == dlogvp).all()
+    assert (dmodel[IVS] == dlogvs).all()
+    assert (dmodel[IRH] == dlogrh).all()
 
     # allocate empty matrix for all kernels on top of each other, all dispersion points in columns
-    DVADP = np.zeros((5 * nlayer, len(waves)), float) * np.nan
+    DVADP = np.zeros((4 * nlayer, len(waves)), float) * np.nan
 
     # ----
     # parallel
     # ----
     def fun(i, modeli):
-        ztopi, logvsi, logpri, logrhi, logvpi = \
-            modeli[IZ], modeli[IVS], modeli[IPR], modeli[IRH], modeli[IVP]
-        n = len(ztopi)
+        logztopi, logvpi, logvsi, logrhi = \
+            modeli[IZ], modeli[IVP], modeli[IVS], modeli[IRH]
+        n = len(logztopi)
+        ztopi = np.exp(logztopi)
+        ztopi[0] = 0.
+
         ilayer = i % n
         H = ztop[-1] - ztop[0]
         if ilayer == n-1:
@@ -135,16 +135,10 @@ def sker17(
         else:
             Hi = ztopi[ilayer + 1] - ztopi[ilayer]
 
-        if  2 * n <= i < 3 * n:
-            # we are perturbing vp/vs not vp
-            vpi = np.exp(logvsi + logpri)
-        else:
-            vpi = np.exp(logvpi)
-
         try:
             logvaluesi = lognofail(herrmanncaller.disperse(
                 ztopi,
-                vpi,
+                np.exp(logvpi),
                 np.exp(logvsi),
                 np.exp(logrhi)))
         except CPiSDomainError as err:
@@ -161,7 +155,7 @@ def sker17(
 
     def gen():
         # loop over layers, then parameters. skip depth of surface
-        for i in range(1, 5 * len(ztop)):
+        for i in range(1, 4 * len(ztop)):
             modeli = model0.copy()
             modeli[i] += dmodel[i]
             yield Job(i, modeli)
@@ -173,19 +167,21 @@ def sker17(
             DVADP[i, :] = DVAVPi
 
     for w, t, m, F, Iwtm in groupbywtm(waves, types, modes, freqs, np.arange(len(waves))):
-        DLOGVADZ     = DVADP[IZ,  :][:, Iwtm]
-        DLOGVADLOGVS = DVADP[IVS, :][:, Iwtm]
-        DLOGVADLOGPR = DVADP[IPR, :][:, Iwtm]
-        DLOGVADLOGRH = DVADP[IRH, :][:, Iwtm]
+        DLOGVADLOGZ  = DVADP[IZ,  :][:, Iwtm]
         DLOGVADLOGVP = DVADP[IVP, :][:, Iwtm]
+        DLOGVADLOGVS = DVADP[IVS, :][:, Iwtm]
+        DLOGVADLOGRH = DVADP[IRH, :][:, Iwtm]
 
-        DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH, DLOGVADLOGVP = \
+
+
+        DLOGVADLOGZ, DLOGVADLOGVP, DLOGVADLOGVS, DLOGVADLOGRH = \
             [np.ma.masked_where(np.isnan(_), _) for _ in
-             [DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH, DLOGVADLOGVP]]
+             [DLOGVADLOGZ, DLOGVADLOGVP, DLOGVADLOGVS, DLOGVADLOGRH]]
 
-        # DLOGVADLOGVP = 1. / (1. / DLOGVADLOGPR + 1. / DLOGVADLOGVS / vp[:, None])
+        DLOGVADLOGPR = DLOGVADLOGVP * DLOGVADLOGVS / (DLOGVADLOGVS - DLOGVADLOGVP)  # unsure
+
         # TEST
-        yield w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH, DLOGVADLOGVP
+        yield w, t, m, F, DLOGVADLOGZ, DLOGVADLOGVP, DLOGVADLOGVS, DLOGVADLOGRH, DLOGVADLOGPR
 
 
 def sker17_1(ztop, vp, vs, rh,
@@ -241,6 +237,7 @@ def main():
                   sker17_RU0_fstart_fend_nfreq_fscale.png
                   ...
     '''
+    raise Exception('TODO : upgrade')
     if len(sys.argv) == 1:
         print(help)
         sys.exit()

@@ -59,11 +59,11 @@ norm=True
 sker_gen = sker17_2(
     depthmodel=dm, 
     curves=curves,
-    dz=0.00001, dlogvs=0.01, dlogpr=0.01, dlogrh=0.01, dlogvp=0.01, norm=norm,
+    dlogz=0.001, dlogvp=0.01, dlogvs=0.01, dlogrh=0.01, norm=norm,
     h=0.005, ddc=0.005)  
 
 # ===================    
-for wave, typ, mode, freqs, dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp in sker_gen:
+for wave, typ, mode, freqs, dlogvadlogz, dlogvadlogvp, dlogvadlogvs, dlogvadlogrh, dlogvadlogpr in sker_gen:
 
     # sensitivity kernel
     z_edges = np.hstack((dm.vp.z, [1.1 * dm.vp.z[-1]])) * 1000.  # m
@@ -72,16 +72,16 @@ for wave, typ, mode, freqs, dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, 
 
     if not norm:
         # mask half space because it integrates the sensitivity over very thick layer => overestimated sensitivity
-        for _ in dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp:
+        for _ in dlogvadlogz, dlogvadlogvp, dlogvadlogvs, dlogvadlogrh, dlogvadlogpr:
             _[-1, :] = np.nan
-        dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp = \
+        dlogvadlogz, dlogvadlogvp, dlogvadlogvs, dlogvadlogrh, dlogvadlogpr = \
             [np.ma.masked_where(np.isnan(_), _) \
-             for _ in [dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp]]
+             for _ in [dlogvadlogz, dlogvadlogvp, dlogvadlogvs, dlogvadlogrh, dlogvadlogpr]]
 
     cmap = tomocmap1(w=0.01, W=0.2)  # cccfcmap3() #plt.cm.RdBu
-    for M, p, q in zip([dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, dlogvadlogvp],
-                       ["Z^{top}_i", "ln Vs_i", "ln (Vp/Vs)_i", r"ln \rho _i", r"ln Vp_i"],
-                       ["Ztop", "lnVs", "lnVpaVs", "lnrho", "lnVp"]):
+    for M, p, q in zip([dlogvadlogz, dlogvadlogvp, dlogvadlogvs, dlogvadlogrh, dlogvadlogpr],
+                       ["ln Z^{top}_i", r"ln Vp_i", "ln Vs_i", r"ln \rho _i", "ln (Vp/Vs)_i"],
+                       ["lnZtop", "lnVp", "lnVs", "lnrho", "lnVpaVs"]):
                            
         # ==== display
         fig1 = plt.figure(figsize=(8,8))
@@ -148,7 +148,7 @@ for wave, typ, mode, freqs, dlogvadz, dlogvadlogvs, dlogvadlogpr, dlogvadlogrh, 
             ax3.invert_yaxis()
 
 
-        # ------
-        plt.show()
+    # ------
+    plt.show()
 
 # ===================
