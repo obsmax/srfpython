@@ -1,3 +1,4 @@
+from typing import Optional
 from srfpython.depthdisp.mod96 import packmod96, unpackmod96
 from srfpython.utils import discrete_time_primitive, cosTaperwidth
 from scipy.fftpack import fft, ifft, fftfreq
@@ -301,7 +302,15 @@ class depthmodel1D(object):
 
 # -------------------------------------------------
 class depthmodel(object):
-    def __init__(self, vp, vs, rh):
+    def __init__(self, 
+        vp: depthmodel1D, vs: depthmodel1D, rh: depthmodel1D, 
+        qp: Optional[depthmodel1D]=None, 
+        fp: Optional[depthmodel1D]=None,
+        etap: Optional[depthmodel1D]=None,
+        qs: Optional[depthmodel1D]=None, 
+        fs: Optional[depthmodel1D]=None,
+        etas: Optional[depthmodel1D]=None,
+        ):
         """initiate with 3 depthmodel1D objects, must have the same ztop values"""
         assert isinstance(vp, depthmodel1D)
         assert isinstance(vs, depthmodel1D)
@@ -314,7 +323,19 @@ class depthmodel(object):
         assert np.all(rh.values > 0.)
 
         self.vp, self.vs, self.rh = vp, vs, rh
-
+        
+        if isinstance(qp, depthmodel1D):
+            assert (qp.z == vp.z).all()
+            assert isinstance(etap, depthmodel1D) and (etap.z == vp.z).all()
+            assert isinstance(etas, depthmodel1D) and (etas.z == vp.z).all()            
+            assert isinstance(fp, depthmodel1D) and (fp.z == vp.z).all()
+            assert isinstance(fs, depthmodel1D) and (fs.z == vs.z).all()                   
+        else:
+            assert qp == qs == etap == etas == fp == fs == None
+        self.qp, self.qs = qp, qs
+        self.etap, self.etas = etap, etas
+        self.fp, self.fs = fp, fs
+        
     # -------------------------------------------------
     def ztop(self):
         return self.vs.ztop()
@@ -337,8 +358,12 @@ class depthmodel(object):
 
     # -------------------------------------------------
     def simplify(self):
-        # group layers with same values, return it as a new object
+        """ group layers with same values, return it as a new object"""
+        if self.qp is not None:
+            raise NotImplementedError('Attenuation not implemented')
+            
         ztop, vp, vs, rh = [self.vp.z[0]], [self.vp.values[0]], [self.vs.values[0]], [self.rh.values[0]]
+
         for i in range(1, len(self.vp)):
             if self.vp.values[i] != self.vp.values[i - 1] or \
                             self.vs.values[i] != self.vs.values[i - 1] or \
@@ -347,6 +372,7 @@ class depthmodel(object):
                 vp.append(self.vp.values[i])
                 vs.append(self.vs.values[i])
                 rh.append(self.rh.values[i])
+                
         return depthmodel( \
             depthmodel1D(ztop, vp),
             depthmodel1D(ztop, vs),
@@ -358,19 +384,34 @@ class depthmodel(object):
 
     # -------------------------------------------------
     def pr(self):
+        """obsolet name, use vp_over_vs"""
         return self.vp_over_vs()
 
     # -------------------------------------------------
     def mu(self):
+        """lame parameter"""
         return depthmodel1D(self.ztop(), self.rh.values * self.vs.values ** 2.)
 
     # -------------------------------------------------
     def lamda(self):
+        """lame parameter"""    
         return depthmodel1D(self.ztop(), self.rh.values * (self.vp.values ** 2. - 2. * self.vs.values ** 2.))
 
     # -------------------------------------------------
     def __str__(self):
-        return packmod96(self.vp.z, self.vp.values, self.vs.values, self.rh.values)
+
+        return packmod96(
+            Z=self.vp.z, 
+            VP=self.vp.values, 
+            VS=self.vs.values, 
+            RHO=self.rh.values,
+            QP=self.qp.values if self.qp is not None else None,
+            QS=self.qs.values if self.qs is not None else None,
+            ETAP=self.etap.values if self.etap is not None else None,
+            ETAS=self.etas.values if self.etas is not None else None,            
+            FREFP=self.fp.values if self.fp is not None else None,                        
+            FREFS=self.fs.values if self.fs is not None else None,                                    
+            )
 
     # -------------------------------------------------
     def write96(self, filename):
@@ -429,10 +470,20 @@ class depthmodel(object):
 
 # -------------------------------------------------
 class depthmodel_from_arrays(depthmodel):
-    def __init__(self, z, vp, vs, rh):
+    def __init__(self, z, vp, vs, rh, 
+        qp: Optional[np.ndarray]=None,
+        etap: Optional[np.ndarray]=None,
+        fp: Optional[np.ndarray]=None,
+        qs: Optional[np.ndarray]=None,
+        etas: Optional[np.ndarray]=None,
+        fs: Optional[np.ndarray]=None,                                        
+        ):
         """initiate with arrays, skip verification for same depth array"""
         assert len(z) == len(vp) == len(vs) == len(rh)
-        z, vp, vs, rh = [np.asarray(_, float) for _ in (z, vp, vs, rh)]
+
+        z, vp, vs, rh = \
+            [np.asarray(_, float) for _ in (z, vp, vs, rh)]
+            
         if not z[0] == 0:
             raise ValueError('z[0] must be 0 ({})'.format(z[0]))
         if not np.all(z[1:] > z[:-1]):
@@ -445,18 +496,43 @@ class depthmodel_from_arrays(depthmodel):
             raise ValueError('vp/vs must be larger than sqrt(4/3.)')
 
         self.vp, self.vs, self.rh = [depthmodel1D(z, _) for _ in (vp, vs, rh)]
+                                    
+        if qp is not None:
+            assert len(qp) == len(qs) \
+                == len(etap) == len(etas) \
+                == len(fp) == len(fs)
+                
+            qp, qs, etap, etas, fp, fs = [\
+                np.asarray(_, float) \
+                for _ in (qp, qs, etap, etas, fp, fs)]
+            
+            self.qp, self.qs, self.etap, self.etas, self.fp, self.fs = \
+                [depthmodel1D(z, _) for _ in (qp, qs, etap, etas, fp, fs)]
+
+        else:
+            self.qp, self.qs = None, None
+            self.etap, self.etas = None, None
+            self.fp, self.fs = None, None
 
 
 # -------------------------------------------------
 class depthmodel_from_mod96string(depthmodel):
     def __init__(self, mod96string):
-        _, Z, _, VP, VS, RHO, _, _, _, _, _, _ = \
+
+        _, Z, _, VP, VS, RHO, QP, QS, ETAP, ETAS, FREFP, FREFS = \
             unpackmod96(mod96string)
 
         depthmodel.__init__(self,
-                            vp=depthmodel1D(Z, VP),
-                            vs=depthmodel1D(Z, VS),
-                            rh=depthmodel1D(Z, RHO))
+            vp=depthmodel1D(Z, VP),
+            vs=depthmodel1D(Z, VS),
+            rh=depthmodel1D(Z, RHO),
+            qp=depthmodel1D(Z, QP),
+            qs=depthmodel1D(Z, QS),
+            etap=depthmodel1D(Z, ETAP),
+            etas=depthmodel1D(Z, ETAS),
+            fp=depthmodel1D(Z, FREFP),
+            fs=depthmodel1D(Z, FREFS),                        
+            )
 
 
 # -------------------------------------------------
