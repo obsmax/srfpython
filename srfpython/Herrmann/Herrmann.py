@@ -454,12 +454,12 @@ class HerrmannCaller(HerrmannCallerBasis):
             curves_out.append(curve)
         return curves_out
 
-    def call_dm(self, depthmodel: "Depthmodel", keepnans=False):
+    def call_dm(self, dm: "depthmodel", keepnans=False):
         return self.__call__(
-            ztop=depthmodel.vp.ztop(), 
-            vp=depthmodel.vp.values, 
-            vs=depthmodel.vs.values, 
-            rh=depthmodel.rh.values, 
+            ztop=dm.vp.ztop(),
+            vp=dm.vp.values,
+            vs=dm.vs.values,
+            rh=dm.rh.values,
             keepnans=keepnans)
 
 
