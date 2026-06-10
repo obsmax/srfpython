@@ -1,5 +1,5 @@
-!*==SRFDIS96.spg  processed by SPAG 6.72Dc at 15:04 on  5 Dec 2017
-! mes modifs
+! THIS PROGRAM IS MODIFIED AFTER CPS Computer Program in Seismology
+! Changes in srfdis96 
 ! le programme prend ses entrees dans stdin, elles correspondent aux sorties de
 ! la version modifiee de srfpre96 vers stdout
 ! sorties vers stdout
@@ -11,7 +11,7 @@
 !        sinon la 3eme colonne est diminuee d un facteur 1-h et la 4eme est augmentee d'un fact. 1+h
 !    5eme et 6eme : vitesse de phase correspondant aux colonnes 3 et 4
 
-! mes modifs : update 10/02/2020
+! update 10/02/2020
 ! les entrees sont lues dans stdin
 !    ligne 1 : nlayer
 !    ligne 2 : valeurs d'epaisseurs de couches en km  (nlayer-1)
@@ -66,7 +66,7 @@
 !         saving one parameter in subroutine sphere
 !     20 JUL 2004 - removed extraneous line at line 550
 !         since dc not defined
-!         if(dabs(c1-c2)  <=  dmin1(1.d-6*c1,0.005d+0*dc) )go to 1000
+!         if(dabs(c1-c2) .le. dmin1(1.d-6*c1,0.005d+0*dc) )go to 1000
 !     28 DEC 2007 - changed the Earth flattening to now use layer
 !         midpoint and the Biswas (1972: PAGEOPH 96, 61-74, 1972)
 !         density mapping for P-SV  - note a true comparison
@@ -336,7 +336,7 @@
 !-----
 !     t1  - period
 !     c1  - initial guess on low side of mode
-!     clow - lowest possible value for present mode in a
+!     clow    - lowest possible value for present mode in a
 !           reversed direction search
 !     dc  - phase velocity search increment
 !     cm  - minimum possible solution
@@ -352,7 +352,7 @@
 !-----
 !     to avoid problems in mode jumping with reversed dispersion
 !     we note what the polarity of period equation is for phase
-!     velocities just beneath the zero crossing at the
+!     velocities just beneath the zero crossing at the 
 !         first period computed.
 !-----
 !     bracket solution
