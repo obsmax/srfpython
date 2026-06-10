@@ -92,6 +92,10 @@ class SensitivityKernel:
             kf = 1.0
             kx = 1000.
             kv = 1000.
+        elif units == "km/s/g.cm-3":
+            kf = 1.
+            kx = 1.
+            kv = 1.
         else:
             raise NotImplemented
 
@@ -103,13 +107,18 @@ class SensitivityKernel:
         # depth model
         ax1 = fig1.add_subplot(gs[1:, 0])
         self.dm.show(ax1, ".-", units=units, )
+        ax1.set_ylabel({
+            'm/s/kg.m-3': 'Depth (m)',
+            'km/s/g.cm-3': 'Depth (km)'}[units])
         ax1.grid(True, linestyle=":", color="k")
         plt.legend()
 
         # disp curve
         ax2 = fig1.add_subplot(
             gs[0, 1:],
-            ylabel={'m/s/kg.m-3': 'Velocity (m/s)'}[units])
+            ylabel={
+                'm/s/kg.m-3': 'Velocity (m/s)',
+                'km/s/g.cm-3': 'Velocity (km/s)'}[units])
 
         for curve in self.all_curves:
             ax2.plot(
@@ -159,7 +168,10 @@ class SensitivityKernel:
         cax = fig1.add_axes((.91, .2, .01, .2))
         plt.colorbar(coll, cax=cax)
 
-        ax3.set_xlabel({'m/s/kg.m-3': 'Frequency (Hz)'}[units])
+        ax3.set_xlabel({
+           'm/s/kg.m-3': 'Frequency (Hz)',
+           'km/s/g.cm-3': 'Frequency (Hz)',
+            }[units])
 
         ax3.set_xlim(min(self.f_edges * kf), max(self.f_edges * kf))
         ax3.set_ylim(min(self.z_edges * kx), max(self.z_edges * kx))
@@ -409,12 +421,12 @@ def main():
     ...
     -norm         if mentionned the kernels are divided by the layer thickness
                   use it for depth models with irregular thicknesses 
+    -rel          if mentionned the kernels are expressed in relative variations                   
     -png          save figures as pngfiles (overwrite if exists)
                   sker17_depthdisp.png
                   sker17_RU0_fstart_fend_nfreq_fscale.png
                   ...
     '''
-    raise Exception('TODO : upgrade')
     if len(sys.argv) == 1:
         print(help)
         sys.exit()
@@ -422,12 +434,9 @@ def main():
     argv = readargv()
     # -----------------------------------:
     dm = depthmodel_from_mod96(argv['m96'][0])
-    ztop = dm.vp.ztop()
-    vp = dm.vp.values
-    vs = dm.vs.values
-    rh = dm.rh.values
 
     norm = "norm" in argv.keys()
+    relative = "relative" in argv.keys()
     png = "png" in argv.keys()
     # -----------------------------------
     Waves, Types, Modes, Freqs = [], [], [], []
@@ -443,116 +452,143 @@ def main():
     # ==== compute the dispersion curves
     hc = HerrmannCallerFromGroupedLists(Waves, Types, Modes, Freqs, h=0.005, ddc=0.005)
     with Timer('dispersion'):
-        curves_out = hc(ztop, vp, vs, rh)
+        curves = hc.call_dm(dm=dm)
 
-    # ==== display
-    fig1 = plt.figure(figsize=(8,8))
-    fig1.subplots_adjust(wspace=0.3)
+    # sensitivity kernels
+    sker_gen = sker17(
+        dm=dm,
+        curves=curves,
+        dlogz=0.01, dlogvp=0.01, dlogvs=0.01, dlogrh=0.01,
+        norm=norm, relative=relative,
+        h=0.005, ddc=0.005)
 
-    # depth model
-    ax1 = fig1.add_subplot(223)
-    dm.show(ax1)
-    ax1.grid(True, linestyle=":", color="k")
-    plt.legend()
+    # ===================
+    for wave, typ, mode, skernels in sker_gen:
 
-    # disp curve
-    ax2 = fig1.add_subplot(222)
-    for curve in curves_out:
-        # ax2.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
-        curve.plot(ax2, "+-")
-    ax2.set_ylabel('velocity (km/s)')
-    ax2.grid(True, which="major")
-    ax2.grid(True, which="minor")
-    logtick(ax2, "xy")
-    plt.legend()
-
-    # ## sensitivity kernels
-    if not png:
-        fig1.show()
-
-    sker_gen = sker17_1(ztop, vp, vs, rh,
-                     Waves, Types, Modes, Freqs,
-                     dz=0.001, dlogvs=.01,
-                     dlogpr=.01, dlogrh=.01, norm=norm,
-                     h=0.005, ddc=0.005)
-                     
-    for w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH in sker_gen:
-            
-        # ------
-        z_edges = np.hstack((ztop, [1.1 * ztop[-1]]))
-        z_mid = np.hstack((0.5 * (ztop[1:] + ztop[:-1]), [1.05 * ztop[-1]]))
-        F_edges = np.hstack((F[0] * 0.95, np.sqrt(F[1:] * F[:-1]), F[-1] * 1.05))
-
-        # ------
-        #vmax = abs(DLOGVADLOGVS).max()
-        # #np.max([abs(DLOGVADZ).max(), abs(DLOGVADLOGVS).max(),
-        # abs(DLOGVADLOGPR).max(), abs(DLOGVADLOGRH).max()])
-
-        if not norm:
-            # mask half space because it integrates the sensitivity over very thick layer => overestimated sensitivity
-            for _ in DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH:
-                _[-1, :] = np.nan
-            DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH = \
-                [np.ma.masked_where(np.isnan(_), _) \
-                 for _ in [DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH]]
-
-        cmap = tomocmap1(w=0.01, W=0.2)  # cccfcmap3() #plt.cm.RdBu
-        for M, p, q in zip([DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH],
-                           ["Z^{top}_i", "ln Vs_i", "ln (Vp/Vs)_i", r"ln \rho _i"],
-                           ["Ztop", "lnVs", "lnVpaVs", "lnrho"]):
-            ax3 = fig1.add_subplot(224, sharex=ax2, sharey=ax1)
-            ax3.set_title('%s%s%d' % (w, t, m))
-
-            vmax = abs(M).max()
-            vmin = -vmax
-
-            coll = plt.pcolormesh(1. / F_edges, z_edges, M,
-                                  vmin=vmin, vmax=vmax, cmap=cmap)
-
-            if M.max() - M.min():
-                levels = np.logspace(-1., 2, 10)
-                levels = np.hstack((-levels[::-1], [0], levels))
-                plt.contour(1. / F, z_mid, M,
-                            levels=levels,
-                            colors="k")
-
-            cax = fig1.add_axes((.91, .2, .01, .2))
-            plt.colorbar(coll, cax=cax)
-
-            ax3.set_xlabel('period (s)')
-            ax3.set_xlim(minmax(1. / F_edges))
-            ax3.set_ylim(minmax(z_edges))
-            ax3.set_xscale('log')
-
-            if norm:
-                textonly(ax3, txt=r'$ \frac{H}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p), loc=3, fontsize=16)
+        for skernel in skernels:
+            fig = skernel.show(vmin=None, vmax=None, cmap=tomocmap1(w=0.01, W=0.2), units="m/s/kg.m-3")
+            fig.suptitle(f"{skernel.parameter_name}, {skernel.curve.wave}{skernel.curve.type}{skernel.curve.mode}")
+            if png:
+                figname = (
+                    f"sker17_"
+                    f"{skernel.curve.wave}{skernel.curve.type}{skernel.curve.mode}_{skernel.parameter_name}"
+                    f"{'_norm' if norm else ''}"
+                    f"{'_rel' if relative else ''}"
+                    f".png")
+                print(figname)
+                fig.savefig(figname)
             else:
-                textonly(ax3, txt=r'$ \frac{d ln%s_j}{d %s} $' % (t, p), loc=3, fontsize=16)
+                plt.show()
 
-            if not ax3.yaxis_inverted():
-                ax3.invert_yaxis()
-            logtick(ax3, "x")
-
-            # ------
-            # plt.setp(ax1.get_xticklabels(), visible=False)
-            # plt.setp(ax2.get_xticklabels(), visible=False)
-            # plt.setp(ax2.get_yticklabels(), visible=False)
-            # plt.setp(ax4.get_yticklabels(), visible=False)
-            fig1.canvas.draw()
-
-            if "png" in argv.keys():
-                k = "%s%s%d" % (w, t, m)
-                fout = 'sker17_%s_%s_%s_%s_%s_%s%s.png' % (k, argv[k][0], argv[k][1], argv[k][2], argv[k][3], q, "_norm" if norm else "")
-                print(fout)
-                fig1.savefig(fout, dpi=300)
-            else:
-                input('pause : press enter to plot the next wave type and mode')
-            cax.cla()
-            ax3.cla()
-
-    # --------------------
-    if "png" not in argv.keys():
-        input('bye')
+    #
+    # # ==== display
+    # fig1 = plt.figure(figsize=(8,8))
+    # fig1.subplots_adjust(wspace=0.3)
+    #
+    # # depth model
+    # ax1 = fig1.add_subplot(223)
+    # dm.show(ax1)
+    # ax1.grid(True, linestyle=":", color="k")
+    # plt.legend()
+    #
+    # # disp curve
+    # ax2 = fig1.add_subplot(222)
+    # for curve in curves_out:
+    #     # ax2.loglog(1. / fs, us, '+-', label="%s%s%d" % (w, t, m))
+    #     curve.plot(ax2, "+-")
+    # ax2.set_ylabel('velocity (km/s)')
+    # ax2.grid(True, which="major")
+    # ax2.grid(True, which="minor")
+    # logtick(ax2, "xy")
+    # plt.legend()
+    #
+    # # ## sensitivity kernels
+    # if not png:
+    #     fig1.show()
+    #
+    # sker_gen = sker17_1(ztop, vp, vs, rh,
+    #                  Waves, Types, Modes, Freqs,
+    #                  dz=0.001, dlogvs=.01,
+    #                  dlogpr=.01, dlogrh=.01, norm=norm,
+    #                  h=0.005, ddc=0.005)
+    #
+    # for w, t, m, F, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH in sker_gen:
+    #
+    #     # ------
+    #     z_edges = np.hstack((ztop, [1.1 * ztop[-1]]))
+    #     z_mid = np.hstack((0.5 * (ztop[1:] + ztop[:-1]), [1.05 * ztop[-1]]))
+    #     F_edges = np.hstack((F[0] * 0.95, np.sqrt(F[1:] * F[:-1]), F[-1] * 1.05))
+    #
+    #     # ------
+    #     #vmax = abs(DLOGVADLOGVS).max()
+    #     # #np.max([abs(DLOGVADZ).max(), abs(DLOGVADLOGVS).max(),
+    #     # abs(DLOGVADLOGPR).max(), abs(DLOGVADLOGRH).max()])
+    #
+    #     if not norm:
+    #         # mask half space because it integrates the sensitivity over very thick layer => overestimated sensitivity
+    #         for _ in DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH:
+    #             _[-1, :] = np.nan
+    #         DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH = \
+    #             [np.ma.masked_where(np.isnan(_), _) \
+    #              for _ in [DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH]]
+    #
+    #     cmap = tomocmap1(w=0.01, W=0.2)  # cccfcmap3() #plt.cm.RdBu
+    #     for M, p, q in zip([DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH],
+    #                        ["Z^{top}_i", "ln Vs_i", "ln (Vp/Vs)_i", r"ln \rho _i"],
+    #                        ["Ztop", "lnVs", "lnVpaVs", "lnrho"]):
+    #         ax3 = fig1.add_subplot(224, sharex=ax2, sharey=ax1)
+    #         ax3.set_title('%s%s%d' % (w, t, m))
+    #
+    #         vmax = abs(M).max()
+    #         vmin = -vmax
+    #
+    #         coll = plt.pcolormesh(1. / F_edges, z_edges, M,
+    #                               vmin=vmin, vmax=vmax, cmap=cmap)
+    #
+    #         if M.max() - M.min():
+    #             levels = np.logspace(-1., 2, 10)
+    #             levels = np.hstack((-levels[::-1], [0], levels))
+    #             plt.contour(1. / F, z_mid, M,
+    #                         levels=levels,
+    #                         colors="k")
+    #
+    #         cax = fig1.add_axes((.91, .2, .01, .2))
+    #         plt.colorbar(coll, cax=cax)
+    #
+    #         ax3.set_xlabel('period (s)')
+    #         ax3.set_xlim(minmax(1. / F_edges))
+    #         ax3.set_ylim(minmax(z_edges))
+    #         ax3.set_xscale('log')
+    #
+    #         if norm:
+    #             textonly(ax3, txt=r'$ \frac{H}{H_i} \, \frac{d ln%s_j}{d %s} $' % (t, p), loc=3, fontsize=16)
+    #         else:
+    #             textonly(ax3, txt=r'$ \frac{d ln%s_j}{d %s} $' % (t, p), loc=3, fontsize=16)
+    #
+    #         if not ax3.yaxis_inverted():
+    #             ax3.invert_yaxis()
+    #         logtick(ax3, "x")
+    #
+    #         # ------
+    #         # plt.setp(ax1.get_xticklabels(), visible=False)
+    #         # plt.setp(ax2.get_xticklabels(), visible=False)
+    #         # plt.setp(ax2.get_yticklabels(), visible=False)
+    #         # plt.setp(ax4.get_yticklabels(), visible=False)
+    #         fig1.canvas.draw()
+    #
+    #         if "png" in argv.keys():
+    #             k = "%s%s%d" % (w, t, m)
+    #             fout = 'sker17_%s_%s_%s_%s_%s_%s%s.png' % (k, argv[k][0], argv[k][1], argv[k][2], argv[k][3], q, "_norm" if norm else "")
+    #             print(fout)
+    #             fig1.savefig(fout, dpi=300)
+    #         else:
+    #             input('pause : press enter to plot the next wave type and mode')
+    #         cax.cla()
+    #         ax3.cla()
+    #
+    # # --------------------
+    # if "png" not in argv.keys():
+    #     input('bye')
 
 
 # -----------------------------

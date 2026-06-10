@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from srfpython.depthdisp.depthmodels import depthmodel_from_arrays
-from srfpython.sensitivitykernels.sker17 import sker17_1
+from srfpython.sensitivitykernels.sker17 import sker17, Curve, tomocmap1
 
 """
 python script to compute depth sensitivity kernels
@@ -10,49 +10,29 @@ python script to compute depth sensitivity kernels
 
 
 # ================== build a 1d velocity model
-ztop = np.arange(0., 30., 1.)  # top layer array, sorted, in km, 1st at 0.0
-vs = np.linspace(1.8, 4.0, len(ztop))  # Vs in each layer from top to half space, km/s
-vp = 1.73 * vs   # Vp in each layer, km/s
-rh = 2.67 * np.ones_like(vs)  # Density in each layer g/cm3
+dm = depthmodel_from_arrays(
+    z = np.arange(0., 30., 1.),  # top layer array, sorted, in km, 1st at 0.0
+    vp = 1.73 * np.linspace(1.8, 4.0, 30),   # Vp in each layer, km/s
+    vs = np.linspace(1.8, 4.0, 30),  # Vs in each layer from top to half space, km/s
+    rh = 2.67 * np.ones(30),  # Density in each layer g/cm3
+    )
 
 # ================== compute sensitivity kernels for one wave type (RC0)
-norm = True      # !!! recommended for non uniform layer model (try irregular ztop to see the difference) !!!
-generator = sker17_1(ztop, vp, vs, rh,
-    Waves=["R"],         # R=rayleigh
-    Types=["C"],         # C=phase velocity
-    Modes=[0],           # 0=fundamental mode
-    Freqs=[[0.1, 0.2]],  # frequencies at which to compute 1d kernels, in Hz
-    norm=norm)
+curves = [Curve(wave='R', type='C', mode=0, freqs=np.linspace(0.005, 0.2, 50)),
+          ]
+
+sker_gen = sker17(
+    dm=dm,
+    curves=curves,
+    norm=True, relative=False,
+    ddc=0.005,
+    )
 
 # only one item here
-wave, type_, mode, freqs, DLOGVADZ, DLOGVADLOGVS, DLOGVADLOGPR, DLOGVADLOGRH = \
-    next(generator)
+# ===================
+for wave, typ, mode, skernels in sker_gen:
 
-# ================== display
-plt.figure()
-# depth model
-ax1 = plt.subplot(121)
-dm = depthmodel_from_arrays(ztop, vp, vs, rh)
-dm.show(ax1)
-ax1.grid(True)
-plt.legend()
-
-# kernels
-if norm:
-    title = r'$ \frac{H}{H_i} \, \frac{d lnV_{{%s%s%d}}}{d lnVs} $' % (wave, type_, mode)
-else:
-    title = r'$ \frac{d lnV_{{%s%s%d}}}{d lnVs} $' % (wave, type_, mode)
-
-ax2 = plt.subplot(122, sharey=ax1, title=title, xlabel="sensitivity")
-ax2.plot(DLOGVADLOGVS[:, 0], ztop, label="%s%s%d@%.2fHz" % (wave, type_, mode, freqs[0]))
-ax2.plot(DLOGVADLOGVS[:, 1], ztop, label="%s%s%d@%.2fHz" % (wave, type_, mode, freqs[1]))
-ax2.grid(True)
-plt.legend()
-# plt.ion()
-plt.show()
-# input('pause')
-
-
-
-
-
+    for skernel in skernels:
+        fig = skernel.show(vmin=None, vmax=None, cmap=tomocmap1(w=0.01, W=0.2), units="km/s/g.cm-3")
+        fig.suptitle(f"{skernel.parameter_name}, {skernel.curve.wave}{skernel.curve.type}{skernel.curve.mode}")
+    plt.show()
