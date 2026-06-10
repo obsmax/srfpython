@@ -172,16 +172,18 @@ def sker17(
         DLOGVADLOGVS = DVADP[IVS, :][:, Iwtm]
         DLOGVADLOGRH = DVADP[IRH, :][:, Iwtm]
 
-
-
         DLOGVADLOGZ, DLOGVADLOGVP, DLOGVADLOGVS, DLOGVADLOGRH = \
             [np.ma.masked_where(np.isnan(_), _) for _ in
              [DLOGVADLOGZ, DLOGVADLOGVP, DLOGVADLOGVS, DLOGVADLOGRH]]
 
-        DLOGVADLOGPR = DLOGVADLOGVP * DLOGVADLOGVS / (DLOGVADLOGVS - DLOGVADLOGVP)  # unsure
+        # # dlnc = dronlnc / dronlnvp dlnvp + drondlnc / dronlnvs dlnvs
+        # # lnvp = lnvs + ln(vp/vs) => dlnvp / dln(vp/vs) = 1
+        # # lnvs = lnvp - ln(vp/vs) => dlnvs / dln(vp/vs) = -1
+        # # => dlnc / dln(vp/vs) = (dronlnc / dronlnvp) - (drondlnc / dronlnvs)
+        # DLOGVADLOGPR = (DLOGVADLOGVP - DLOGVADLOGVS)
 
         # TEST
-        yield w, t, m, F, DLOGVADLOGZ, DLOGVADLOGVP, DLOGVADLOGVS, DLOGVADLOGRH, DLOGVADLOGPR
+        yield w, t, m, F, DLOGVADLOGZ, DLOGVADLOGVP, DLOGVADLOGVS, DLOGVADLOGRH # , DLOGVADLOGPR
 
 
 def sker17_1(ztop, vp, vs, rh,
