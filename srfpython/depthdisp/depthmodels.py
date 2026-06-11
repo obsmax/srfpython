@@ -497,7 +497,7 @@ class depthmodel_from_arrays(depthmodel):
             raise ValueError('vs[1:] must be positive')
         if not np.all(rh > 0.):
             raise ValueError('rh must be positive')
-        if not np.all(vp / vs >= np.sqrt(4 / 3.)):
+        if not np.all((vp[vs>0] / vs[vs>0]) >= np.sqrt(4 / 3.)):
             raise ValueError('vp/vs must be larger than sqrt(4/3.)')
 
         self.vp, self.vs, self.rh = [depthmodel1D(z, _) for _ in (vp, vs, rh)]
