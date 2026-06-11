@@ -292,7 +292,7 @@ class HerrmannCallerBasis(object):
         if len(vs) > 1 and not (vs[1:] > 0.08).all():
             # vs[0] can be negative if a water layer exists
             raise CPiSDomainError('vs domain error %s' % str(vs))
-
+        
         if (np.isinf(vp) | np.isnan(vp)).any():
             raise CPiSDomainError('vp value error %s' % str(vp))
 

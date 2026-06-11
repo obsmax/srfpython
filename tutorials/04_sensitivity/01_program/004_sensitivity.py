@@ -66,9 +66,8 @@ sker_gen = sker17(
 for wave, typ, mode, skernels in sker_gen:
 
     for skernel in skernels:
-        if skernel.parameter_name == "vs":
-            fig = skernel.show(vmin=None, vmax=None, cmap=tomocmap1(w=0.01, W=0.2), units="m/s/kg.m-3")
-            fig.suptitle(f"{skernel.parameter_name}, {skernel.curve.wave}{skernel.curve.type}{skernel.curve.mode}")
+        fig = skernel.show(vmin=None, vmax=None, cmap=tomocmap1(w=0.01, W=0.2), units="m/s/kg.m-3")
+        fig.suptitle(f"{skernel.parameter_name}, {skernel.curve.wave}{skernel.curve.type}{skernel.curve.mode}")
 
 plt.show()
 

@@ -319,7 +319,12 @@ class depthmodel(object):
         assert np.all(vp.z == vs.z)
         assert np.all(vp.z == rh.z)
         assert np.all(vp.values > vs.values)
-        assert np.all(vs.values > 0.)
+        for i_first_solid, vsi in enumerate(vs.values):
+            if vsi > 0:break
+        else:
+            raise ValueError('vs cannot be all 0')
+        assert np.all(vs.values[i_first_solid:] > 0)
+            
         assert np.all(rh.values > 0.)
 
         self.vp, self.vs, self.rh = vp, vs, rh
@@ -488,8 +493,8 @@ class depthmodel_from_arrays(depthmodel):
             raise ValueError('z[0] must be 0 ({})'.format(z[0]))
         if not np.all(z[1:] > z[:-1]):
             raise ValueError('z must be strictly growing')
-        if not np.all(vs > 0.):
-            raise ValueError('vs must be positive')
+        if len(vs) > 1 and not np.all(vs[1:] > 0.):
+            raise ValueError('vs[1:] must be positive')
         if not np.all(rh > 0.):
             raise ValueError('rh must be positive')
         if not np.all(vp / vs >= np.sqrt(4 / 3.)):
