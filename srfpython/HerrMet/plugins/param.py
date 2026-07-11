@@ -11,7 +11,7 @@ default_parameterization_list = ['mZVSPRRH', 'mZVSVPRH', 'mZVSPRzRHvp', 'mZVSPRz
 default_parameterization = default_parameterization_list[0]
 
 # ------------------------------ autorized_keys
-authorized_keys = ["-basedon", "-t", "-dvp", "-dvs", "-drh", "-dpr", "-growing", "-op", "-h", "-help"]
+authorized_keys = ["-basedon", "-t", "-dvp", "-dvs", "-drh", "-dpr", "-dh", "-growing", "-op", "-h", "-help"]
 
 # ------------------------------ help messages
 short_help = "--param      create a template parameterization file"
@@ -53,7 +53,8 @@ long_help = """\
     -dvs     f f     add prior constraint on the vs offset between layers, idem
     -drh     f f     add prior constraint on the density offset between layers, idem, g/cm3
     -dpr     f f     add prior constraint on the vp/vs offset between layers, idem, no unit
-    -growing         shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0.
+    -dh      f f     add prior constraint on the layer thickness, km
+    -growing         shortcut for -dvp 0. 5. -dvs 0. 5. -drh 0. 5. -dpr -5. 0. -dh 0. 5.
     -op              force overwriting {herrmetparamfilelocal} if exists
     -h, -help        display the help message for this plugin 
     """.format(herrmetparamfilelocal=HERRMETPARAMFILELOCAL,
@@ -111,21 +112,24 @@ def param(argv):
         assert "-dvp" not in argv.keys()  # not compatible with -growing
         assert "-drh" not in argv.keys()  # not compatible with -growing
         assert "-dpr" not in argv.keys()  # not compatible with -growing
-        dvp = 0., 5.
-        dvs = 0., 5.
-        drh = 0., 5.
-        dpr = -5., 0.
+        assert "-dh" not in argv.keys()  # not compatible with -growing
+        dvp = (0., 5.)
+        dvs = (0., 5.)
+        drh = (0., 5.)
+        dpr = (-5., 0.)
+        dh =  (0., 5.)
     else:
         dvp = minmax(np.asarray(argv['-dvp'], float)) if "-dvp" in argv.keys() else None
         dvs = minmax(np.asarray(argv['-dvs'], float)) if "-dvs" in argv.keys() else None
         drh = minmax(np.asarray(argv['-drh'], float)) if "-drh" in argv.keys() else None
         dpr = minmax(np.asarray(argv['-dpr'], float)) if "-dpr" in argv.keys() else None
+        dh = minmax(np.asarray(argv['-dh'], float)) if "-dh" in argv.keys() else None
 
     if not type_ in default_parameterization_list:
         raise Exception('please pick one type in %s' % str(default_parameterization_list))
 
     write_default_paramfile(
-        nlayer, zbot, which_parameterizer=type_, basedon=basedon, dvp=dvp, dvs=dvs, drh=drh, dpr=dpr)
+        nlayer, zbot, which_parameterizer=type_, basedon=basedon, dvp=dvp, dvs=dvs, drh=drh, dpr=dpr, dh=dh)
 
     print("you can edit {} to adjust parameters boundaries, "
           "do not change line orders".format(HERRMETPARAMFILELOCAL))

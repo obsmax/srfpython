@@ -8,6 +8,7 @@ from srfpython.HerrMet.priorpdf import (
     LogRhoM_DVS,
     LogRhoM_DVPDVSDRH,
     LogRhoM_DVPDVSDRHDPR,
+    LogRhoM_DVPDVSDRHDPRDH,
     LogRhoM_TIKHONOV,
     )
 from srfpython.HerrMet.files import HERRMETPARAMFILELOCAL
@@ -22,20 +23,31 @@ from srfpython.HerrMet.parameterizers import \
 
 def write_default_paramfile(nlayer, zbot,
                             which_parameterizer="mZVSPRRH", basedon=None,
-                            dvp=None, dvs=None, drh=None, dpr=None):
+                            dvp=None, dvs=None, drh=None, dpr=None, dh=None):
     """create a default parameter file to be customized by user"""
     # ------
 
-    if np.all([_ is None for _ in (dvs, dvp, drh, dpr)]):
+    def is_none(*x):
+        return np.array([_ is None for _ in x], bool)
+
+    dparam_is_none = is_none(dvs, dvp, drh, dpr, dh)
+    # TODO : simplify this
+    if dparam_is_none.all():
         which_prior = DefaultLogRhoM
-    elif dvs is not None and dvp is None and drh is None and dpr is None:
+    elif (dparam_is_none == [False, True, True, True, True]).all():
         which_prior = LogRhoM_DVS
-    elif dvs is not None and dvp is not None and drh is not None and dpr is None:
+    elif (dparam_is_none == [False, False, False, True, True]).all():
         which_prior = LogRhoM_DVPDVSDRH
-    elif dvs is not None and dvp is not None and drh is not None and dpr is not None:
+    elif (dparam_is_none == [False, False, False, False, True]).all():
         which_prior = LogRhoM_DVPDVSDRHDPR
+    elif (dparam_is_none == [False, False, False, False, False]).all():
+        which_prior = LogRhoM_DVPDVSDRHDPRDH
     else:
-        raise NotImplementedError('please specify either dvs alone, or dvp, dvs and drh, or dvp, dvs, drh and dpr')
+        raise NotImplementedError(
+            'please specify either dvs alone, '
+            'or dvp, dvs and drh, '
+            'or dvp, dvs, drh and dpr'
+            'or dvp, dvs, drh, dpr and dh')
 
     if which_parameterizer == "mZVSPRRH":
         if basedon is None:
@@ -73,7 +85,7 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#met TYPE = "mZVSPRRH"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
 
-            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr, dh=dh))
 
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
@@ -125,7 +137,7 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#met TYPE = "mZVSVPRH"\n')
             fid.write('#met NLAYER = %d\n' % nlayer)
 
-            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr, dh=dh))
 
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
@@ -169,7 +181,7 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#met PRz  = "lambda Z: 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
             fid.write('#met RHvp = "lambda VP: 1.74 * VP ** 0.25"\n')
 
-            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr, dh=dh))
 
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
@@ -213,7 +225,7 @@ def write_default_paramfile(nlayer, zbot,
             fid.write('#met PRz  = "lambda Z: 1.0335 * np.exp(-Z / 0.5408) + 1.7310"\n')
             fid.write('#met RHz  = "lambda Z: Z * 0. + 2.67"\n')
 
-            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr, dh=dh))
 
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
@@ -255,7 +267,7 @@ def write_default_paramfile(nlayer, zbot,
                 '1.6612 * VP - 0.4721 * VP ** 2.0 + 0.0671 * VP ** 3.0 '
                 '- 0.0043 * VP ** 4.0 + 0.000106 * VP ** 5.0"\n')
 
-            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr))
+            fid.write(which_prior.header(dvp=dvp, dvs=dvs, drh=drh, dpr=dpr, dh=dh))
 
             fid.write('#fld KEY VINF VSUP\n')
             fid.write('#unt - - -\n')
@@ -326,6 +338,19 @@ def load_paramfile(paramfile, verbose=True):
                     drhmax=A.metadata['DRHMAX'],
                     dprmin=A.metadata['DPRMIN'],
                     dprmax=A.metadata['DPRMAX'])
+
+    elif A.metadata['PRIORTYPE'] == "DVPDVSDRHDPRDH":
+        logRHOM = LogRhoM_DVPDVSDRHDPRDH(parameterizer,
+                    dvpmin=A.metadata['DVPMIN'],
+                    dvpmax=A.metadata['DVPMAX'],
+                    dvsmin=A.metadata['DVSMIN'],
+                    dvsmax=A.metadata['DVSMAX'],
+                    drhmin=A.metadata['DRHMIN'],
+                    drhmax=A.metadata['DRHMAX'],
+                    dprmin=A.metadata['DPRMIN'],
+                    dprmax=A.metadata['DPRMAX'],
+                    dhmin = A.metadata['DHMIN'],
+                    dhmax = A.metadata['DHMAX'])
 
     elif A.metadata['PRIORTYPE'] == "TIKHONOV":
         logRHOM = LogRhoM_TIKHONOV(

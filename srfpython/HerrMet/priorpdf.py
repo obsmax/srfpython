@@ -9,7 +9,6 @@ class DefaultLogRhoM(LogUniND):
     """build the prior pdf, include constraints on the model parameters and eventually on some relations between them
     """
     k, nanbehavior = 1000., 2
-
     def __init__(self, parameterizer):
         """no more constraints than parameters"""
         LogUniND.__init__(self,
@@ -20,18 +19,19 @@ class DefaultLogRhoM(LogUniND):
         self.p = parameterizer
 
     @staticmethod
-    def header(dvp=None, dvs=None, drh=None, dpr=None):
+    def header(dvp=None, dvs=None, drh=None, dpr=None, dh=None):
         """ a method to write the apropriate header lines in the parameter file, see subclasses"""
         assert dvp is None
         assert dvs is None
         assert drh is None
         assert dpr is None
+        assert dh is None
         return ""
 
 
 class LogRhoM_DVS(DefaultLogRhoM):
     """add new constraitns on the vs offsets on interfaces"""
-    # -------
+
     def __init__(self, parameterizer, dvsmin, dvsmax):
         assert dvsmin < dvsmax
         self.p = parameterizer
@@ -51,19 +51,19 @@ class LogRhoM_DVS(DefaultLogRhoM):
         return LogUniND.__call__(self, extended_m)
 
     @staticmethod
-    def header(dvp=None, dvs=None, drh=None, dpr=None):
+    def header(dvp=None, dvs=None, drh=None, dpr=None, dh=None):
         assert dvp is None
         assert drh is None
         assert dpr is None
-        header = '#met PRIORTYPE = "DVS"\n'
-        header += '#met DVSMIN = {}\n'.format(dvs[0])
-        header += '#met DVSMAX = {}\n'.format(dvs[1])
+        assert dh is None
+        header = f'#met PRIORTYPE = "DVS"\n'
+        header += f'#met DVSMIN = {dvs[0]}\n'
+        header += f'#met DVSMAX = {dvs[1]}\n'
         return header
 
 
 class LogRhoM_DVPDVSDRH(DefaultLogRhoM):
     """add new constraitns on the vs offsets on interfaces"""
-    # -------
     def __init__(self, parameterizer, dvpmin, dvpmax, dvsmin, dvsmax, drhmin, drhmax):
         assert dvsmin < dvsmax
         assert dvpmin < dvpmax
@@ -93,21 +93,21 @@ class LogRhoM_DVPDVSDRH(DefaultLogRhoM):
         return LogUniND.__call__(self, extended_m)
 
     @staticmethod
-    def header(dvp=None, dvs=None, drh=None, dpr=None):
+    def header(dvp=None, dvs=None, drh=None, dpr=None, dh=None):
         assert dpr is None
-        header  = '#met PRIORTYPE = "DVPDVSDRH"\n'
-        header += '#met DVPMIN = {}\n'.format(dvp[0])
-        header += '#met DVPMAX = {}\n'.format(dvp[1])
-        header += '#met DVSMIN = {}\n'.format(dvs[0])
-        header += '#met DVSMAX = {}\n'.format(dvs[1])
-        header += '#met DRHMIN = {}\n'.format(drh[0])
-        header += '#met DRHMAX = {}\n'.format(drh[1])
+        assert dh is None
+        header  = f'#met PRIORTYPE = "DVPDVSDRH"\n'
+        header += f'#met DVPMIN = {dvp[0]}\n'
+        header += f'#met DVPMAX = {dvp[1]}\n'
+        header += f'#met DVSMIN = {dvs[0]}\n'
+        header += f'#met DVSMAX = {dvs[1]}\n'
+        header += f'#met DRHMIN = {drh[0]}\n'
+        header += f'#met DRHMAX = {drh[1]}\n'
         return header
 
 
 class LogRhoM_DVPDVSDRHDPR(DefaultLogRhoM):
     """add new constraitns on the vs offsets on interfaces"""
-
     def __init__(self, parameterizer, dvpmin, dvpmax, dvsmin, dvsmax, drhmin, drhmax, dprmin, dprmax):
         assert dvsmin < dvsmax
         assert dvpmin < dvpmax
@@ -142,23 +142,87 @@ class LogRhoM_DVPDVSDRHDPR(DefaultLogRhoM):
         return LogUniND.__call__(self, extended_m)
 
     @staticmethod
-    def header(dvp=None, dvs=None, drh=None, dpr=None):
+    def header(dvp=None, dvs=None, drh=None, dpr=None, dh=None):
+        assert dh is None
+        header  = f'#met PRIORTYPE = "DVPDVSDRHDPR"\n'
+        header += f'#met DVPMIN = {dvp[0]}\n'
+        header += f'#met DVPMAX = {dvp[1]}\n'
+        header += f'#met DVSMIN = {dvs[0]}\n'
+        header += f'#met DVSMAX = {dvs[1]}\n'
+        header += f'#met DRHMIN = {drh[0]}\n'
+        header += f'#met DRHMAX = {drh[1]}\n'
+        header += f'#met DPRMIN = {dpr[0]}\n'
+        header += f'#met DPRMAX = {dpr[1]}\n'
+        return header
 
-        header  = '#met PRIORTYPE = "DVPDVSDRHDPR"\n'
-        header += '#met DVPMIN = {}\n'.format(dvp[0])
-        header += '#met DVPMAX = {}\n'.format(dvp[1])
-        header += '#met DVSMIN = {}\n'.format(dvs[0])
-        header += '#met DVSMAX = {}\n'.format(dvs[1])
-        header += '#met DRHMIN = {}\n'.format(drh[0])
-        header += '#met DRHMAX = {}\n'.format(drh[1])
-        header += '#met DPRMIN = {}\n'.format(dpr[0])
-        header += '#met DPRMAX = {}\n'.format(dpr[1])
+
+class LogRhoM_DVPDVSDRHDPRDH(DefaultLogRhoM):
+    """add new constraitns on the vs offsets on interfaces"""
+    def __init__(self, parameterizer,
+                 dvpmin, dvpmax,
+                 dvsmin, dvsmax,
+                 drhmin, drhmax,
+                 dprmin, dprmax,
+                 dhmin, dhmax):
+        assert dvsmin < dvsmax
+        assert dvpmin < dvpmax
+        assert drhmin < drhmax
+        assert dprmin < dprmax
+        assert dhmin < dhmax
+        self.p = parameterizer
+        NLAYER = self.p.NLAYER
+        MINF = np.concatenate((self.p.MINF,
+                               np.ones(NLAYER - 1) * dvpmin,
+                               np.ones(NLAYER - 1) * dvsmin,
+                               np.ones(NLAYER - 1) * drhmin,
+                               np.ones(NLAYER - 1) * dprmin,
+                               np.ones(NLAYER - 1) * dhmin,
+                               ))
+        MSUP = np.concatenate((self.p.MSUP,
+                               np.ones(NLAYER - 1) * dvpmax,
+                               np.ones(NLAYER - 1) * dvsmax,
+                               np.ones(NLAYER - 1) * drhmax,
+                               np.ones(NLAYER - 1) * dprmax,
+                               np.ones(NLAYER - 1) * dhmax,
+                               ))
+        LogUniND.__init__(self,
+                          vinfs=MINF,
+                          vsups=MSUP,
+                          k=self.k,
+                          nanbehavior=self.nanbehavior)
+
+    def __call__(self, m):
+        ZTOP, VP, VS, RH = self.p.inv(m)
+
+        DH = (ZTOP[1:] - ZTOP[:-1])
+        DVP = VS[1:] - VS[:-1]
+        DVS = VP[1:] - VP[:-1]
+        DRH = RH[1:] - RH[:-1]
+        PR = VP / VS
+        DPR = PR[1:] - PR[:-1]
+        extended_m = np.concatenate((m, DVP, DVS, DRH, DPR, DH))
+        return LogUniND.__call__(self, extended_m)
+
+    @staticmethod
+    def header(dvp=None, dvs=None, drh=None, dpr=None, dh=None):
+
+        header  = f'#met PRIORTYPE = "DVPDVSDRHDPRDH"\n'
+        header += f'#met DVPMIN = {dvp[0]}\n'
+        header += f'#met DVPMAX = {dvp[1]}\n'
+        header += f'#met DVSMIN = {dvs[0]}\n'
+        header += f'#met DVSMAX = {dvs[1]}\n'
+        header += f'#met DRHMIN = {drh[0]}\n'
+        header += f'#met DRHMAX = {drh[1]}\n'
+        header += f'#met DPRMIN = {dpr[0]}\n'
+        header += f'#met DPRMAX = {dpr[1]}\n'
+        header += f'#met DHMIN = {dh[0]}\n'
+        header += f'#met DHMAX = {dh[1]}\n'
         return header
 
 
 class LogRhoM_TIKHONOV(DefaultLogRhoM):
     """add new constraitns on the vs offsets on interfaces"""
-
+    #TODO to be improved
     def __init__(self, parameterizer, alpha_tikhonov: float):
         DefaultLogRhoM.__init__(self, parameterizer=parameterizer)
         self.alpha_tikhonov = alpha_tikhonov
@@ -209,15 +273,17 @@ class LogRhoM_TIKHONOV(DefaultLogRhoM):
             self.alpha_tikhonov * (log_rhom_2 + log_rhom_3 + log_rhom_4 + log_rhom_5)
 
     @staticmethod
-    def header(dvp=None, dvs=None, drh=None, dpr=None):
+    def header(dvp=None, dvs=None, drh=None, dpr=None, dh=None):
 
-        header  = '#met PRIORTYPE = "DVPDVSDRHDPR"\n'
-        header += '#met DVPMIN = {}\n'.format(dvp[0])
-        header += '#met DVPMAX = {}\n'.format(dvp[1])
-        header += '#met DVSMIN = {}\n'.format(dvs[0])
-        header += '#met DVSMAX = {}\n'.format(dvs[1])
-        header += '#met DRHMIN = {}\n'.format(drh[0])
-        header += '#met DRHMAX = {}\n'.format(drh[1])
-        header += '#met DPRMIN = {}\n'.format(dpr[0])
-        header += '#met DPRMAX = {}\n'.format(dpr[1])
+        header  = f'#met PRIORTYPE = "TICKHONOV"\n'
+        header += f'#met DVPMIN = {dvp[0]}\n'
+        header += f'#met DVPMAX = {dvp[1]}\n'
+        header += f'#met DVSMIN = {dvs[0]}\n'
+        header += f'#met DVSMAX = {dvs[1]}\n'
+        header += f'#met DRHMIN = {drh[0]}\n'
+        header += f'#met DRHMAX = {drh[1]}\n'
+        header += f'#met DPRMIN = {dpr[0]}\n'
+        header += f'#met DPRMAX = {dpr[1]}\n'
+        header += f'#met DHMIN = {dh[0]}\n'
+        header += f'#met DHMAX = {dh[1]}\n'
         return header
