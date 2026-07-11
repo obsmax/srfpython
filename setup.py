@@ -85,5 +85,6 @@ setuptools.setup(
              'srfpython/bin/HerrMet',
              'srfpython/bin/sker17',
              'srfpython/bin/poisson.py',
+             'srfpython/bin/brocher.py',
              'srfpython/bin/quickdisp.py',
              ])
