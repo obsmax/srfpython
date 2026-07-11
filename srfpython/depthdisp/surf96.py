@@ -3,16 +3,25 @@ import numpy as np
 
 def unpacksurf96(string):
     """unpack dispersion curves at surf96 format (see Herrmann's doc)"""
-    string = [line.strip() for line in string.split('\n')]
-    if "" in string:
-        string.remove('')
-    npoints = len(string)
+    
+    lines = []
+    for line in string.split('\n'):
+        line = line.strip()
+        
+        if line.startswith('#'):
+            continue
+        if line == "":
+            continue         
+        
+        lines.append(line)
+        
+    npoints = len(lines)
 
     datatypes = ['|U1', '|U1', '|U1', int, float, float, float]
     WAVE, TYPE, FLAG, MODE, PERIOD, VALUE, DVALUE = [np.empty(npoints, dtype=d) for d in datatypes]
     NLC, NLU, NRC, NRU = 0, 0, 0, 0
     for n in range(npoints):
-        l = string[n].split()
+        l = lines[n].split()
         WAVE[n], TYPE[n], FLAG[n] = np.asarray(l[1:4], "|U1")
         MODE[n] = int(l[4])
         PERIOD[n], VALUE[n], DVALUE[n] = np.asarray(l[5:], float)
