@@ -136,7 +136,7 @@ class DepthDispDisplay(object):
                  "vs": dist_scale / time_scale,
                  "rh": density_scale}[which.lower()]
 
-        # dm1d = dm1d.copy()
+        dm1d = dm1d.copy()  # OUI sinon le fait de ploter vp puis vp/vs applique le scaling 2 fois
         dm1d.z *= dist_scale
         dm1d.values *= scale
         dm1d.show(
