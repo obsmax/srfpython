@@ -5,4 +5,4 @@
 HerrMet --optimize -inv
 
 # show the results
-HerrMet --optimize -show y 10
+HerrMet --optimize -show y 10 -conv -plot 0 0

@@ -72,3 +72,13 @@ echo -e "\n    # extract the inversion solution for later use..."
 echo "        bash 150_extract.sh ..."
 bash 150_extract.sh
 
+
+echo -e "\n    # taking the median of the best models decreases the fit, we run an optimization to try to improve the consistency of the final solution ..."
+echo "        bash 200_optimize.sh ..."
+bash 200_optimize.sh
+echo "        bash 201_get_mprior_and_dobs.sh ..."
+bash 201_get_mprior_and_dobs.sh
+echo "        bash 202_run_optimize.sh ..."
+bash 202_run_optimize.sh
+echo "        bash 203a_show_optimization.sh ..."
+bash 203a_show_optimization.sh

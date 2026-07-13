@@ -9,9 +9,9 @@ HerrMet -verbose 0 --optimize -temp
 # in this tuto I edit here below :
 cat << END > _HerrMet.optimize.param
 # Parameter file for the optimization plugin
-# ========== recall the grid parameters
-nx           1
-ny           1
+# ========== recall the grid parameters (pointless for single node)
+nx           1           #
+ny           1           #
 dx           1.000000    # km
 dy           1.000000    # km
 
@@ -21,11 +21,11 @@ datafiles    _HerrMet_data010/_HerrMet.target
 extractfiles _HerrMet_data010/_HerrMet.best_1000_0.00_1.p0.50.mod96
 
 # ========== optimization parameters
-ndecim       1  # downsamp the grid
-newnz        100       # new vertical grid (needed to interpolate the extracted files)
-newdz        0.03      # new vertical grid (needed to interpolate the extracted files)
+ndecim       1          # downsamp the grid
+newnz        100        # new vertical grid (needed to interpolate the extracted files)
+newdz        0.03       # new vertical grid (needed to interpolate the extracted files)
 Lh           1.000000   # horizontal smoothing distance km
-Lv           0.100000   # vertical smoothing distance km
+Lv           0.050000   # vertical smoothing distance km
 vsunc        0.100000   # km/s
 damping      1.000000   # weight of the regularization
 

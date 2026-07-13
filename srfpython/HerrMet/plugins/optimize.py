@@ -4,13 +4,17 @@ from builtins import input
 import sys, glob, os
 import warnings
 import numpy as np
+import matplotlib.pyplot as plt
+print(plt)
 import scipy.sparse as sp
 from scipy.sparse import linalg as splinalg
-from srfpython.depthdisp.depthmodels import depthmodel_from_mod96
+from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_from_arrays
 from srfpython.standalone.multipro8 import Job, MapSync
 from srfpython.depthdisp.dispcurves import surf96reader
 from srfpython.standalone.stdout import waitbarpipe
 from srfpython.HerrMet.datacoders import Datacoder_log, makedatacoder
+from srfpython.HerrMet.paramfile import load_paramfile
+from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay
 from srfpython.HerrMet.optimizetools import ForwardOperator, ModelSmoother, ModelCovarianceMatrix
 from srfpython.utils import Timer
 from srfpython.HerrMet.files import \
@@ -27,7 +31,8 @@ default_option = None
 
 # ------------------------------ autorized_keys
 authorized_keys = ["-h", "-help",
-                   "-temp", "-mprior", "-dobs", "-inv", "-show"]
+                   "-temp", "-mprior", "-dobs", "-inv",
+                   "-show", "-plot", "-conv"]
 
 # ------------------------------ help messages
 short_help = "--optimize   3D optimization plugin"
@@ -41,6 +46,9 @@ long_help = """\
                      created and customized after option -temp
     -dobs            collect the observed dispersion points to fit
     -inv             run the linearized inversion
+    -plot  i i       plot prior, start and optimized modes for one node
+                     provide node indexs iy then ix
+    -conv            show optimization convergence curves
     -show  s f       show a slice accross the prior (from point wise depth inv), 
                      starting and final models
                      provide the slice direction z y or x and the slice value in km
@@ -500,120 +508,209 @@ def optimize(argv, verbose, mapkwargs):
                 print('convergence achieved')
                 break
 
-    # ===============================
-    if "-show" in argv.keys():
-        import matplotlib.pyplot as plt
+    if "-plot" in argv.keys() or "-conv" in argv.keys() or "-show" in argv.keys():
 
-        with np.load(HERRMETOPTIMIZEPRIORFILE) as loader:
-            x = loader['x']
-            y = loader['y']
-            zmid = loader['zmid']
-            xedges = loader['xedges']
-            yedges = loader['yedges']
-            zedges = loader['zedges']
-            vs_prior = loader['Mprior']
+        if "-plot" in argv.keys():
 
-        with np.load(HERRMETOPTIMIZEINVFILE) as loader:
-            vs_0 = loader['M0']
-            vs_sol = loader['Msol']
-            data_costs = loader['data_costs']
-            model_costs = loader['model_costs']
-            total_costs = loader['total_costs']
+            iy, ix = argv['-plot']  # indexs of node to show
+            # iy = ix = 0  # for now
 
-        plt.figure()
+            with np.load(HERRMETOPTIMIZEPRIORFILE) as loader:
+                (nz, ny, nx) = loader['Mprior'].shape
+                i_model = np.ravel_multi_index([iy, ix], (ny, nx))
 
-        plt.plot(data_costs, 'bs-', label="$ \chi_D^2 $") #0.5 * (CDinvdiag * (Dobs - DI) ** 2.0).sum()
-        plt.semilogy(model_costs, 'gs-', label="$ \chi_M^2 $")   ##0.5 * (CM_sparse_lu.solve(MI - M0) * (MI - M0)).sum()  # fails if I use Mprior instead of M0
-        plt.plot(total_costs, 'ro-', label="$ \chi_D^2 + chi_M^2 $")
-        plt.gca().set_xlabel('iteration number')
-        plt.gca().grid(True, linestyle=":")
-        plt.gca().set_ylabel(r'$ \chi $')
-        plt.gca().legend()
+                mprior = loader['Mprior'][:, iy, ix]
+                parameterizer_string = loader['parameterizer_strings'][i_model]
+                parameterizer, logRHOM = load_paramfile(parameterizer_string, verbose=True)
 
-        if argv['-show'][0] == "z":
-            zslice = argv['-show'][1]
-            iz = np.argmin(abs(zmid - zslice))
+            with np.load(HERRMETOPTIMIZEDOBSFILE) as loader:
+                datacoder_string = loader['datacoder_strings'][i_model]
+                datacoder = makedatacoder(datacoder_string, which=Datacoder_log)
+                dobs = loader['Dobs'][i_model * datacoder.freqs.size:(i_model+1) * datacoder.freqs.size]
+                dunc = loader['Dunc'][i_model * datacoder.freqs.size:(i_model+1) * datacoder.freqs.size]
 
-            fig = plt.figure(figsize=(12, 4))
-            ax1 = plt.subplot(131, title="$ Vs^{prior} $",
-                              aspect=1.0, xlabel="x(km)", ylabel="y(km)")
-            ax2 = plt.subplot(132, title="$ Vs^{0} $",
-                              aspect=1.0, xlabel="x(km)", ylabel="y(km)",
-                              sharex=ax1, sharey=ax1)
-            ax3 = plt.subplot(133, title="$ Vs^{sol} $",
-                              aspect=1.0, xlabel="x(km)", ylabel="y(km)",
-                              sharex=ax1, sharey=ax1)
-            fig.suptitle('depth : {:.2f}km'.format(zmid[iz]))
-            cax = fig.add_axes((0.95, 0.3, 0.012, 0.3))
+            with np.load(HERRMETOPTIMIZEINVFILE) as loader:
+                m0 = loader['M0'][:, iy, ix]
+                msol = loader['Msol'][:, iy, ix]
+                d0 = loader['D0'][i_model * datacoder.freqs.size:(i_model+1) * datacoder.freqs.size]
+                dsol = loader['Dsol'][i_model * datacoder.freqs.size:(i_model+1) * datacoder.freqs.size]
+                dprior = loader['Dprior'][i_model * datacoder.freqs.size:(i_model+1) * datacoder.freqs.size]
 
-            vsmin = min([vs[iz, ...].min() for vs in [vs_prior, vs_0, vs_sol]])
-            vsmax = min([vs[iz, ...].max() for vs in [vs_prior, vs_0, vs_sol]])
-            for ax, vs in zip([ax1, ax2, ax3], [vs_prior, vs_0, vs_sol]):
-                coll = ax.pcolormesh(xedges, yedges, vs[iz, ...],
-                              vmin=vsmin, vmax=vsmax,
-                              cmap=plt.get_cmap('jet_r'))
+            dm_prior = depthmodel_from_arrays(*parameterizer.inv(mprior))
+            dm_0 = depthmodel_from_arrays(*parameterizer.inv(m0))
+            dm_sol = depthmodel_from_arrays(*parameterizer.inv(msol))
 
-            plt.colorbar(coll, cax=cax)
-            # plt.ion()
-            plt.show()
-            # input('pause')
+            fig = plt.figure()
+            ddd = DepthDispDisplay(fig=fig, targetfile=datacoder_string)
 
-        elif argv['-show'][0] == "x":
-            xslice = argv['-show'][1]
-            ix = np.argmin(abs(x - xslice))
+            ddd.plotdisp(
+                waves=datacoder.waves,
+                types=datacoder.types,
+                modes=datacoder.modes,
+                freqs=datacoder.freqs,
+                values=datacoder.inv(dobs),
+                dvalues=dunc,
+                color="b", marker="+", ls="none", alpha=1, label="obs")
 
-            fig = plt.figure(figsize=(12, 4))
-            ax1 = plt.subplot(131, title="$ Vs^{prior} $",
-                              xlabel="y(km)", ylabel="z(km)")
-            ax2 = plt.subplot(132, title="$ Vs^{0} $",
-                              xlabel="y(km)", ylabel="z(km)",
-                              sharex=ax1, sharey=ax1)
-            ax3 = plt.subplot(133, title="$ Vs^{sol} $",
-                              xlabel="y(km)", ylabel="z(km)",
-                              sharex=ax1, sharey=ax1)
-            for ax in ax1, ax2, ax3:
-                ax.invert_yaxis()
-            fig.suptitle('x = {:.2f}km'.format(x[ix]))
-            cax = fig.add_axes((0.95, 0.3, 0.012, 0.3))
+            ddd.plotdisp(
+                waves=datacoder.waves,
+                types=datacoder.types,
+                modes=datacoder.modes,
+                freqs=datacoder.freqs,
+                values=datacoder.inv(dprior),
+                color="m", linewidth=3, alpha=1, label="prior")
 
-            vsmin = min([vs[..., ix].min() for vs in [vs_prior, vs_0, vs_sol]])
-            vsmax = min([vs[..., ix].max() for vs in [vs_prior, vs_0, vs_sol]])
-            for ax, vs in zip([ax1, ax2, ax3], [vs_prior, vs_0, vs_sol]):
-                coll = ax.pcolormesh(yedges, zedges, vs[..., ix],
-                                     vmin=vsmin, vmax=vsmax,
-                                     cmap=plt.get_cmap('jet_r'))
+            ddd.plotdisp(
+                waves=datacoder.waves,
+                types=datacoder.types,
+                modes=datacoder.modes,
+                freqs=datacoder.freqs,
+                values=datacoder.inv(d0),
+                color="k", linewidth=1, alpha=1, label="start")
 
-            plt.colorbar(coll, cax=cax)
-            # plt.ion()
-            plt.show()
-            # input('pause')
+            ddd.plotdisp(
+                waves=datacoder.waves,
+                types=datacoder.types,
+                modes=datacoder.modes,
+                freqs=datacoder.freqs,
+                values=datacoder.inv(dsol),
+                color="r", linewidth=3, alpha=1, label="optimized")
 
-        elif argv['-show'][0] == "y":
-            yslice = argv['-show'][1]
-            iy = np.argmin(abs(y - yslice))
+            ddd.plot_depthmodel(dm_prior, color="m", linewidth=3, alpha=1, label="prior")
+            ddd.plot_depthmodel(dm_0, color="k", linewidth=1, alpha=1, label="start")
+            ddd.plot_depthmodel(dm_sol, color="r", linewidth=3, alpha=1, label="optimized")
+            fig.axes[0].legend()
+            # plt.show()
 
-            fig = plt.figure(figsize=(12, 4))
-            ax1 = plt.subplot(131, title="$ Vs^{prior} $",
-                              xlabel="y(km)", ylabel="z(km)")
-            ax2 = plt.subplot(132, title="$ Vs^{0} $",
-                              xlabel="y(km)", ylabel="z(km)",
-                              sharex=ax1, sharey=ax1)
-            ax3 = plt.subplot(133, title="$ Vs^{sol} $",
-                              xlabel="y(km)", ylabel="z(km)",
-                              sharex=ax1, sharey=ax1)
-            for ax in ax1, ax2, ax3:
-                ax.invert_yaxis()
-            fig.suptitle('y = {:.2f}km'.format(y[iy]))
-            cax = fig.add_axes((0.95, 0.3, 0.012, 0.3))
+        if "-conv" in argv.keys():
 
-            vsmin = min([vs[:, iy, :].min() for vs in [vs_prior, vs_0, vs_sol]])
-            vsmax = min([vs[:, iy, :].max() for vs in [vs_prior, vs_0, vs_sol]])
-            for ax, vs in zip([ax1, ax2, ax3], [vs_prior, vs_0, vs_sol]):
-                coll = ax.pcolormesh(xedges, zedges, vs[:, iy, :],
-                                     vmin=vsmin, vmax=vsmax,
-                                     cmap=plt.get_cmap('jet_r'))
+            with np.load(HERRMETOPTIMIZEINVFILE) as loader:
+                data_costs = loader['data_costs']
+                model_costs = loader['model_costs']
+                total_costs = loader['total_costs']
 
-            plt.colorbar(coll, cax=cax)
-            # plt.ion()
-            plt.show()
-            # input('pause')
+            plt.figure()
+            plt.plot(data_costs, 'bs-', label="$ \chi_D^2 $") #0.5 * (CDinvdiag * (Dobs - DI) ** 2.0).sum()
+            plt.semilogy(model_costs, 'gs-', label="$ \chi_M^2 $")   ##0.5 * (CM_sparse_lu.solve(MI - M0) * (MI - M0)).sum()  # fails if I use Mprior instead of M0
+            plt.plot(total_costs, 'ro-', label="$ \chi_D^2 + chi_M^2 $")
+            plt.gca().set_xlabel('iteration number')
+            plt.gca().grid(True, linestyle=":")
+            plt.gca().set_ylabel(r'$ \chi $')
+            plt.gca().legend()
+
+        if "-show" in argv.keys():
+
+            with np.load(HERRMETOPTIMIZEPRIORFILE) as loader:
+                x = loader['x']
+                y = loader['y']
+                zmid = loader['zmid']
+                xedges = loader['xedges']
+                yedges = loader['yedges']
+                zedges = loader['zedges']
+                vs_prior = loader['Mprior']
+
+            with np.load(HERRMETOPTIMIZEINVFILE) as loader:
+                vs_0 = loader['M0']
+                vs_sol = loader['Msol']
+                # data_costs = loader['data_costs']
+                # model_costs = loader['model_costs']
+                # total_costs = loader['total_costs']
+            #
+            # plt.figure()
+            # plt.plot(data_costs, 'bs-', label="$ \chi_D^2 $") #0.5 * (CDinvdiag * (Dobs - DI) ** 2.0).sum()
+            # plt.semilogy(model_costs, 'gs-', label="$ \chi_M^2 $")   ##0.5 * (CM_sparse_lu.solve(MI - M0) * (MI - M0)).sum()  # fails if I use Mprior instead of M0
+            # plt.plot(total_costs, 'ro-', label="$ \chi_D^2 + chi_M^2 $")
+            # plt.gca().set_xlabel('iteration number')
+            # plt.gca().grid(True, linestyle=":")
+            # plt.gca().set_ylabel(r'$ \chi $')
+            # plt.gca().legend()
+
+            if argv['-show'][0] == "z":
+                zslice = argv['-show'][1]
+                iz = np.argmin(abs(zmid - zslice))
+
+                fig = plt.figure(figsize=(12, 4))
+                ax1 = plt.subplot(131, title="$ Vs^{prior} $",
+                                  aspect=1.0, xlabel="x(km)", ylabel="y(km)")
+                ax2 = plt.subplot(132, title="$ Vs^{0} $",
+                                  aspect=1.0, xlabel="x(km)", ylabel="y(km)",
+                                  sharex=ax1, sharey=ax1)
+                ax3 = plt.subplot(133, title="$ Vs^{sol} $",
+                                  aspect=1.0, xlabel="x(km)", ylabel="y(km)",
+                                  sharex=ax1, sharey=ax1)
+                fig.suptitle('depth : {:.2f}km'.format(zmid[iz]))
+                cax = fig.add_axes((0.95, 0.3, 0.012, 0.3))
+
+                vsmin = min([vs[iz, ...].min() for vs in [vs_prior, vs_0, vs_sol]])
+                vsmax = min([vs[iz, ...].max() for vs in [vs_prior, vs_0, vs_sol]])
+                for ax, vs in zip([ax1, ax2, ax3], [vs_prior, vs_0, vs_sol]):
+                    coll = ax.pcolormesh(xedges, yedges, vs[iz, ...],
+                                  vmin=vsmin, vmax=vsmax,
+                                  cmap=plt.get_cmap('jet_r'))
+
+                plt.colorbar(coll, cax=cax)
+                # plt.ion()
+                # plt.show()
+                # input('pause')
+
+            elif argv['-show'][0] == "x":
+                xslice = argv['-show'][1]
+                ix = np.argmin(abs(x - xslice))
+
+                fig = plt.figure(figsize=(12, 4))
+                ax1 = plt.subplot(131, title="$ Vs^{prior} $",
+                                  xlabel="y(km)", ylabel="z(km)")
+                ax2 = plt.subplot(132, title="$ Vs^{0} $",
+                                  xlabel="y(km)", ylabel="z(km)",
+                                  sharex=ax1, sharey=ax1)
+                ax3 = plt.subplot(133, title="$ Vs^{sol} $",
+                                  xlabel="y(km)", ylabel="z(km)",
+                                  sharex=ax1, sharey=ax1)
+                for ax in ax1, ax2, ax3:
+                    ax.invert_yaxis()
+                fig.suptitle('x = {:.2f}km'.format(x[ix]))
+                cax = fig.add_axes((0.95, 0.3, 0.012, 0.3))
+
+                vsmin = min([vs[..., ix].min() for vs in [vs_prior, vs_0, vs_sol]])
+                vsmax = min([vs[..., ix].max() for vs in [vs_prior, vs_0, vs_sol]])
+                for ax, vs in zip([ax1, ax2, ax3], [vs_prior, vs_0, vs_sol]):
+                    coll = ax.pcolormesh(yedges, zedges, vs[..., ix],
+                                         vmin=vsmin, vmax=vsmax,
+                                         cmap=plt.get_cmap('jet_r'))
+
+                plt.colorbar(coll, cax=cax)
+                # plt.ion()
+                # plt.show()
+                # input('pause')
+
+            elif argv['-show'][0] == "y":
+                yslice = argv['-show'][1]
+                iy = np.argmin(abs(y - yslice))
+
+                fig = plt.figure(figsize=(12, 4))
+                ax1 = plt.subplot(131, title="$ Vs^{prior} $",
+                                  xlabel="y(km)", ylabel="z(km)")
+                ax2 = plt.subplot(132, title="$ Vs^{0} $",
+                                  xlabel="y(km)", ylabel="z(km)",
+                                  sharex=ax1, sharey=ax1)
+                ax3 = plt.subplot(133, title="$ Vs^{sol} $",
+                                  xlabel="y(km)", ylabel="z(km)",
+                                  sharex=ax1, sharey=ax1)
+                for ax in ax1, ax2, ax3:
+                    ax.invert_yaxis()
+                fig.suptitle('y = {:.2f}km'.format(y[iy]))
+                cax = fig.add_axes((0.95, 0.3, 0.012, 0.3))
+
+                vsmin = min([vs[:, iy, :].min() for vs in [vs_prior, vs_0, vs_sol]])
+                vsmax = min([vs[:, iy, :].max() for vs in [vs_prior, vs_0, vs_sol]])
+                for ax, vs in zip([ax1, ax2, ax3], [vs_prior, vs_0, vs_sol]):
+                    coll = ax.pcolormesh(xedges, zedges, vs[:, iy, :],
+                                         vmin=vsmin, vmax=vsmax,
+                                         cmap=plt.get_cmap('jet_r'))
+
+                plt.colorbar(coll, cax=cax)
+                # plt.ion()
+                # plt.show()
+                # input('pause')
+
+        plt.show()

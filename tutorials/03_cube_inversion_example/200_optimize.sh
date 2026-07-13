@@ -20,8 +20,8 @@ extractfiles ./inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.best_1000_
 
 # ========== optimization parameters
 ndecim       1    # downsamp the grid
-newnz        10   # new vertical grid (needed to interpolate the extracted files)
-newdz        0.33 # new vertical grid (needed to interpolate the extracted files)
+newnz        60   # new vertical grid (needed to interpolate the extracted files)
+newdz        0.05 # new vertical grid (needed to interpolate the extracted files)
 Lh           1.0  # horizontal smoothing distance km
 Lv           0.5  # vertical smoothing distance km
 vsunc        0.1  # km/s
