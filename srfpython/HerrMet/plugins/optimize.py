@@ -32,7 +32,7 @@ default_option = None
 # ------------------------------ autorized_keys
 authorized_keys = ["-h", "-help",
                    "-temp", "-mprior", "-dobs", "-inv",
-                   "-show", "-plot", "-conv"]
+                   "-show", "-plot", "-conv", "-export"]
 
 # ------------------------------ help messages
 short_help = "--optimize   3D optimization plugin"
@@ -52,6 +52,7 @@ long_help = """\
     -show  s f       show a slice accross the prior (from point wise depth inv), 
                      starting and final models
                      provide the slice direction z y or x and the slice value in km
+    -export i i      save optimized model at mod96 format                     
     -h, -help        display the help message for this plugin 
 """.format(default_option=default_option)
 
@@ -507,6 +508,20 @@ def optimize(argv, verbose, mapkwargs):
             if np.abs(DM).max() <= 0.01:
                 print('convergence achieved')
                 break
+
+    if "-export" in argv.keys():
+        iy, ix = argv['-export']  # indexs of node to export
+
+        with np.load(HERRMETOPTIMIZEPRIORFILE) as loader:
+            (nz, ny, nx) = loader['Mprior'].shape
+            i_model = np.ravel_multi_index([iy, ix], (ny, nx))
+            parameterizer_string = loader['parameterizer_strings'][i_model]
+            parameterizer, logRHOM = load_paramfile(parameterizer_string, verbose=True)
+
+        with np.load(HERRMETOPTIMIZEINVFILE) as loader:
+            msol = loader['Msol'][:, iy, ix]
+        dm_sol = depthmodel_from_arrays(*parameterizer.inv(msol))
+        dm_sol.write96("_HerrMet.optimized.mod96")
 
     if "-plot" in argv.keys() or "-conv" in argv.keys() or "-show" in argv.keys():
 
