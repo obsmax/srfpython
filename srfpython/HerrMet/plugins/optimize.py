@@ -12,7 +12,7 @@ from srfpython.depthdisp.depthmodels import depthmodel_from_mod96, depthmodel_fr
 from srfpython.standalone.multipro8 import Job, MapSync
 from srfpython.depthdisp.dispcurves import surf96reader
 from srfpython.standalone.stdout import waitbarpipe
-from srfpython.HerrMet.datacoders import Datacoder_log, makedatacoder
+from srfpython.HerrMet.datacoders import Datacoder_log, makedatacoder, Datacoder
 from srfpython.HerrMet.paramfile import load_paramfile
 from srfpython.depthdisp.depthdispdisplay import DepthDispDisplay
 from srfpython.HerrMet.optimizetools import ForwardOperator, ModelSmoother, ModelCovarianceMatrix
@@ -543,13 +543,14 @@ def optimize(argv, verbose, mapkwargs):
             fig = plt.figure()
             ddd = DepthDispDisplay(fig=fig, targetfile=datacoder_string)
 
+            values, dvalues = datacoder.targetinv(dobs=dobs, CDinv=dunc**-2.) # nb : dunc = _CDinv ** -0.5 => CDinv = dunc ** -2.
             ddd.plotdisp(
                 waves=datacoder.waves,
                 types=datacoder.types,
                 modes=datacoder.modes,
                 freqs=datacoder.freqs,
-                values=datacoder.inv(dobs),
-                dvalues=dunc,
+                values=values,  # nb : dobs is ln(values) => values is exp(dobs)
+                dvalues=dvalues,  # nb : dunc corresponds to the diag terms of CDinv, must be reconverted to velocity
                 color="b", marker="+", ls="none", alpha=1, label="obs")
 
             ddd.plotdisp(

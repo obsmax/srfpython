@@ -39,9 +39,18 @@ class Datacoder(object):
         self.dvalues = dvalues  # target dispersion
 
     def target(self):
-        dobs = self.values  # target data array
-        CDinv = self.dvalues ** -2.  # target data covariance (inverted, diagonal terms)
+        dobs = self.values.copy()  # target data array
+        # dvalues corresponds to sigma_velocity
+        # var === dvalues**2
+        # 1/var = Diag(Cdinv) = dvalues**-2
+        CDinv = self.dvalues.copy() ** -2.  # target data covariance (inverted, diagonal terms)
         return dobs, CDinv
+
+    def targetinv(self, dobs, CDinv):
+        """do the opposite of target for a given dobs Cdinv"""
+        values = self.inv(dobs)
+        dvalues = CDinv ** -0.5
+        return values, dvalues
 
     def __call__(self, values):
         """converts dispersion values into a data array d"""
@@ -81,6 +90,17 @@ class Datacoder_log(Datacoder):
         dobs = np.log(self.values)
         CDinv = (self.dvalues / self.values) ** -2.
         return dobs, CDinv
+
+    def targetinv(self, dobs, CDinv):
+        """do the opposite of target for a given dobs Cdinv"""
+        values = self.inv(dobs)
+        # CDinv = (self.dvalues / self.values) ** -2.
+        # CDinv = (self.values / self.dvalues) ** 2.
+        # CDinv ** 0.5 = (self.values / self.dvalues)
+        # self.dvalues  = (self.values / CDinv ** 0.5)
+        # self.dvalues  = (self.values * CDinv ** -0.5)
+        dvalues = (values * CDinv ** -0.5)
+        return values, dvalues
 
     def __call__(self, values):
         assert len(values) == len(self.values)
