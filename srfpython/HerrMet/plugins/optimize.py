@@ -28,10 +28,11 @@ except ImportError:
 
 # ------------------------------ defaults
 default_option = None
+default_ddc = 0.005  # accuracy of the forward solver, too low => slower, too high : risk to miss modes
 
 # ------------------------------ autorized_keys
 authorized_keys = ["-h", "-help",
-                   "-temp", "-mprior", "-dobs", "-inv",
+                   "-temp", "-mprior", "-dobs", "-inv",  "-ddc",
                    "-show", "-plot", "-conv", "-export"]
 
 # ------------------------------ help messages
@@ -52,9 +53,11 @@ long_help = """\
     -show  s f       show a slice accross the prior (from point wise depth inv), 
                      starting and final models
                      provide the slice direction z y or x and the slice value in km
-    -export i i      save optimized model at mod96 format                     
+    -export i i      save optimized model at mod96 format
+    -ddc             solver accuracy, default {default_ddc}
     -h, -help        display the help message for this plugin 
-""".format(default_option=default_option)
+""".format(default_option=default_option,
+           default_ddc=default_ddc)
 
 # ------------------------------ example usage
 example = """\
@@ -78,25 +81,37 @@ def check_keys(argv):
 
 OPTIMIZEPARAMTXT = """
 # Parameter file for the optimization plugin
-# ========== recall the grid parameters
+# ========== Horizontal grid parameters
+# assume that an inversion has run for each node in a cartesian grid defined by their nodes pairs (iy, ix)
+# for a single inversion point use nx=ny=1, dx=dy=1.0 
 nx           {nx:d}
 ny           {ny:d}
 dx           {dx:f}    # km
 dy           {dy:f}    # km
 
 # ========== path to the point-wise inversion data and results
-# formattable strings including reference to iy and ix
-targetfiles  {targetfiles:s}    
-extractfiles {extractfiles:s}   
+# use formattable strings including reference to iy and ix.
+
+# Dispersion curve of each node, by default you should point to the _Herrmet*/_Herrmet.target
+targetfiles  {targetfiles:s}
+
+# Which model to use as prior in each node (iy, ix)
+# point either to the best fitting models (e.g. rank0) or to the median of n best or last models
+# nb the start model is not the prior but the smooth version of it     
+priorfiles {priorfiles:s}
+
+# Posterior uncertainty of McMC can be used as prior uncertainty of the optimization process
+lowerfiles {lowerfiles:s}
+upperfiles {upperfiles:s}
 
 # ========== optimization parameters
-ndecim       {ndecim:d}  # downsamp the grid
-newnz        {newnz:f}   # new vertical grid (needed to interpolate the extracted files)
-newdz        {newdz:f}   # new vertical grid (needed to interpolate the extracted files)
-Lh           {Lh:f}   # horizontal smoothing distance km
-Lv           {Lv:f}   # vertical smoothing distance km
-vsunc        {vsunc:f}   # km/s
-damping      {damping:f}   # weight of the regularization
+ndecim       {ndecim:<8d}   # downsamp the grid, i.e. discard nodes of the horizontal grid
+newnz        {newnz:<8d}   # new vertical grid (needed to interpolate the extracted files)
+newdz        {newdz:<8f}   # new vertical grid (needed to interpolate the extracted files)
+Lh           {Lh:<8f}   # horizontal smoothing distance km
+Lv           {Lv:<8f}   # vertical smoothing distance km
+vsunc        {vsunc:<8f}   # velocity uncertainty km/s, or scaling factor to prior uncertainty if lower/upper files are provided
+damping      {damping:<8f}   # weight of the regularization
 """
 
 
@@ -119,10 +134,12 @@ def load_optimize_parameters():
             if l.startswith('vsunc'):     vsunc = float(l.split()[1])
             if l.startswith('damping'): damping = float(l.split()[1])
 
-            if l.startswith('extractfiles'): extractfiles = l.split()[1]
+            if l.startswith('priorfiles'): priorfiles = l.split()[1]
+            if l.startswith('lowerfiles'): lowerfiles = l.split()[1]
+            if l.startswith('upperfiles'): upperfiles = l.split()[1]
             if l.startswith(('datafiles', 'targetfiles')): datafiles = l.split()[1]
 
-    return nx, ny, newnz, dx, dy, newdz, ndecim, Lh, Lv, vsunc, damping, extractfiles, datafiles
+    return nx, ny, newnz, dx, dy, newdz, ndecim, Lh, Lv, vsunc, damping, priorfiles, lowerfiles, upperfiles, datafiles
 
 
 def add_to_npz(npzfile, allow_pickle=False, **kwargs):
@@ -155,6 +172,8 @@ def optimize(argv, verbose, mapkwargs):
         print(long_help)
         return
 
+    ddc = float(argv['-ddc'][0]) if "-ddc" in argv.keys() else default_ddc
+
     check_keys(argv)
 
     # ===============================
@@ -163,7 +182,9 @@ def optimize(argv, verbose, mapkwargs):
               nx=1, ny=1, newnz=1,
               dx=1., dy=1.0, newdz=1.0,
               targetfiles="./path/to/inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.target",
-              extractfiles="./path/to/inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.best_1000_0_1.p0.50.mod96",
+              priorfiles="./path/to/inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.best_1000_0_1.p0.50.mod96",
+              lowerfiles="./path/to/inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.best_1000_0_1.p0.16.mod96",
+              upperfiles="./path/to/inversion/_HerrMet_node_iy{iy:03d}_ix{ix:03d}/_HerrMet.best_1000_0_1.p0.84.mod96",
               ndecim=1, Lh=1.0, Lv=0.5, vsunc=0.1, damping=1.0)
 
           if verbose:
@@ -188,8 +209,9 @@ def optimize(argv, verbose, mapkwargs):
         nx, ny, newnz, \
             dx, dy, newdz, ndecim, \
             Lh, Lv, vsunc, damping, \
-            extractfiles, datafiles = \
-            load_optimize_parameters()
+            priorfiles, lowerfiles, upperfiles, \
+            datafiles = \
+                load_optimize_parameters()
 
         x = (np.arange(nx) * dx)[::ndecim]
         y = (np.arange(ny) * dy)[::ndecim]
@@ -206,17 +228,38 @@ def optimize(argv, verbose, mapkwargs):
         vs_cube = np.zeros((len(ztop), len(y), len(x)), float)
         vsunc_cube = np.zeros_like(vs_cube)
 
+        def first_file(path):
+            ls = glob.glob(path)
+            if len(ls) >= 1: return ls[0]
+            else: return None
+
         for i, iy in enumerate(iys):
             for j, ix in enumerate(ixs):
                 try:
-                    m96file = extractfiles.format(iy=iy, ix=ix)
-                    print('loading {}'.format(m96file))
-                    dm = depthmodel_from_mod96(m96file)
+
+                    m96file_prior = first_file(priorfiles.format(iy=iy, ix=ix))
+                    print('loading {}'.format(m96file_prior))
+                    dm_prior = depthmodel_from_mod96(m96file_prior)
+                    
+                    m96file_lower = first_file(lowerfiles.format(iy=iy, ix=ix))
+                    m96file_upper = first_file(upperfiles.format(iy=iy, ix=ix))
+                    if m96file_lower is None or m96file_upper is None:
+                        print(f'using constant prior uncertainty on vs : {vsunc}km/s')
+                        dm_lower = None
+                        dm_upper = None
+                    else:
+                        print('loading {}'.format(m96file_lower))
+                        print('loading {}'.format(m96file_upper))
+                        dm_lower = depthmodel_from_mod96(m96file_lower)
+                        dm_upper = depthmodel_from_mod96(m96file_upper)
+
                 except Exception as e:
                     raise e
 
-                vs_cube[:, i, j] = dm.vs.interp(z=zmid)
+                vs_cube[:, i, j] = dm_prior.vs.interp(z=zmid)
                 vsunc_cube[:, i, j] = vsunc
+                if dm_lower is not None and dm_upper is not None:
+                    vsunc_cube[:, i, j] *=  0.5 * (dm_upper.vs.interp(z=zmid) - dm_lower.vs.interp(z=zmid))
 
         # ===============
         iz, jy, kx = np.mgrid[:nz, :ny, :nx]
@@ -276,8 +319,8 @@ def optimize(argv, verbose, mapkwargs):
             parameterizer_string = parameter_string_header
 
             for i in range(len(ztop)):
-                # SET VINF < VS extracted from pointwise inv < VSUP
-                # such as parameterizer.MMEAN corresponds to the extracted vs
+                # SET VINF < {VS extracted from pointwise inv} < VSUP
+                # such that parameterizer.MMEAN corresponds to the extracted vs
                 parameterizer_string += "VS{} {} {}\n".format(i, vs[i] - 0.01, vs[i] + 0.01)
             # parameterizer = load_paramfile(parameter_string, verbose=False)[0]
             return iy, jx, parameterizer_string
@@ -313,11 +356,12 @@ def optimize(argv, verbose, mapkwargs):
     if "-dobs" in argv.keys():
 
         # ==================== read the parameter file
-        nx, ny, newnz, \
+        (nx, ny, newnz, \
             dx, dy, newdz, ndecim, \
             Lh, Lv, vsunc, damping, \
-            extractfiles, datafiles = \
-            load_optimize_parameters()
+            priorfiles, lowerfiles, upperfiles, \
+            datafiles) = \
+                load_optimize_parameters()
 
         # x = (np.arange(nx) * dx)[::ndecim]
         # y = (np.arange(ny) * dy)[::ndecim]
@@ -440,6 +484,7 @@ def optimize(argv, verbose, mapkwargs):
             parameterizer_strings=parameterizer_strings,
             datacoder_strings=datacoder_strings,
             nx=nx, ny=ny, nz=nz, Nobs=Nobs,
+            ddc=ddc,
             **mapkwargs)
 
         Dprior = g(Mprior)
@@ -521,7 +566,7 @@ def optimize(argv, verbose, mapkwargs):
         with np.load(HERRMETOPTIMIZEINVFILE) as loader:
             msol = loader['Msol'][:, iy, ix]
         dm_sol = depthmodel_from_arrays(*parameterizer.inv(msol))
-        dm_sol.write96("_HerrMet.optimized.mod96")
+        dm_sol.write96(f"_optimized_iy{iy:03d}_ix{ix:03d}.mod96")
 
     if "-plot" in argv.keys() or "-conv" in argv.keys() or "-show" in argv.keys():
 
@@ -535,6 +580,8 @@ def optimize(argv, verbose, mapkwargs):
                 i_model = np.ravel_multi_index([iy, ix], (ny, nx))
 
                 mprior = loader['Mprior'][:, iy, ix]
+                munc = loader['Munc'][:, iy, ix]
+
                 parameterizer_string = loader['parameterizer_strings'][i_model]
                 parameterizer, logRHOM = load_paramfile(parameterizer_string, verbose=True)
 
@@ -552,6 +599,8 @@ def optimize(argv, verbose, mapkwargs):
                 dprior = loader['Dprior'][i_model * datacoder.freqs.size:(i_model+1) * datacoder.freqs.size]
 
             dm_prior = depthmodel_from_arrays(*parameterizer.inv(mprior))
+            dm_lower = depthmodel_from_arrays(*parameterizer.inv((mprior-munc).clip(0.0001, np.inf)))
+            dm_upper = depthmodel_from_arrays(*parameterizer.inv(mprior+munc))
             dm_0 = depthmodel_from_arrays(*parameterizer.inv(m0))
             dm_sol = depthmodel_from_arrays(*parameterizer.inv(msol))
 
@@ -593,6 +642,9 @@ def optimize(argv, verbose, mapkwargs):
                 color="r", linewidth=3, alpha=1, label="optimized")
 
             ddd.plot_depthmodel(dm_prior, color="m", linewidth=3, alpha=1, label="prior")
+            ddd.plot_depthmodel(dm_lower, color="m", linewidth=1, alpha=1)
+            ddd.plot_depthmodel(dm_upper, color="m", linewidth=1, alpha=1)
+
             ddd.plot_depthmodel(dm_0, color="k", linewidth=1, alpha=1, label="start")
             ddd.plot_depthmodel(dm_sol, color="r", linewidth=3, alpha=1, label="optimized")
             fig.axes[0].legend()

@@ -20,11 +20,13 @@ class ForwardOperator(object):
     def __init__(self,
                  parameterizer_strings, datacoder_strings,
                  nx, ny, nz, Nobs,
+                 ddc=0.005,
                  verbose=True, **mapkwargs):
 
         self.mapkwargs = mapkwargs
         self.nx, self.ny, self.nz = nx, ny, nz
         self.Nobs = Nobs  # number of dispersion point per node of the grid
+        self.ddc = ddc
 
         def job_generator():
             ls = zip(parameterizer_strings, datacoder_strings)
@@ -35,7 +37,7 @@ class ForwardOperator(object):
             parameterizer = load_paramfile(parameterizer_string, verbose=False)[0]
             datacoder = makedatacoder(datacoder_string, which=Datacoder_log)
 
-            theory = Theory(parameterizer=parameterizer, datacoder=datacoder)
+            theory = Theory(parameterizer=parameterizer, datacoder=datacoder, ddc=ddc)
 
             return nnode, theory
 

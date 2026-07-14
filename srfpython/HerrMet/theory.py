@@ -97,10 +97,9 @@ class Theory(object):
                 # probably because some freq points are above the cut off period
                 warnings.warn('g(m+dm) contains nans of infs')
                 # raise ValueError('g(m+dm) contains nans of infs')
-
             fd[:, j] = (gmj - gm) / deltam[j]
 
-        fd[np.isnan(fd)] = 0.
+        fd[np.isnan(fd) | np.isinf(fd)] = 0.
         return fd
 
 
