@@ -277,33 +277,34 @@ class HerrmannCallerBasis(object):
             raise CPiSDomainError('Z VP, VS, RH must be the same length')  # assert n == len(vp) == len(vs) == len(rh)
 
         if (np.isinf(ztop) | np.isnan(ztop)).any():
-            raise CPiSDomainError('got inapropriate values for Z (%s)' % str(ztop))
+            raise CPiSDomainError('got inapropriate values for Z (dimless):(%s)' % str(ztop))
 
         Ibad = ((ztop[1:] - ztop[:-1]) / ztop[-1] < 0.001)
         if Ibad.any():
             H = ztop[1:] - ztop[:-1]
             raise CPiSDomainError(
                 'Z must be growing, layers must be at least '
-                '0.001 times the finite layer, got %s (%s)' % (str(ztop), str(H[Ibad])))
+                '0.001 times the finite layer, '
+                'got %s (%s)' % (str(ztop), str(H[Ibad])))
 
         if (np.isinf(vs) | np.isnan(vs)).any():
-            raise CPiSDomainError('vs value error %s' % str(vs))
+            raise CPiSDomainError('vs value error (dimless) %s' % str(vs))
 
         if len(vs) > 1 and not (vs[1:] > 0.08).all():
             # vs[0] can be negative if a water layer exists
-            raise CPiSDomainError('vs domain error %s' % str(vs))
+            raise CPiSDomainError('vs domain error (dimless) %s' % str(vs))
         
         if (np.isinf(vp) | np.isnan(vp)).any():
-            raise CPiSDomainError('vp value error %s' % str(vp))
+            raise CPiSDomainError('vp value error (dimless) %s' % str(vp))
 
         if not (vp > vs * (4. / 3.) ** 0.5).all():
-            raise CPiSDomainError('vp over vs domain error %s' % str(vp / vs))
+            raise CPiSDomainError('vp over vs domain error (dimless) %s' % str(vp / vs))
 
         if (np.isinf(rh) | np.isnan(rh)).any():
-            raise CPiSDomainError('rh value error %s' % str(rh))
+            raise CPiSDomainError('rh value error (dimless) %s' % str(rh))
 
         if not np.all((rh > 0.)):
-            raise CPiSDomainError('density domain error : %s' % str(rh))
+            raise CPiSDomainError('density domain error (dimless) : %s' % str(rh))
 
         out = "%d\n" % n + \
               ("%f " * (n - 1)) % tuple(ztop[1:] - ztop[:-1]) + "\n" + \
