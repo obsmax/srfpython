@@ -1,2 +1,3 @@
-converted to fortran90 using
-https://fortran.uk/plusfortonline.php
+This program is modified after parts of Computing Program in Seismology (CPS)
+From Herrmann R. B.
+Please refer to the original software in case of any doubt
